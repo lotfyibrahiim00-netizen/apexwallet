@@ -1399,22 +1399,300 @@ function initApp() {
     showToast('Exported CSV file!', 'success');
   };
 
+  // ==========================================
+  // PIN SECURITY & BIOMETRIC LOCK CONTROLLER
+  // ==========================================
+  const pinOverlay = document.getElementById('pin-lock-overlay');
+  const pinTitle = document.getElementById('pin-lock-title');
+  const pinSubtitle = document.getElementById('pin-lock-subtitle');
+  const pinDotsContainer = document.getElementById('pin-dots-container');
+  const pinDots = document.querySelectorAll('.pin-dot');
+  const pinFeedback = document.getElementById('pin-feedback-msg');
+  const pinBiometricBtn = document.getElementById('pin-biometric-btn');
+  const pinBackspaceBtn = document.getElementById('pin-backspace-btn');
+  const pinKeyButtons = document.querySelectorAll('[data-pin-key]');
+
+  let enteredPin = '';
+  let tempFirstPin = '';
+  let tempOldPin = '';
+  let pinFlow = 'unlock'; // 'unlock' | 'setup_initial' | 'setup_confirm' | 'change_old' | 'change_new' | 'change_confirm'
+  let isPinBusy = false;
+
+  function updatePinDots() {
+    pinDots.forEach((dot, idx) => {
+      if (idx < enteredPin.length) {
+        dot.classList.add('filled');
+      } else {
+        dot.classList.remove('filled');
+      }
+      dot.classList.remove('error', 'success');
+    });
+  }
+
+  function flashPinDots(statusClass) {
+    pinDots.forEach(dot => {
+      dot.classList.remove('error', 'success');
+      dot.classList.add(statusClass);
+    });
+  }
+
+  function triggerPinError(msg) {
+    if (pinFeedback) {
+      pinFeedback.textContent = msg;
+      pinFeedback.classList.remove('opacity-0');
+    }
+    flashPinDots('error');
+    if (pinDotsContainer) {
+      pinDotsContainer.classList.add('pin-shake');
+      setTimeout(() => pinDotsContainer.classList.remove('pin-shake'), 450);
+    }
+    isPinBusy = true;
+    setTimeout(() => {
+      enteredPin = '';
+      updatePinDots();
+      isPinBusy = false;
+      if (pinFeedback) pinFeedback.classList.add('opacity-0');
+    }, 600);
+  }
+
+  function showPinLock(flowOverride) {
+    if (!pinOverlay) return;
+    const isConfigured = window.WalletSecurity ? window.WalletSecurity.isConfigured() : false;
+
+    if (flowOverride) {
+      pinFlow = flowOverride;
+    } else {
+      pinFlow = isConfigured ? 'unlock' : 'setup_initial';
+    }
+
+    enteredPin = '';
+    tempFirstPin = '';
+    tempOldPin = '';
+    updatePinDots();
+    if (pinFeedback) pinFeedback.classList.add('opacity-0');
+
+    if (pinFlow === 'setup_initial') {
+      if (pinTitle) pinTitle.textContent = 'Create Security PIN';
+      if (pinSubtitle) pinSubtitle.textContent = 'Choose a 4-digit PIN to encrypt your wallet';
+    } else if (pinFlow === 'change_old') {
+      if (pinTitle) pinTitle.textContent = 'Current Security PIN';
+      if (pinSubtitle) pinSubtitle.textContent = 'Enter your current 4-digit PIN';
+    } else {
+      if (pinTitle) pinTitle.textContent = 'ApexWallet Security';
+      if (pinSubtitle) pinSubtitle.textContent = 'Enter your 4-digit PIN to access your vault';
+    }
+
+    pinOverlay.classList.remove('opacity-0', 'pointer-events-none');
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+
+    // Check biometric availability
+    if (window.WalletSecurity && typeof window.WalletSecurity.isBiometricsAvailable === 'function') {
+      window.WalletSecurity.isBiometricsAvailable().then(avail => {
+        if (!avail && pinBiometricBtn) {
+          pinBiometricBtn.style.visibility = 'hidden';
+        }
+      });
+    }
+  }
+
+  function hidePinLock() {
+    if (!pinOverlay) return;
+    pinOverlay.classList.add('opacity-0', 'pointer-events-none');
+    enteredPin = '';
+    updatePinDots();
+  }
+
+  async function handlePinDigit(digit) {
+    if (isPinBusy || enteredPin.length >= 4) return;
+    enteredPin += digit;
+    updatePinDots();
+
+    if (enteredPin.length === 4) {
+      isPinBusy = true;
+      const currentInput = enteredPin;
+
+      try {
+        if (pinFlow === 'setup_initial') {
+          tempFirstPin = currentInput;
+          enteredPin = '';
+          pinFlow = 'setup_confirm';
+          if (pinTitle) pinTitle.textContent = 'Confirm Security PIN';
+          if (pinSubtitle) pinSubtitle.textContent = 'Re-enter your 4-digit PIN to verify';
+          updatePinDots();
+          isPinBusy = false;
+          return;
+        }
+
+        if (pinFlow === 'setup_confirm') {
+          if (currentInput === tempFirstPin) {
+            flashPinDots('success');
+            await window.WalletSecurity.setupPin(currentInput);
+            showToast('Security PIN created & vault encrypted!', 'success');
+            setTimeout(() => {
+              hidePinLock();
+              isPinBusy = false;
+              renderCurrentView();
+            }, 300);
+          } else {
+            triggerPinError('PINs do not match. Try again.');
+            pinFlow = 'setup_initial';
+            if (pinTitle) pinTitle.textContent = 'Create Security PIN';
+            if (pinSubtitle) pinSubtitle.textContent = 'Choose a 4-digit PIN to encrypt your wallet';
+          }
+          return;
+        }
+
+        if (pinFlow === 'unlock') {
+          const res = await window.WalletSecurity.unlock(currentInput);
+          if (res.success) {
+            flashPinDots('success');
+            store.loadFromDecrypted(res.data);
+            showToast('Wallet unlocked', 'info');
+            setTimeout(() => {
+              hidePinLock();
+              isPinBusy = false;
+              renderCurrentView();
+            }, 250);
+          } else {
+            triggerPinError('Incorrect PIN. Please try again.');
+          }
+          return;
+        }
+
+        if (pinFlow === 'change_old') {
+          const res = await window.WalletSecurity.unlock(currentInput);
+          if (res.success) {
+            flashPinDots('success');
+            tempOldPin = currentInput;
+            enteredPin = '';
+            pinFlow = 'change_new';
+            if (pinTitle) pinTitle.textContent = 'New Security PIN';
+            if (pinSubtitle) pinSubtitle.textContent = 'Enter your new 4-digit PIN';
+            updatePinDots();
+            isPinBusy = false;
+          } else {
+            triggerPinError('Incorrect current PIN');
+          }
+          return;
+        }
+
+        if (pinFlow === 'change_new') {
+          tempFirstPin = currentInput;
+          enteredPin = '';
+          pinFlow = 'change_confirm';
+          if (pinTitle) pinTitle.textContent = 'Confirm New PIN';
+          if (pinSubtitle) pinSubtitle.textContent = 'Re-enter new 4-digit PIN to confirm';
+          updatePinDots();
+          isPinBusy = false;
+          return;
+        }
+
+        if (pinFlow === 'change_confirm') {
+          if (currentInput === tempFirstPin) {
+            flashPinDots('success');
+            const res = await window.WalletSecurity.changePin(tempOldPin, currentInput);
+            if (res.success) {
+              showToast('Security PIN changed successfully!', 'success');
+              setTimeout(() => {
+                hidePinLock();
+                isPinBusy = false;
+              }, 300);
+            } else {
+              triggerPinError(res.error || 'Failed to update PIN');
+            }
+          } else {
+            triggerPinError('New PINs do not match.');
+            pinFlow = 'change_new';
+            if (pinTitle) pinTitle.textContent = 'New Security PIN';
+            if (pinSubtitle) pinSubtitle.textContent = 'Enter your new 4-digit PIN';
+          }
+          return;
+        }
+      } catch (err) {
+        console.error('PIN process error:', err);
+        triggerPinError('Security error occurred');
+      }
+    }
+  }
+
+  function handlePinBackspace() {
+    if (isPinBusy || enteredPin.length === 0) return;
+    enteredPin = enteredPin.slice(0, -1);
+    updatePinDots();
+  }
+
+  // Keypad clicks
+  pinKeyButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const digit = btn.getAttribute('data-pin-key');
+      if (digit) handlePinDigit(digit);
+    });
+  });
+
+  if (pinBackspaceBtn) {
+    pinBackspaceBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      handlePinBackspace();
+    });
+  }
+
+  if (pinBiometricBtn) {
+    pinBiometricBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      showToast('Biometrics active: enter PIN to unlock', 'info');
+    });
+  }
+
+  // Keyboard input (0-9, Backspace)
+  window.addEventListener('keydown', (e) => {
+    if (pinOverlay && !pinOverlay.classList.contains('pointer-events-none')) {
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        handlePinDigit(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handlePinBackspace();
+      }
+    }
+  });
+
+  // Connect security engine lock state
+  if (window.WalletSecurity) {
+    window.WalletSecurity.onLockStateChange = (locked) => {
+      if (locked) {
+        showPinLock('unlock');
+      } else {
+        hidePinLock();
+      }
+    };
+  }
+
+  window.promptChangePin = () => {
+    showPinLock('change_old');
+  };
+
   // Sync currency dropdown in header
   const currSelect = document.getElementById('header-currency-select');
   if (currSelect) currSelect.value = currentCurrency;
+
+  // Check initial security lock state
+  if (window.WalletSecurity && (!window.WalletSecurity.isConfigured() || window.WalletSecurity.isLocked)) {
+    showPinLock();
+  }
 
   // Initial tab & modal
   const hash = window.location.hash.replace('#', '');
   const initialTab = hash === 'cards' || hash === 'history' ? hash : 'dashboard';
   const initialModal = hash.startsWith('modal-') ? hash.replace('modal-', '') : null;
 
-    switchView(initialTab);
-    if (initialModal && modals[initialModal]) {
-      setTimeout(() => openModal(initialModal), 200);
-    }
-  } catch (err) {
-    console.error('Fatal UI error:', err);
+  switchView(initialTab);
+  if (initialModal && modals[initialModal]) {
+    setTimeout(() => openModal(initialModal), 200);
   }
+} catch (err) {
+  console.error('Fatal UI error:', err);
+}
 }
 
 if (document.readyState === 'loading') {

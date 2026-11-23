@@ -551,12 +551,22 @@ function getInitialSampleData() {
 class WalletAppStore {
   constructor() {
     this.storageKey = 'apexwallet_user_vault_v1';
-    this.loadState();
+    this.banks = [];
+    this.cards = [];
+    this.transactions = [];
     this.activeTab = 'dashboard';
     this.selectedAccountFilter = 'all'; // 'all' | 'bank:{id}' | 'card:{id}'
     this.selectedStatementFilter = 'all'; // 'all' | '2026-12' | '2026-11' etc.
     this.searchQuery = '';
     this.selectedCategoryFilter = 'all';
+    this.loadState();
+  }
+
+  loadFromDecrypted(data) {
+    if (!data) return;
+    this.banks = data.banks || [];
+    this.cards = data.cards || [];
+    this.transactions = data.transactions || [];
   }
 
   loadState() {
@@ -564,6 +574,14 @@ class WalletAppStore {
     try {
       localStorage.removeItem('fintech_wallet_store_v1');
     } catch (e) {}
+
+    // If security vault is configured and locked, wait for PIN unlock
+    if (window.WalletSecurity && window.WalletSecurity.isConfigured() && window.WalletSecurity.isLocked) {
+      this.banks = [];
+      this.cards = [];
+      this.transactions = [];
+      return;
+    }
 
     const raw = localStorage.getItem(this.storageKey);
     if (raw) {
@@ -581,7 +599,6 @@ class WalletAppStore {
     this.banks = [];
     this.cards = [];
     this.transactions = [];
-    this.saveState();
   }
 
   clearAllData() {
@@ -597,7 +614,11 @@ class WalletAppStore {
       cards: this.cards,
       transactions: this.transactions
     };
-    localStorage.setItem(this.storageKey, JSON.stringify(payload));
+    if (window.WalletSecurity && window.WalletSecurity.isConfigured() && !window.WalletSecurity.isLocked) {
+      window.WalletSecurity.saveVault(payload);
+    } else {
+      localStorage.setItem(this.storageKey, JSON.stringify(payload));
+    }
   }
 
   resetToSampleData() {
