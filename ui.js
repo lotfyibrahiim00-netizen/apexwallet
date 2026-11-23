@@ -883,17 +883,6 @@ function initApp() {
     showToast('Exported CSV file!', 'success');
   };
 
-  // Clock in status bar
-  function updateStatusBarClock() {
-    const clockEl = document.getElementById('status-bar-clock');
-    if (clockEl) {
-      const now = new Date();
-      clockEl.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    }
-  }
-  updateStatusBarClock();
-  setInterval(updateStatusBarClock, 30000);
-
   // Initial tab & modal
   const hash = window.location.hash.replace('#', '');
   const initialTab = hash === 'cards' || hash === 'history' ? hash : 'dashboard';

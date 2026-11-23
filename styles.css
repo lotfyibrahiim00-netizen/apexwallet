@@ -103,21 +103,6 @@ body {
   }
 }
 
-/* Status Bar */
-.mobile-status-bar {
-  height: 44px;
-  padding: 6px 22px 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 11px;
-  font-weight: 700;
-  color: #111827;
-  z-index: 40;
-  background-color: var(--bg-slate);
-  user-select: none;
-}
-
 /* Floating Navigation Bar (Revolut & Telda iOS style) */
 .floating-bottom-nav {
   position: absolute;
