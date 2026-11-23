@@ -1622,6 +1622,7 @@ function initApp() {
   const pinDotsContainer = document.getElementById('pin-dots-container');
   const pinDots = document.querySelectorAll('.pin-dot');
   const pinFeedback = document.getElementById('pin-feedback-msg');
+  const pinCancelBtn = document.getElementById('pin-cancel-btn');
   const pinBiometricBtn = document.getElementById('pin-biometric-btn');
   const pinBackspaceBtn = document.getElementById('pin-backspace-btn');
   const pinKeyButtons = document.querySelectorAll('[data-pin-key]');
@@ -1694,6 +1695,15 @@ function initApp() {
     } else {
       if (pinTitle) pinTitle.textContent = 'ApexWallet Security';
       if (pinSubtitle) pinSubtitle.textContent = 'Enter your 4-digit PIN to access your vault';
+    }
+
+    // Toggle Cancel button for Change PIN flow
+    if (pinCancelBtn) {
+      if (pinFlow.startsWith('change_')) {
+        pinCancelBtn.classList.remove('hidden');
+      } else {
+        pinCancelBtn.classList.add('hidden');
+      }
     }
 
     pinOverlay.classList.remove('opacity-0', 'pointer-events-none');
@@ -1786,16 +1796,18 @@ function initApp() {
         }
 
         if (pinFlow === 'change_old') {
-          const res = await window.WalletSecurity.unlock(currentInput);
-          if (res.success) {
+          const isValid = await window.WalletSecurity.verifyPinOnly(currentInput);
+          if (isValid) {
             flashPinDots('success');
             tempOldPin = currentInput;
-            enteredPin = '';
-            pinFlow = 'change_new';
-            if (pinTitle) pinTitle.textContent = 'New Security PIN';
-            if (pinSubtitle) pinSubtitle.textContent = 'Enter your new 4-digit PIN';
-            updatePinDots();
-            isPinBusy = false;
+            setTimeout(() => {
+              enteredPin = '';
+              pinFlow = 'change_new';
+              if (pinTitle) pinTitle.textContent = 'New Security PIN';
+              if (pinSubtitle) pinSubtitle.textContent = 'Enter your new 4-digit PIN';
+              updatePinDots();
+              isPinBusy = false;
+            }, 250);
           } else {
             triggerPinError('Incorrect current PIN');
           }
@@ -1804,12 +1816,15 @@ function initApp() {
 
         if (pinFlow === 'change_new') {
           tempFirstPin = currentInput;
-          enteredPin = '';
-          pinFlow = 'change_confirm';
-          if (pinTitle) pinTitle.textContent = 'Confirm New PIN';
-          if (pinSubtitle) pinSubtitle.textContent = 'Re-enter new 4-digit PIN to confirm';
-          updatePinDots();
-          isPinBusy = false;
+          flashPinDots('success');
+          setTimeout(() => {
+            enteredPin = '';
+            pinFlow = 'change_confirm';
+            if (pinTitle) pinTitle.textContent = 'Confirm New PIN';
+            if (pinSubtitle) pinSubtitle.textContent = 'Re-enter your new 4-digit PIN';
+            updatePinDots();
+            isPinBusy = false;
+          }, 250);
           return;
         }
 
@@ -1817,20 +1832,23 @@ function initApp() {
           if (currentInput === tempFirstPin) {
             flashPinDots('success');
             const res = await window.WalletSecurity.changePin(tempOldPin, currentInput);
-            if (res.success) {
+            if (res && res.success) {
               showToast('Security PIN changed successfully!', 'success');
               setTimeout(() => {
                 hidePinLock();
                 isPinBusy = false;
+                renderCurrentView();
               }, 300);
             } else {
-              triggerPinError(res.error || 'Failed to update PIN');
+              triggerPinError((res && res.error) || 'Failed to update PIN');
             }
           } else {
-            triggerPinError('New PINs do not match.');
-            pinFlow = 'change_new';
-            if (pinTitle) pinTitle.textContent = 'New Security PIN';
-            if (pinSubtitle) pinSubtitle.textContent = 'Enter your new 4-digit PIN';
+            triggerPinError('New PINs do not match. Try again.');
+            setTimeout(() => {
+              pinFlow = 'change_new';
+              if (pinTitle) pinTitle.textContent = 'New Security PIN';
+              if (pinSubtitle) pinSubtitle.textContent = 'Enter your new 4-digit PIN';
+            }, 600);
           }
           return;
         }
@@ -1890,6 +1908,13 @@ function initApp() {
     } catch (err) {
       console.warn('Biometric unlock caught:', err);
     }
+  }
+
+  if (pinCancelBtn) {
+    pinCancelBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      hidePinLock();
+    });
   }
 
   if (pinBiometricBtn) {

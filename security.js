@@ -251,6 +251,21 @@
     }
 
     /**
+     * Check if a given PIN matches without modifying lock state
+     */
+    async verifyPinOnly(pin) {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      try {
+        const securityRecord = JSON.parse(raw);
+        const calculatedVerifier = await this._computeVerifier(pin, securityRecord.salt);
+        return calculatedVerifier === securityRecord.verifier;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    /**
      * Change PIN
      */
     async changePin(oldPin, newPin) {
@@ -258,14 +273,76 @@
         return { success: false, error: 'New PIN must be 4 digits' };
       }
 
-      const verifyRes = await this.unlock(oldPin);
-      if (!verifyRes.success) {
+      const isValid = await this.verifyPinOnly(oldPin);
+      if (!isValid) {
         return { success: false, error: 'Current PIN is incorrect' };
       }
 
-      const currentData = verifyRes.data;
-      await this.setupPin(newPin);
-      await this.saveVault(currentData);
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const securityRecord = JSON.parse(raw);
+      const oldSaltArr = new Uint8Array(securityRecord.salt.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+      const oldKey = await this._deriveKey(oldPin, oldSaltArr);
+
+      let currentData = { banks: [], cards: [], transactions: [] };
+      try {
+        currentData = await this._decryptPayload(securityRecord.vault, oldKey);
+      } catch (e) {
+        console.error('Failed to decrypt vault during PIN change:', e);
+        return { success: false, error: 'Failed to decrypt current vault' };
+      }
+
+      // Generate fresh salt and new key for new PIN
+      const newSaltBytes = crypto.getRandomValues(new Uint8Array(16));
+      const newSaltHex = bufToHex(newSaltBytes);
+      const newVerifier = await this._computeVerifier(newPin, newSaltHex);
+      const newKey = await this._deriveKey(newPin, newSaltBytes);
+
+      // Re-encrypt vault with new key
+      const newEncryptedVault = await this._encryptPayload(currentData, newKey);
+
+      securityRecord.salt = newSaltHex;
+      securityRecord.verifier = newVerifier;
+      securityRecord.vault = newEncryptedVault;
+      securityRecord.updatedAt = new Date().toISOString();
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(securityRecord));
+
+      // If biometrics is active, update the encrypted PIN stored for biometrics
+      if (this.isBiometricsEnabled()) {
+        try {
+          const bioRaw = localStorage.getItem(BIOMETRIC_KEY);
+          if (bioRaw) {
+            const bioData = JSON.parse(bioRaw);
+            const bioKeyBytes = b64ToBuf(bioData.bioKey);
+            const enc = new TextEncoder();
+            const bioCryptoKey = await crypto.subtle.importKey(
+              'raw',
+              bioKeyBytes,
+              { name: 'AES-GCM' },
+              false,
+              ['encrypt']
+            );
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const encryptedPinBuffer = await crypto.subtle.encrypt(
+              { name: 'AES-GCM', iv: iv },
+              bioCryptoKey,
+              enc.encode(newPin)
+            );
+            const packed = new Uint8Array(iv.length + encryptedPinBuffer.byteLength);
+            packed.set(iv);
+            packed.set(new Uint8Array(encryptedPinBuffer), iv.length);
+            bioData.encryptedPin = bufToB64(packed);
+            bioData.updatedAt = new Date().toISOString();
+            localStorage.setItem(BIOMETRIC_KEY, JSON.stringify(bioData));
+          }
+        } catch (bioErr) {
+          console.warn('Note: Could not refresh biometric pin record:', bioErr);
+        }
+      }
+
+      this.activeKey = newKey;
+      this.isLocked = false;
+      this.lastActiveTime = Date.now();
       return { success: true };
     }
 
