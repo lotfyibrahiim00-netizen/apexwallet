@@ -431,6 +431,123 @@
       </div>
     </div>
 
+    <!-- ============================================== -->
+    <!-- SLIDE-UP MODAL 5: CUSTOMIZE CARD THEME -->
+    <!-- ============================================== -->
+    <div id="modal-customize-card" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
+      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      
+      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] overflow-y-auto">
+        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3"></div>
+
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h3 class="text-sm font-extrabold text-slate-900">Customize Card Color</h3>
+            <p id="customize-card-subtitle" class="text-[11px] text-slate-400">Choose real bank colors or custom gradient</p>
+          </div>
+          <button data-close-modal="customizeCard" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- Live Preview of Card being edited -->
+        <div id="customize-card-preview" class="p-4 rounded-2xl text-white mb-4 shadow-md transition-all">
+          <div class="flex justify-between items-center text-xs font-semibold">
+            <span id="customize-preview-name">Card Nickname</span>
+            <span id="customize-preview-type" class="text-[9px] bg-white/20 px-2 py-0.5 rounded-full uppercase">CREDIT</span>
+          </div>
+          <p id="customize-preview-amount" class="text-xl font-bold mt-2 font-mono">0.00 EGP</p>
+          <div class="w-full h-1 bg-white/20 rounded-full mt-2 overflow-hidden">
+            <div class="bg-white h-full w-[60%] rounded-full"></div>
+          </div>
+          <div class="flex justify-between text-[10px] opacity-80 mt-2 font-mono">
+            <span id="customize-preview-last4">•••• 0000</span>
+            <span id="customize-preview-cycle">Cycle: 25th → 24th</span>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <!-- Real Bank Colors -->
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">🏛️ Official Bank Colors</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button type="button" onclick="window.applyCardThemePreset('cib')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+                <span class="w-4 h-4 rounded-full bg-[#002D62] shrink-0 shadow-xs"></span>
+                <span class="text-[11px] font-bold text-slate-800">CIB Navy</span>
+              </button>
+              <button type="button" onclick="window.applyCardThemePreset('hsbc')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+                <span class="w-4 h-4 rounded-full bg-[#DB0011] shrink-0 shadow-xs"></span>
+                <span class="text-[11px] font-bold text-slate-800">HSBC Red</span>
+              </button>
+              <button type="button" onclick="window.applyCardThemePreset('qnb')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+                <span class="w-4 h-4 rounded-full bg-[#7C003D] shrink-0 shadow-xs"></span>
+                <span class="text-[11px] font-bold text-slate-800">QNB Wine</span>
+              </button>
+              <button type="button" onclick="window.applyCardThemePreset('nbe')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+                <span class="w-4 h-4 rounded-full bg-[#006837] shrink-0 shadow-xs"></span>
+                <span class="text-[11px] font-bold text-slate-800">NBE Green</span>
+              </button>
+              <button type="button" onclick="window.applyCardThemePreset('bm')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+                <span class="w-4 h-4 rounded-full bg-[#991B1E] shrink-0 shadow-xs"></span>
+                <span class="text-[11px] font-bold text-slate-800">Banque Misr</span>
+              </button>
+              <button type="button" onclick="window.applyCardThemePreset('enbd')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+                <span class="w-4 h-4 rounded-full bg-[#0B3082] shrink-0 shadow-xs"></span>
+                <span class="text-[11px] font-bold text-slate-800">Emirates NBD</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Luxury Gradient Presets -->
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">💎 Luxury Gradients</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button type="button" onclick="window.applyCardThemePreset('indigo')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+                <span class="w-4 h-4 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-600 shrink-0 shadow-xs"></span>
+                <span class="text-[11px] font-bold text-slate-800">Indigo</span>
+              </button>
+              <button type="button" onclick="window.applyCardThemePreset('midnight')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+                <span class="w-4 h-4 rounded-full bg-gradient-to-tr from-slate-900 to-zinc-800 shrink-0 shadow-xs"></span>
+                <span class="text-[11px] font-bold text-slate-800">Obsidian</span>
+              </button>
+              <button type="button" onclick="window.applyCardThemePreset('emerald')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+                <span class="w-4 h-4 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-600 shrink-0 shadow-xs"></span>
+                <span class="text-[11px] font-bold text-slate-800">Emerald</span>
+              </button>
+              <button type="button" onclick="window.applyCardThemePreset('rose')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+                <span class="w-4 h-4 rounded-full bg-gradient-to-tr from-rose-600 to-pink-600 shrink-0 shadow-xs"></span>
+                <span class="text-[11px] font-bold text-slate-800">Rose</span>
+              </button>
+              <button type="button" onclick="window.applyCardThemePreset('gold')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+                <span class="w-4 h-4 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-600 shrink-0 shadow-xs"></span>
+                <span class="text-[11px] font-bold text-slate-800">Gold VIP</span>
+              </button>
+              <button type="button" onclick="window.applyCardThemePreset('cyan')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+                <span class="w-4 h-4 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 shrink-0 shadow-xs"></span>
+                <span class="text-[11px] font-bold text-slate-800">Cyan</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Custom Color Picker -->
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">🎨 Custom Color</label>
+            <div class="flex items-center gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+              <input type="color" id="customize-custom-color" value="#4F46E5" oninput="window.applyCardCustomColor(this.value)" onchange="window.applyCardCustomColor(this.value)" class="w-8 h-8 rounded-full border border-slate-300 cursor-pointer p-0">
+              <div>
+                <span class="text-xs font-bold text-slate-800 block">Pick Custom Color</span>
+                <span class="text-[10px] text-slate-400">Creates matching rich gradient</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button data-close-modal="customizeCard" class="mt-4 w-full py-2.5 bg-[#111827] text-white text-xs font-bold rounded-full shadow-md active-press transition-all">
+          Done
+        </button>
+      </div>
+    </div>
+
   </main>
 
   <!-- Application Logic Scripts -->

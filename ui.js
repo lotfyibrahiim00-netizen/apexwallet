@@ -12,6 +12,7 @@ function initApp() {
 
   // Selected featured card on Overview
   let activeFeaturedCardId = store.cards.length > 0 ? store.cards[0].id : null;
+  let editingCardId = null;
 
   // --- Element Selectors ---
   const views = {
@@ -25,7 +26,9 @@ function initApp() {
     transaction: document.getElementById('modal-transaction'),
     bank: document.getElementById('modal-bank'),
     card: document.getElementById('modal-card'),
-    quickActions: document.getElementById('modal-quick-actions')
+    quickActions: document.getElementById('modal-quick-actions'),
+    customizeCard: document.getElementById('modal-customize-card'),
+    'customize-card': document.getElementById('modal-customize-card')
   };
 
   // --- Toast System ---
@@ -111,7 +114,7 @@ function initApp() {
     const modal = modals[modalId];
     if (!modal) return;
     
-    modal.classList.remove('pointer-events-none');
+    modal.classList.remove('pointer-events-none', 'opacity-0');
     modal.classList.add('opacity-100');
     
     const sheet = modal.querySelector('.modal-sheet');
@@ -126,6 +129,29 @@ function initApp() {
     } else if (modalId === 'card') {
       populateCardBankDropdown();
       updateCardCycleInputs();
+    } else if (modalId === 'customizeCard' || modalId === 'customize-card') {
+      if (!editingCardId) {
+        editingCardId = activeFeaturedCardId || (store.cards[0] ? store.cards[0].id : null);
+      }
+      if (editingCardId) {
+        const card = store.getCard(editingCardId);
+        const bank = card ? store.getBank(card.bankId) : null;
+        const stats = store.getCardSpendingStats(editingCardId);
+        const subtitle = document.getElementById('customize-card-subtitle');
+        const previewBox = document.getElementById('customize-card-preview');
+        const nameEl = document.getElementById('customize-preview-name');
+        const typeEl = document.getElementById('customize-preview-type');
+        const amountEl = document.getElementById('customize-preview-amount');
+        const last4El = document.getElementById('customize-preview-last4');
+        const cycleEl = document.getElementById('customize-preview-cycle');
+        if (subtitle && card) subtitle.textContent = `Customizing: ${bank ? bank.shortCode : ''} ${card.name}`;
+        if (nameEl && card) nameEl.textContent = `${bank ? bank.shortCode : ''} ${card.name}`;
+        if (typeEl && card) typeEl.textContent = card.cardType.toUpperCase();
+        if (amountEl && card) amountEl.textContent = `${formatCurrency(stats.spent)} / ${formatCurrency(stats.target)}`;
+        if (last4El && card) last4El.textContent = `•••• ${card.last4}`;
+        if (cycleEl && card) cycleEl.textContent = card.cycleStartDay ? `Cycle: ${card.cycleStartDay}th → ${card.cycleEndDay}th` : card.network;
+        if (previewBox && card) previewBox.style.background = getCardGradientStyle(card, bank);
+      }
     }
   }
 
@@ -140,7 +166,7 @@ function initApp() {
     }
 
     setTimeout(() => {
-      modal.classList.add('pointer-events-none');
+      modal.classList.add('pointer-events-none', 'opacity-0');
       modal.classList.remove('opacity-100');
     }, 280);
   }
@@ -403,178 +429,264 @@ function initApp() {
   }
 
   // ==========================================
-  // VIEW 1: OVERVIEW (VISUAL CARD-FIRST)
+  // VIEW 1: OVERVIEW (SWIPEABLE CARDS CAROUSEL)
   // ==========================================
   function renderOverviewView() {
     const container = document.getElementById('view-dashboard');
     if (!container) return;
 
-    // Pick the active featured card (fallback to first card)
-    let featuredCard = store.getCard(activeFeaturedCardId);
-    if (!featuredCard && store.cards.length > 0) {
-      featuredCard = store.cards[0];
-      activeFeaturedCardId = featuredCard.id;
+    if (store.cards.length === 0) {
+      container.innerHTML = `
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 text-center">
+          <p class="text-xs text-slate-500 font-semibold">No cards added yet</p>
+          <button onclick="window.openModal('card')" class="mt-3 px-4 py-2 bg-[#111827] text-white text-xs font-bold rounded-full">
+            + Add First Card
+          </button>
+        </div>
+      `;
+      return;
     }
 
-    const featuredStats = featuredCard ? store.getCardSpendingStats(featuredCard.id) : null;
-    const bank = featuredCard ? store.getBank(featuredCard.bankId) : null;
-
-    // Build Secondary Cards Mini Pills (cards that are over limit or nearing limit or other cards)
-    const otherCards = store.cards.filter(c => !featuredCard || c.id !== featuredCard.id);
-    
-    // Recent 5 transactions
-    const recentTxs = store.getFilteredTransactions().slice(0, 5);
+    // Ensure valid active card
+    if (!activeFeaturedCardId || !store.getCard(activeFeaturedCardId)) {
+      activeFeaturedCardId = store.cards[0].id;
+    }
+    const activeIndex = store.cards.findIndex(c => c.id === activeFeaturedCardId);
 
     container.innerHTML = `
       <div class="space-y-4">
         
-        <!-- Quick Card Switcher Chips -->
-        ${store.cards.length > 1 ? `
-          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-            ${store.cards.map(c => {
-              const isSelected = c.id === activeFeaturedCardId;
-              const cStat = store.getCardSpendingStats(c.id);
-              return `
-                <button onclick="window.selectFeaturedCard('${c.id}')" class="px-3 py-1 rounded-full text-[11px] font-bold shrink-0 transition-all ${
-                  isSelected 
-                    ? 'bg-[#111827] text-white shadow-xs' 
-                    : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
-                }">
-                  ${c.name} ${cStat.isExceeded ? '⚠️' : ''}
-                </button>
-              `;
-            }).join('')}
+        <!-- Header Subtitle with Active Card Info & Carousel Hint -->
+        <div class="flex justify-between items-center px-1">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-bold text-slate-800">Your Cards</span>
+            <span id="card-counter-badge" class="text-[10px] bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded-full font-bold">
+              ${activeIndex + 1}/${store.cards.length}
+            </span>
           </div>
-        ` : ''}
+          <span class="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+            <span>Swipe Card or Tap Tabs</span>
+            <span>&rarr;</span>
+          </span>
+        </div>
 
-        <!-- 1. FEATURED CREDIT CARD VISUAL (EXACT DESIGN MATCH) -->
-        ${featuredCard ? `
-          <div class="bg-gradient-to-tr from-indigo-600 via-indigo-700 to-violet-600 text-white p-5 rounded-3xl shadow-lg shadow-indigo-200/50 relative overflow-hidden">
-            <!-- Subtle glow circle -->
-            <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
-
-            <div class="flex justify-between items-center relative z-10">
-              <span class="text-xs font-semibold opacity-85 tracking-wide">${bank ? bank.shortCode : ''} ${featuredCard.name}</span>
-              <span class="text-[10px] bg-white/20 px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider backdrop-blur-xs">
-                ${featuredCard.cardType}
-              </span>
-            </div>
-
-            <p class="text-2xl font-bold mt-4 font-mono tracking-tight relative z-10">
-              ${formatCurrency(featuredStats.spent)} 
-              <span class="text-xs font-normal opacity-80">/ ${formatCurrency(featuredStats.target)}</span>
-            </p>
-
-            <!-- Slim Progress Bar -->
-            <div class="w-full h-1.5 bg-white/20 rounded-full mt-3 overflow-hidden relative z-10">
-              <div class="${featuredStats.isExceeded ? 'bg-rose-400' : 'bg-white'} h-full rounded-full transition-all duration-500 shadow-sm" style="width: ${featuredStats.percentage}%;"></div>
-            </div>
-
-            <div class="flex justify-between text-[11px] opacity-80 mt-3 font-medium relative z-10">
-              <span class="font-mono">•••• ${featuredCard.last4}</span>
-              ${featuredCard.cardType === 'credit' && featuredCard.cycleStartDay ? `
-                <span>Cycle: ${featuredCard.cycleStartDay}th → ${featuredCard.cycleEndDay}th</span>
-              ` : `
-                <span>${featuredCard.network || 'VISA'}</span>
-              `}
-            </div>
-          </div>
-        ` : `
-          <div class="bg-white p-6 rounded-3xl border border-slate-200 text-center">
-            <p class="text-xs text-slate-500 font-semibold">No cards added yet</p>
-            <button onclick="window.openModal('card')" class="mt-3 px-4 py-2 bg-[#111827] text-white text-xs font-bold rounded-full">
-              + Add First Card
-            </button>
-          </div>
-        `}
-
-        <!-- 2. SECONDARY CARD MINI PILLS (OVER LIMIT / WARNING STATES) -->
-        <div class="space-y-2.5">
-          ${otherCards.map(c => {
+        <!-- Quick Card Selector Pills (Scrollable horizontally from top) -->
+        <div id="card-selector-tabs" class="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-5 px-5 scroll-smooth">
+          ${store.cards.map((c) => {
+            const isSel = c.id === activeFeaturedCardId;
             const cStat = store.getCardSpendingStats(c.id);
-            const isExceeded = cStat.isExceeded;
-            const isWarning = cStat.isWarning;
-
-            if (isExceeded) {
-              return `
-                <div onclick="window.selectFeaturedCard('${c.id}')" class="bg-white p-4 rounded-2xl border border-rose-200 flex justify-between items-center shadow-2xs hover:border-rose-300 transition-all cursor-pointer">
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-xs font-bold text-slate-900">${c.name} ••${c.last4}</span>
-                      <span class="text-[10px] bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full font-bold">Over Limit</span>
-                    </div>
-                    <p class="text-[11px] text-slate-400 mt-0.5">
-                      ${formatCurrency(cStat.spent)} / ${formatCurrency(cStat.target)} ${c.cycleStartDay ? `• Cycle ${c.cycleStartDay}th–${c.cycleEndDay}th` : ''}
-                    </p>
-                  </div>
-                  <span class="text-xs font-bold text-rose-600 font-mono">+${formatCurrency(cStat.overAmount)}</span>
-                </div>
-              `;
-            } else if (isWarning) {
-              return `
-                <div onclick="window.selectFeaturedCard('${c.id}')" class="bg-white p-4 rounded-2xl border border-amber-200 flex justify-between items-center shadow-2xs hover:border-amber-300 transition-all cursor-pointer">
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-xs font-bold text-slate-900">${c.name} ••${c.last4}</span>
-                      <span class="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">80%+ Limit</span>
-                    </div>
-                    <p class="text-[11px] text-slate-400 mt-0.5">
-                      ${formatCurrency(cStat.spent)} / ${formatCurrency(cStat.target)} ${c.cycleStartDay ? `• Cycle ${c.cycleStartDay}th–${c.cycleEndDay}th` : ''}
-                    </p>
-                  </div>
-                  <span class="text-xs font-bold text-amber-600 font-mono">${Math.round(cStat.rawPercentage)}%</span>
-                </div>
-              `;
-            } else {
-              return `
-                <div onclick="window.selectFeaturedCard('${c.id}')" class="bg-white p-3.5 rounded-2xl border border-slate-100 flex justify-between items-center shadow-2xs hover:border-slate-200 transition-all cursor-pointer">
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-xs font-bold text-slate-800">${c.name} ••${c.last4}</span>
-                      <span class="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">Safe</span>
-                    </div>
-                    <p class="text-[11px] text-slate-400 mt-0.5">
-                      ${formatCurrency(cStat.spent)} / ${formatCurrency(cStat.target)}
-                    </p>
-                  </div>
-                  <span class="text-xs font-semibold text-slate-600 font-mono">${Math.round(cStat.rawPercentage)}%</span>
-                </div>
-              `;
-            }
+            return `
+              <button type="button" data-tab-card-id="${c.id}" onclick="window.scrollToCard('${c.id}')" class="px-3.5 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 ${isSel ? 'bg-[#111827] text-white shadow-xs' : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-300'}">
+                <span>${c.name}</span>
+                ${cStat.isExceeded ? '<span class="text-rose-400 text-[10px]">⚠️</span>' : ''}
+              </button>
+            `;
           }).join('')}
         </div>
 
-        <!-- 3. CLEAN ACTIVITY (EXACT DESIGN MATCH) -->
-        <div class="space-y-2.5 pt-1">
-          <div class="flex justify-between items-center">
-            <p class="text-xs font-bold text-slate-800 uppercase tracking-wider">Card Activity</p>
-            <button onclick="window.switchTab('history')" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800">
-              See All &rarr;
-            </button>
-          </div>
+        <!-- 1. SWIPEABLE CARDS CAROUSEL (EXACT DESIGN MATCH) -->
+        <div id="cards-carousel" class="flex gap-3 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-1 pt-1 -mx-5 px-5 scroll-smooth">
+          ${store.cards.map((card) => {
+            const cardStat = store.getCardSpendingStats(card.id);
+            const bank = store.getBank(card.bankId);
+            const gradient = getCardGradientStyle(card, bank);
+            const isCredit = card.cardType === 'credit';
+            const isSelected = card.id === activeFeaturedCardId;
 
-          ${recentTxs.length === 0 ? `
-            <div class="bg-white p-4 rounded-2xl text-center text-xs text-slate-400 border border-slate-100">
-              No transactions logged yet
-            </div>
-          ` : recentTxs.map(tx => {
-            const isCredit = tx.card && tx.card.cardType === 'credit';
+            return `
+              <div id="card-carousel-item-${card.id}" data-card-id="${card.id}" class="min-w-[315px] w-[88%] snap-center shrink-0 p-5 rounded-3xl text-white shadow-lg shadow-slate-900/10 transition-all duration-300 relative overflow-hidden select-none cursor-pointer ${isSelected ? 'ring-2 ring-[#111827]/40 scale-100' : 'scale-[0.98] opacity-95'}" style="background: ${gradient};" onclick="window.scrollToCard('${card.id}')">
+                <!-- Subtle glow circle -->
+                <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
+
+                <!-- Top Row: Bank + Nickname & Custom Color Button -->
+                <div class="flex justify-between items-center relative z-10">
+                  <span class="text-xs font-semibold opacity-90 tracking-wide">${bank ? bank.shortCode : ''} ${card.name}</span>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="window.openCustomizeCardModal('${card.id}', event)" class="px-2 py-0.5 rounded-full bg-white/20 hover:bg-white/30 text-[10px] font-bold flex items-center gap-1 backdrop-blur-xs transition-all active:scale-95 shadow-2xs" title="Customize Card Color">
+                      <span>🎨</span>
+                      <span>Color</span>
+                    </button>
+                    <span class="text-[9px] bg-white/20 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider backdrop-blur-xs">
+                      ${card.cardType}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Spent vs Limit -->
+                <p class="text-2xl font-bold mt-3.5 font-mono tracking-tight relative z-10">
+                  ${formatCurrency(cardStat.spent)} 
+                  <span class="text-xs font-normal opacity-80">/ ${formatCurrency(cardStat.target)}</span>
+                </p>
+
+                <!-- Slim Progress Bar -->
+                <div class="w-full h-1.5 bg-white/20 rounded-full mt-3 overflow-hidden relative z-10">
+                  <div class="${cardStat.isExceeded ? 'bg-rose-400' : (cardStat.isWarning ? 'bg-amber-400' : 'bg-white')} h-full rounded-full transition-all duration-500 shadow-sm" style="width: ${cardStat.percentage}%;"></div>
+                </div>
+
+                <!-- Bottom Row: Last 4 & Billing Cycle -->
+                <div class="flex justify-between text-[11px] opacity-80 mt-3 font-medium relative z-10">
+                  <span class="font-mono">•••• ${card.last4}</span>
+                  ${isCredit && card.cycleStartDay ? `
+                    <span>Cycle: ${card.cycleStartDay}th → ${card.cycleEndDay}th</span>
+                  ` : `
+                    <span>${card.network || 'VISA'}</span>
+                  `}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <!-- Carousel Pagination Dots / Pills -->
+        <div id="carousel-pagination-dots" class="flex justify-center items-center gap-1.5 pt-0.5">
+          ${store.cards.map((c, idx) => `
+            <button type="button" data-dot-card-id="${c.id}" onclick="window.scrollToCard('${c.id}')" class="h-1.5 rounded-full transition-all duration-300 ${
+              c.id === activeFeaturedCardId ? 'w-6 bg-[#111827]' : 'w-2 bg-slate-300 hover:bg-slate-400'
+            }" title="Card ${idx + 1}"></button>
+          `).join('')}
+        </div>
+
+        <!-- 2. SECONDARY CARD MINI PILLS (OVER LIMIT / WARNING STATES) -->
+        <div id="overview-secondary-cards" class="space-y-2.5 pt-1"></div>
+
+        <!-- 3. CLEAN ACTIVITY FOR CURRENT CARD -->
+        <div id="overview-activity-container" class="space-y-2.5 pt-1"></div>
+
+      </div>
+    `;
+
+    // Populate dynamic secondary cards & activity without re-rendering carousel
+    renderSecondaryCards(activeFeaturedCardId);
+    renderCardActivity(activeFeaturedCardId);
+
+    // Attach scroll listener to carousel to auto-detect centered card
+    setupCarouselScrollListener();
+
+    // Scroll carousel to initial active card position
+    const initialEl = document.getElementById('card-carousel-item-' + activeFeaturedCardId);
+    if (initialEl) {
+      initialEl.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+    }
+  }
+
+  // --- Dynamic Sub-Renderers (Smooth updates without wiping carousel DOM) ---
+  function renderSecondaryCards(activeCardId) {
+    const container = document.getElementById('overview-secondary-cards');
+    if (!container) return;
+
+    // Show warning/over-limit cards as alert pills (like in the design spec)
+    const alertCards = store.cards.filter(c => {
+      if (c.id === activeCardId) return false;
+      const cStat = store.getCardSpendingStats(c.id);
+      return cStat.isExceeded || cStat.isWarning;
+    });
+
+    if (alertCards.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="space-y-2">
+        ${alertCards.map(c => {
+          const cStat = store.getCardSpendingStats(c.id);
+          const isExceeded = cStat.isExceeded;
+
+          if (isExceeded) {
+            return `
+              <div onclick="window.scrollToCard('${c.id}')" class="bg-white p-3.5 rounded-2xl border border-rose-200 flex justify-between items-center shadow-2xs hover:border-rose-300 transition-all cursor-pointer active:scale-[0.99]">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-900">${c.name} ••${c.last4}</span>
+                    <span class="text-[10px] bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full font-bold">Over Limit</span>
+                  </div>
+                  <p class="text-[11px] text-slate-400 mt-0.5">
+                    ${formatCurrency(cStat.spent)} / ${formatCurrency(cStat.target)} ${c.cycleStartDay ? `• Cycle ${c.cycleStartDay}th–${c.cycleEndDay}th` : ''}
+                  </p>
+                </div>
+                <span class="text-xs font-bold text-rose-600 font-mono">+${formatCurrency(cStat.overAmount)}</span>
+              </div>
+            `;
+          } else {
+            return `
+              <div onclick="window.scrollToCard('${c.id}')" class="bg-white p-3.5 rounded-2xl border border-amber-200 flex justify-between items-center shadow-2xs hover:border-amber-300 transition-all cursor-pointer active:scale-[0.99]">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-900">${c.name} ••${c.last4}</span>
+                    <span class="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">80%+ Limit</span>
+                  </div>
+                  <p class="text-[11px] text-slate-400 mt-0.5">
+                    ${formatCurrency(cStat.spent)} / ${formatCurrency(cStat.target)} ${c.cycleStartDay ? `• Cycle ${c.cycleStartDay}th–${c.cycleEndDay}th` : ''}
+                  </p>
+                </div>
+                <span class="text-xs font-bold text-amber-600 font-mono">${Math.round(cStat.rawPercentage)}%</span>
+              </div>
+            `;
+          }
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function renderCardActivity(cardId) {
+    const container = document.getElementById('overview-activity-container');
+    if (!container) return;
+
+    const card = store.getCard(cardId);
+    if (!card) return;
+
+    // Filter transactions: show ONLY activity for this active card
+    const cardTxs = store.getFilteredTransactions().filter(t => t.cardId === cardId);
+    const cardStat = store.getCardSpendingStats(cardId);
+
+    container.innerHTML = `
+      <div class="flex justify-between items-center mb-1">
+        <div>
+          <p class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <span>Activity</span>
+            <span class="text-indigo-600 font-extrabold">• ${card.name}</span>
+          </p>
+          <p class="text-[10px] text-slate-400 font-medium">
+            ${cardTxs.length} ${cardTxs.length === 1 ? 'expense' : 'expenses'} • ${formatCurrency(cardStat.spent)} total
+          </p>
+        </div>
+        <button onclick="window.switchTab('history')" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
+          All History &rarr;
+        </button>
+      </div>
+
+      ${cardTxs.length === 0 ? `
+        <div class="bg-white p-5 rounded-2xl text-center border border-slate-100 shadow-2xs">
+          <p class="text-xs text-slate-400 font-medium">No expenses recorded for ${card.name} yet</p>
+          <button onclick="window.openAddTxForCard('${card.id}')" class="mt-2.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full transition-all inline-flex items-center gap-1">
+            <span>+</span>
+            <span>Add Expense for this card</span>
+          </button>
+        </div>
+      ` : `
+        <div class="space-y-2.5">
+          ${cardTxs.slice(0, 8).map(tx => {
+            const isCredit = card.cardType === 'credit';
             const stmtName = (tx.statementInfo && tx.statementInfo.statementMonthName) ? tx.statementInfo.statementMonthName.substring(0, 3) : 'Dec';
             const isCurrentCycle = tx.statementInfo && tx.statementInfo.statementMonth === 12;
 
             return `
               <div class="bg-white p-3.5 rounded-2xl flex justify-between items-center shadow-2xs border border-slate-100/80 hover:shadow-xs transition-all">
-                <div>
-                  <p class="text-xs font-bold text-slate-900 leading-tight">${tx.merchant}</p>
-                  ${isCredit ? `
-                    <span class="text-[10px] ${isCurrentCycle ? 'text-indigo-600' : 'text-slate-400'} font-semibold">
-                      Affects ${stmtName} Statement
-                    </span>
-                  ` : `
-                    <span class="text-[10px] text-slate-400 font-medium">
-                      Debit Card • ${tx.card ? tx.card.name : ''}
-                    </span>
-                  `}
+                <div class="pr-2 min-w-0">
+                  <p class="text-xs font-bold text-slate-900 leading-tight truncate">${tx.merchant}</p>
+                  <div class="flex items-center gap-1.5 mt-0.5">
+                    ${isCredit ? `
+                      <span class="text-[10px] ${isCurrentCycle ? 'text-indigo-600 font-semibold' : 'text-slate-400 font-medium'}">
+                        Affects ${stmtName} Statement
+                      </span>
+                    ` : `
+                      <span class="text-[10px] text-slate-400 font-medium">
+                        Debit Card
+                      </span>
+                    `}
+                    <span class="text-[10px] text-slate-300">•</span>
+                    <span class="text-[10px] text-slate-400 font-medium">${tx.date}</span>
+                  </div>
                 </div>
                 <span class="text-xs font-bold text-slate-900 font-mono tracking-tight shrink-0 ml-2">
                   -${formatCurrency(tx.amount)}
@@ -583,10 +695,205 @@ function initApp() {
             `;
           }).join('')}
         </div>
-
-      </div>
+      `}
     `;
   }
+
+  // Helper to pre-select card in Add Transaction modal
+  window.openAddTxForCard = (cardId) => {
+    const card = store.getCard(cardId);
+    openModal('transaction');
+    setTimeout(() => {
+      const cardSelect = document.getElementById('tx-card-select');
+      if (card && cardSelect) {
+        cardSelect.value = cardId;
+        updateTxCyclePreview();
+      }
+    }, 60);
+  };
+
+  // --- Update Active Card UI (Smooth update without DOM recreation) ---
+  function updateActiveCardUI(cardId, scrollCarousel = false) {
+    activeFeaturedCardId = cardId;
+    const card = store.getCard(cardId);
+    if (!card) return;
+
+    // 1. Update top selector tabs
+    const tabsContainer = document.getElementById('card-selector-tabs');
+    if (tabsContainer) {
+      tabsContainer.querySelectorAll('button[data-tab-card-id]').forEach(btn => {
+        const isSel = btn.dataset.tabCardId === cardId;
+        if (isSel) {
+          btn.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 bg-[#111827] text-white shadow-xs';
+          btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        } else {
+          btn.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 hover:border-slate-300';
+        }
+      });
+    }
+
+    // 2. Update card highlight in carousel
+    const carousel = document.getElementById('cards-carousel');
+    if (carousel) {
+      carousel.querySelectorAll('[data-card-id]').forEach(item => {
+        const isSel = item.dataset.cardId === cardId;
+        if (isSel) {
+          item.classList.add('ring-2', 'ring-[#111827]/40', 'scale-100');
+          item.classList.remove('scale-[0.98]', 'opacity-95');
+        } else {
+          item.classList.remove('ring-2', 'ring-[#111827]/40', 'scale-100');
+          item.classList.add('scale-[0.98]', 'opacity-95');
+        }
+      });
+    }
+
+    // 3. Update pagination dots
+    const dotsContainer = document.getElementById('carousel-pagination-dots');
+    if (dotsContainer) {
+      dotsContainer.querySelectorAll('button[data-dot-card-id]').forEach(dot => {
+        const isSel = dot.dataset.dotCardId === cardId;
+        dot.className = `h-1.5 rounded-full transition-all duration-300 ${isSel ? 'w-6 bg-[#111827]' : 'w-2 bg-slate-300 hover:bg-slate-400'}`;
+      });
+    }
+
+    // 4. Update index counter badge (e.g. 1/8)
+    const counterEl = document.getElementById('card-counter-badge');
+    if (counterEl) {
+      const idx = store.cards.findIndex(c => c.id === cardId);
+      counterEl.textContent = `${idx + 1}/${store.cards.length}`;
+    }
+
+    // 5. Update secondary cards below
+    renderSecondaryCards(cardId);
+
+    // 6. Update card activity below
+    renderCardActivity(cardId);
+
+    // 7. If requested, smooth scroll carousel to card
+    if (scrollCarousel && carousel) {
+      const el = document.getElementById('card-carousel-item-' + cardId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+  }
+
+  // --- Carousel Scroll Listener ---
+  function setupCarouselScrollListener() {
+    const carousel = document.getElementById('cards-carousel');
+    if (!carousel) return;
+
+    let scrollTimeout = null;
+    carousel.addEventListener('scroll', () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        const carouselRect = carousel.getBoundingClientRect();
+        const carouselCenter = carouselRect.left + carouselRect.width / 2;
+
+        let closestCardId = null;
+        let minDistance = Infinity;
+
+        carousel.querySelectorAll('[data-card-id]').forEach(item => {
+          const rect = item.getBoundingClientRect();
+          const itemCenter = rect.left + rect.width / 2;
+          const distance = Math.abs(carouselCenter - itemCenter);
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestCardId = item.dataset.cardId;
+          }
+        });
+
+        if (closestCardId && closestCardId !== activeFeaturedCardId) {
+          updateActiveCardUI(closestCardId, false);
+        }
+      }, 70);
+    }, { passive: true });
+  }
+
+  // Scroll carousel smoothly to card
+  window.scrollToCard = (cardId) => {
+    updateActiveCardUI(cardId, true);
+  };
+
+  // --- Card Color Customization Functions ---
+  window.openCustomizeCardModal = (cardId, e) => {
+    if (e) e.stopPropagation();
+    editingCardId = cardId;
+    const card = store.getCard(cardId);
+    if (!card) return;
+
+    const bank = store.getBank(card.bankId);
+    const stats = store.getCardSpendingStats(cardId);
+
+    // Update modal live preview
+    const subtitle = document.getElementById('customize-card-subtitle');
+    const previewBox = document.getElementById('customize-card-preview');
+    const nameEl = document.getElementById('customize-preview-name');
+    const typeEl = document.getElementById('customize-preview-type');
+    const amountEl = document.getElementById('customize-preview-amount');
+    const last4El = document.getElementById('customize-preview-last4');
+    const cycleEl = document.getElementById('customize-preview-cycle');
+    const colorInput = document.getElementById('customize-custom-color');
+
+    if (subtitle) subtitle.textContent = `Customizing: ${bank ? bank.shortCode : ''} ${card.name}`;
+    if (nameEl) nameEl.textContent = `${bank ? bank.shortCode : ''} ${card.name}`;
+    if (typeEl) typeEl.textContent = card.cardType.toUpperCase();
+    if (amountEl) amountEl.textContent = `${formatCurrency(stats.spent)} / ${formatCurrency(stats.target)}`;
+    if (last4El) last4El.textContent = `•••• ${card.last4}`;
+    if (cycleEl) cycleEl.textContent = card.cycleStartDay ? `Cycle: ${card.cycleStartDay}th → ${card.cycleEndDay}th` : card.network;
+
+    if (previewBox) {
+      previewBox.style.background = getCardGradientStyle(card, bank);
+    }
+
+    if (colorInput && card.customColor) {
+      colorInput.value = card.customColor;
+    }
+
+    openModal('customizeCard');
+  };
+
+  window.applyCardThemePreset = (presetKey) => {
+    if (!editingCardId) return;
+    store.updateCardColor(editingCardId, { colorPreset: presetKey, customColor: null });
+    
+    // Update live preview in modal
+    const card = store.getCard(editingCardId);
+    const bank = card ? store.getBank(card.bankId) : null;
+    const previewBox = document.getElementById('customize-card-preview');
+    if (previewBox && card) {
+      previewBox.style.background = getCardGradientStyle(card, bank);
+    }
+
+    // Update card background in carousel directly
+    const carouselCardEl = document.getElementById('card-carousel-item-' + editingCardId);
+    if (carouselCardEl && card) {
+      carouselCardEl.style.background = getCardGradientStyle(card, bank);
+    }
+
+    showToast(`Applied ${CARD_THEMES[presetKey]?.name || 'theme'}!`, 'success');
+  };
+
+  window.applyCardCustomColor = (hexColor) => {
+    if (!editingCardId) return;
+    store.updateCardColor(editingCardId, { colorPreset: null, customColor: hexColor });
+
+    // Update live preview in modal
+    const card = store.getCard(editingCardId);
+    const bank = card ? store.getBank(card.bankId) : null;
+    const previewBox = document.getElementById('customize-card-preview');
+    if (previewBox && card) {
+      previewBox.style.background = getCardGradientStyle(card, bank);
+    }
+
+    // Update card background in carousel directly
+    const carouselCardEl = document.getElementById('card-carousel-item-' + editingCardId);
+    if (carouselCardEl && card) {
+      carouselCardEl.style.background = getCardGradientStyle(card, bank);
+    }
+
+    showToast('Custom color applied!', 'success');
+  };
 
   // ==========================================
   // VIEW 2: BANKS (3 MAX PER BANK)
@@ -663,9 +970,14 @@ function initApp() {
                             ${formatCurrency(cStat.spent)}
                           </span>
                           <span class="text-[10px] text-slate-400 font-mono">/ ${formatCurrency(cStat.target)}</span>
-                          <button onclick="window.confirmDeleteCard('${c.id}')" class="text-slate-300 hover:text-rose-500 block ml-auto mt-1">
-                            <i data-lucide="x" class="w-3 h-3"></i>
-                          </button>
+                          <div class="flex items-center justify-end gap-1.5 mt-1">
+                            <button onclick="window.openCustomizeCardModal('${c.id}', event)" class="p-0.5 text-slate-400 hover:text-indigo-600 transition-colors" title="Customize Card Color">
+                              <span class="text-xs">🎨</span>
+                            </button>
+                            <button onclick="window.confirmDeleteCard('${c.id}')" class="text-slate-300 hover:text-rose-500 transition-colors" title="Delete Card">
+                              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     `;

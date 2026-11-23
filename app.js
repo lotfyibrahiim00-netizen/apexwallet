@@ -52,6 +52,35 @@ const PRESET_BANKS = [
   { name: 'Barclays', code: 'BARC', color: '#00AEEF' }
 ];
 
+// --- Card Color & Gradient Themes (Real Bank & Luxury Styles) ---
+const CARD_THEMES = {
+  cib: { id: 'cib', name: 'CIB Navy', gradient: 'linear-gradient(135deg, #002D62 0%, #06172E 100%)', color: '#002D62', isDark: true },
+  hsbc: { id: 'hsbc', name: 'HSBC Crimson', gradient: 'linear-gradient(135deg, #DB0011 0%, #660008 100%)', color: '#DB0011', isDark: true },
+  qnb: { id: 'qnb', name: 'QNB Wine', gradient: 'linear-gradient(135deg, #7C003D 0%, #3B001D 100%)', color: '#7C003D', isDark: true },
+  nbe: { id: 'nbe', name: 'NBE Forest', gradient: 'linear-gradient(135deg, #006837 0%, #002816 100%)', color: '#006837', isDark: true },
+  bm: { id: 'bm', name: 'Banque Misr', gradient: 'linear-gradient(135deg, #991B1E 0%, #4D090B 100%)', color: '#991B1E', isDark: true },
+  enbd: { id: 'enbd', name: 'Emirates NBD', gradient: 'linear-gradient(135deg, #0B3082 0%, #051842 100%)', color: '#0B3082', isDark: true },
+  indigo: { id: 'indigo', name: 'Indigo Violet', gradient: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)', color: '#4F46E5', isDark: true },
+  midnight: { id: 'midnight', name: 'Obsidian Black', gradient: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)', color: '#0F172A', isDark: true },
+  emerald: { id: 'emerald', name: 'Emerald Teal', gradient: 'linear-gradient(135deg, #059669 0%, #044E47 100%)', color: '#059669', isDark: true },
+  rose: { id: 'rose', name: 'Sunset Rose', gradient: 'linear-gradient(135deg, #E11D48 0%, #881337 100%)', color: '#E11D48', isDark: true },
+  gold: { id: 'gold', name: 'Champagne Gold', gradient: 'linear-gradient(135deg, #D97706 0%, #78350F 100%)', color: '#D97706', isDark: true },
+  cyan: { id: 'cyan', name: 'Electric Cyan', gradient: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)', color: '#0284C7', isDark: true }
+};
+
+function getCardGradientStyle(card, bank) {
+  if (card && card.colorPreset && CARD_THEMES[card.colorPreset]) {
+    return CARD_THEMES[card.colorPreset].gradient;
+  }
+  if (card && card.customColor) {
+    return `linear-gradient(135deg, ${card.customColor} 0%, #0F172A 100%)`;
+  }
+  if (bank && bank.accentColor) {
+    return `linear-gradient(135deg, ${bank.accentColor} 0%, #0F172A 100%)`;
+  }
+  return 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)';
+}
+
 // --- Smart Billing Cycle Engine ---
 /**
  * Calculates which billing statement month a transaction falls into based on
@@ -209,6 +238,7 @@ function getInitialSampleData() {
       cycleStartDay: 25,
       cycleEndDay: 24,
       network: 'Mastercard',
+      colorPreset: 'cib',
       createdAt: '2026-01-01'
     },
     {
@@ -221,6 +251,7 @@ function getInitialSampleData() {
       cycleStartDay: null,
       cycleEndDay: null,
       network: 'Visa',
+      colorPreset: 'indigo',
       createdAt: '2026-01-01'
     },
     // HSBC Cards (2 cards)
@@ -234,6 +265,7 @@ function getInitialSampleData() {
       cycleStartDay: 15,
       cycleEndDay: 14,
       network: 'Visa',
+      colorPreset: 'hsbc',
       createdAt: '2026-01-02'
     },
     {
@@ -246,6 +278,7 @@ function getInitialSampleData() {
       cycleStartDay: null,
       cycleEndDay: null,
       network: 'Mastercard',
+      colorPreset: 'midnight',
       createdAt: '2026-01-02'
     },
     // QNB Cards (1 card)
@@ -259,6 +292,7 @@ function getInitialSampleData() {
       cycleStartDay: 1,
       cycleEndDay: 30,
       network: 'Mastercard',
+      colorPreset: 'qnb',
       createdAt: '2026-01-03'
     },
     // NBE Cards (3 cards - Maximum Cap Reached)
@@ -272,6 +306,7 @@ function getInitialSampleData() {
       cycleStartDay: null,
       cycleEndDay: null,
       network: 'Meeza',
+      colorPreset: 'nbe',
       createdAt: '2026-01-04'
     },
     {
@@ -284,6 +319,7 @@ function getInitialSampleData() {
       cycleStartDay: 20,
       cycleEndDay: 19,
       network: 'Visa',
+      colorPreset: 'gold',
       createdAt: '2026-01-04'
     },
     {
@@ -296,6 +332,7 @@ function getInitialSampleData() {
       cycleStartDay: null,
       cycleEndDay: null,
       network: 'Mastercard',
+      colorPreset: 'emerald',
       createdAt: '2026-01-04'
     }
   ];
@@ -530,6 +567,16 @@ class WalletAppStore {
         this.banks = parsed.banks || [];
         this.cards = parsed.cards || [];
         this.transactions = parsed.transactions || [];
+        // Ensure colorPreset is present on older saved cards
+        this.cards.forEach(c => {
+          if (!c.colorPreset && !c.customColor) {
+            if (c.bankId === 'bank_cib') c.colorPreset = c.cardType === 'credit' ? 'cib' : 'indigo';
+            else if (c.bankId === 'bank_hsbc') c.colorPreset = c.cardType === 'credit' ? 'hsbc' : 'midnight';
+            else if (c.bankId === 'bank_qnb') c.colorPreset = 'qnb';
+            else if (c.bankId === 'bank_nbe') c.colorPreset = c.cardType === 'credit' ? 'gold' : (c.cardType === 'prepaid' ? 'nbe' : 'emerald');
+            else c.colorPreset = 'indigo';
+          }
+        });
         return;
       } catch (e) {
         console.error('Error parsing stored wallet data:', e);
@@ -615,7 +662,7 @@ class WalletAppStore {
     return this.cards.find(c => c.id === cardId);
   }
 
-  addCard({ bankId, name, last4, cardType, monthlyTarget, cycleStartDay, cycleEndDay, network }) {
+  addCard({ bankId, name, last4, cardType, monthlyTarget, cycleStartDay, cycleEndDay, network, colorPreset, customColor }) {
     // Strict 3-card cap enforcement
     if (!this.canAddCardToBank(bankId)) {
       throw new Error('This bank already has the maximum of 3 cards allowed.');
@@ -644,6 +691,8 @@ class WalletAppStore {
       cycleStartDay: cardType === 'credit' ? parseInt(cycleStartDay, 10) : null,
       cycleEndDay: cardType === 'credit' ? parseInt(cycleEndDay, 10) : null,
       network: network || (cardType === 'prepaid' ? 'Meeza' : 'Visa'),
+      colorPreset: colorPreset || null,
+      customColor: customColor || null,
       createdAt: new Date().toISOString()
     };
 
@@ -669,6 +718,15 @@ class WalletAppStore {
       card.cycleEndDay = null;
     }
 
+    this.saveState();
+    return true;
+  }
+
+  updateCardColor(cardId, { colorPreset, customColor }) {
+    const card = this.getCard(cardId);
+    if (!card) return false;
+    if (colorPreset !== undefined) card.colorPreset = colorPreset;
+    if (customColor !== undefined) card.customColor = customColor;
     this.saveState();
     return true;
   }
