@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ApexWallet — Smart Bank & Transaction Tracker</title>
+  <title>ApexWallet — Visual Card-First Tracker</title>
   
   <!-- PWA & Mobile Meta Tags -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0F172A">
+  <meta name="theme-color" content="#111827">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -21,18 +21,7 @@
       theme: {
         extend: {
           colors: {
-            slate: {
-              50: '#F8FAFC',
-              100: '#F1F5F9',
-              200: '#E2E8F0',
-              300: '#CBD5E1',
-              400: '#94A3B8',
-              500: '#64748B',
-              600: '#475569',
-              700: '#334155',
-              800: '#1E293B',
-              900: '#0F172A',
-            },
+            charcoal: '#111827',
             emerald: {
               50: '#ECFDF5',
               100: '#D1FAE5',
@@ -43,6 +32,7 @@
             rose: {
               50: '#FFF1F2',
               100: '#FFE4E6',
+              200: '#FECDD3',
               500: '#F43F5E',
               600: '#E11D48',
               700: '#BE123C',
@@ -52,7 +42,6 @@
               100: '#FEF3C7',
               500: '#F59E0B',
               600: '#D97706',
-              700: '#B45309',
             }
           }
         }
@@ -62,285 +51,134 @@
 
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    window.__ERRORS__ = [];
+    window.addEventListener('error', function(e) {
+      window.__ERRORS__.push(e.message + ' at ' + e.filename + ':' + e.lineno);
+    });
+  </script>
 
   <!-- Custom Styles -->
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-slate-200/70 antialiased select-none">
+<body class="bg-slate-200 flex justify-center min-h-screen font-sans antialiased select-none">
 
   <!-- Desktop Presentation Bar (Hidden on Mobile) -->
-  <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 hidden md:flex items-center gap-3 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-slate-300/80 shadow-md text-xs">
+  <div class="fixed top-3 left-1/2 -translate-x-1/2 z-50 hidden md:flex items-center gap-3 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full border border-slate-300/80 shadow-md text-xs">
     <div class="flex items-center gap-1.5 font-bold text-slate-800">
       <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-      <span>Mobile Viewport (430px)</span>
+      <span>Visual Card-First (390px)</span>
     </div>
     <span class="text-slate-300">|</span>
-    <!-- Currency Switcher -->
     <div class="flex items-center gap-1">
       <span class="text-slate-500 text-[11px]">Currency:</span>
-      <select onchange="window.switchCurrency(this.value)" class="bg-slate-100 border border-slate-200 rounded-lg px-2 py-0.5 text-xs font-semibold text-slate-800 cursor-pointer outline-none">
-        <option value="EGP">EGP (Egyptian Pound)</option>
+      <select onchange="window.switchCurrency(this.value)" class="bg-slate-100 border border-slate-200 rounded-full px-2.5 py-0.5 text-xs font-bold text-slate-800 cursor-pointer outline-none">
+        <option value="EGP">EGP</option>
         <option value="USD">USD ($)</option>
         <option value="EUR">EUR (€)</option>
         <option value="GBP">GBP (£)</option>
-        <option value="SAR">SAR (Riyal)</option>
-        <option value="AED">AED (Dirham)</option>
+        <option value="SAR">SAR</option>
+        <option value="AED">AED</option>
       </select>
     </div>
     <span class="text-slate-300">|</span>
-    <button onclick="window.resetSampleData()" class="text-slate-600 hover:text-indigo-600 font-semibold transition-colors flex items-center gap-1">
+    <button onclick="window.resetSampleData()" class="text-slate-600 hover:text-indigo-600 font-bold transition-colors flex items-center gap-1">
       <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-      <span>Reset Demo Data</span>
+      <span>Reset Demo</span>
     </button>
     <span class="text-slate-300">|</span>
-    <button onclick="window.exportTransactionsCSV()" class="text-slate-600 hover:text-emerald-600 font-semibold transition-colors flex items-center gap-1">
+    <button onclick="window.exportTransactionsCSV()" class="text-slate-600 hover:text-emerald-600 font-bold transition-colors flex items-center gap-1">
       <i data-lucide="download" class="w-3.5 h-3.5"></i>
-      <span>Export CSV</span>
+      <span>CSV</span>
     </button>
   </div>
 
   <!-- Toast Notification Container -->
-  <div id="toast-container" class="fixed top-12 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-[380px] pointer-events-none flex flex-col gap-2"></div>
+  <div id="toast-container" class="fixed top-10 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-[360px] pointer-events-none flex flex-col gap-2"></div>
 
   <!-- ============================================== -->
-  <!-- SMARTPHONE VIEWPORT CONTAINER (MAX-WIDTH 430px) -->
+  <!-- SMARTPHONE VIEWPORT CONTAINER (MAX-WIDTH 390px) -->
   <!-- ============================================== -->
   <main class="mobile-app-shell">
     
-    <!-- Dynamic Island / Hardware Mockup -->
+    <!-- Dynamic Island / Top Mockup -->
     <div class="dynamic-island">
-      <span class="w-2.5 h-2.5 rounded-full bg-slate-800"></span>
-      <span class="w-2.5 h-2.5 rounded-full bg-slate-900 border border-slate-700/60"></span>
+      <span class="w-2 h-2 rounded-full bg-slate-800"></span>
+      <span class="w-2 h-2 rounded-full bg-slate-900 border border-slate-700/60"></span>
     </div>
 
     <!-- Mobile Status Bar -->
     <div class="mobile-status-bar">
       <span id="status-bar-clock" class="tracking-tight font-mono">10:44</span>
-      <div class="flex items-center gap-1.5 text-slate-700">
+      <div class="flex items-center gap-1.5 text-slate-800">
         <i data-lucide="signal" class="w-3.5 h-3.5"></i>
         <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
-        <div class="w-5 h-2.5 border border-slate-700 rounded-[3px] p-[1px] flex items-center">
+        <div class="w-5 h-2.5 border border-slate-800 rounded-[3px] p-[1px] flex items-center">
           <div class="w-3.5 h-1.5 bg-slate-900 rounded-[1px]"></div>
         </div>
       </div>
     </div>
 
-    <!-- App Header -->
-    <header class="px-5 pt-1 pb-2 flex items-center justify-between bg-slate-50 border-b border-slate-200/50">
-      <div class="flex items-center gap-2.5">
-        <div class="w-9 h-9 rounded-2xl bg-gradient-to-tr from-slate-900 to-indigo-900 text-white flex items-center justify-center font-bold text-xs shadow-sm">
-          AW
-        </div>
-        <div>
-          <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Fintech Tracker</span>
-          <h1 class="text-sm font-extrabold text-slate-900 leading-tight">ApexWallet</h1>
-        </div>
+    <!-- Top Bar (Revolut / Telda Style) -->
+    <header class="px-5 pt-2 pb-3 flex justify-between items-center bg-slate-50">
+      <div>
+        <h1 id="header-title" class="text-xl font-extrabold text-slate-900 tracking-tight leading-tight">Cards</h1>
+        <p id="header-subtitle" class="text-xs text-slate-400 font-medium">18 transactions • 84,850 EGP spent</p>
       </div>
-
-      <div class="flex items-center gap-2">
-        <!-- Quick Demo Reload Icon on Mobile -->
-        <button onclick="window.resetSampleData()" class="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 flex items-center justify-center shadow-2xs active-press" title="Reset Demo Data">
-          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-        </button>
-        <!-- Currency Pill -->
-        <div class="px-2.5 py-1 rounded-xl bg-white border border-slate-200/80 text-xs font-bold text-slate-800 shadow-2xs">
-          <span id="current-currency-display">EGP</span>
-        </div>
-      </div>
+      <button id="top-add-btn" class="w-9 h-9 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg flex items-center justify-center shadow-md shadow-indigo-500/25 active-press transition-all" title="Add Transaction, Card or Bank">
+        +
+      </button>
     </header>
 
-    <!-- Global Dynamic Filter Bar (Account & Statement Period) -->
-    <div class="px-4 py-2 bg-slate-50 border-b border-slate-200/70 flex items-center gap-2">
-      <!-- Account Filter -->
-      <div class="relative flex-1">
-        <select id="filter-account" class="w-full text-[11px] font-bold text-slate-700 bg-white border border-slate-200/90 rounded-xl px-2.5 py-1.5 appearance-none shadow-2xs focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer">
-          <option value="all">💳 All Accounts</option>
-        </select>
-        <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-      </div>
-
-      <!-- Statement Month Filter -->
-      <div class="relative flex-1">
-        <select id="filter-statement" class="w-full text-[11px] font-bold text-slate-700 bg-white border border-slate-200/90 rounded-xl px-2.5 py-1.5 appearance-none shadow-2xs focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer">
-          <option value="all">🗓️ All Statements</option>
-        </select>
-        <i data-lucide="chevron-down" class="w-3 h-3 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-      </div>
-    </div>
-
-    <!-- Scrollable Main Content Container -->
-    <div id="mobile-scroll-body" class="flex-1 overflow-y-auto px-4 py-3 pb-24 bg-slate-50">
+    <!-- Scrollable Main Content -->
+    <div id="mobile-scroll-body" class="flex-1 overflow-y-auto px-5 py-2 pb-24 bg-slate-50">
       
-      <!-- ============================================== -->
-      <!-- VIEW 1: DASHBOARD -->
-      <!-- ============================================== -->
-      <section id="view-dashboard" class="space-y-4">
-        <!-- Dynamic Alert Banner for Target Exceeded (Injected via JS) -->
-        <div id="dashboard-alert-banner"></div>
+      <!-- VIEW 1: OVERVIEW (Visual Card-First Hero) -->
+      <section id="view-dashboard"></section>
 
-        <!-- Top Summary Cards (Count & Amount Spent) -->
-        <div class="grid grid-cols-2 gap-2.5">
-          <!-- Total Amount Spent Card -->
-          <div class="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Spent</span>
-              <div class="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
-              </div>
-            </div>
-            <div>
-              <h2 id="stat-total-spent" class="text-base font-black text-slate-900 tracking-tight font-mono">0.00</h2>
-              <span id="stat-spent-subtitle" class="text-[10px] text-slate-400 font-medium block truncate mt-0.5">Current Filter</span>
-            </div>
-          </div>
+      <!-- VIEW 2: BANKS (3 max per bank) -->
+      <section id="view-cards" class="hidden"></section>
 
-          <!-- Total Transactions Count Card -->
-          <div class="bg-white rounded-3xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Transactions</span>
-              <div class="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
-              </div>
-            </div>
-            <div>
-              <h2 id="stat-total-count" class="text-base font-black text-slate-900 tracking-tight font-mono">0</h2>
-              <span id="stat-count-subtitle" class="text-[10px] text-slate-400 font-medium block truncate mt-0.5">Total logs</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Target & Limit Tracker (Overall & Per Card) -->
-        <div id="target-limit-tracker"></div>
-
-        <!-- Recent Transactions Preview -->
-        <div>
-          <div class="flex items-center justify-between mb-2.5 px-1">
-            <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Recent Activity</h3>
-            <button onclick="document.querySelector('[data-tab=history]').click()" class="text-[11px] font-bold text-emerald-600 hover:text-emerald-700">
-              View All &rarr;
-            </button>
-          </div>
-          <div id="dashboard-recent-tx-list" class="space-y-2"></div>
-        </div>
-      </section>
-
-      <!-- ============================================== -->
-      <!-- VIEW 2: CARDS & BANKS -->
-      <!-- ============================================== -->
-      <section id="view-cards" class="hidden space-y-4">
-        <div class="flex items-center justify-between px-1">
-          <div>
-            <h2 class="text-sm font-extrabold text-slate-900">Banks & Cards</h2>
-            <p class="text-[11px] text-slate-400">Enforcing maximum 3 cards per bank</p>
-          </div>
-          <button onclick="window.openModal('bank')" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-2xl flex items-center gap-1.5 shadow-sm active-press">
-            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-            <span>Add Bank</span>
-          </button>
-        </div>
-
-        <!-- Banks & Cards List -->
-        <div id="cards-banks-list" class="space-y-4"></div>
-      </section>
-
-      <!-- ============================================== -->
       <!-- VIEW 3: HISTORY -->
-      <!-- ============================================== -->
-      <section id="view-history" class="hidden space-y-3">
-        <div class="flex items-center justify-between px-1">
-          <div>
-            <h2 class="text-sm font-extrabold text-slate-900">Transaction History</h2>
-            <span id="history-count-badge" class="text-[11px] text-slate-400">All recorded transactions</span>
-          </div>
-          <button onclick="window.exportTransactionsCSV()" class="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 text-[11px] font-semibold rounded-xl flex items-center gap-1 hover:bg-slate-50 shadow-2xs">
-            <i data-lucide="download" class="w-3 h-3 text-emerald-600"></i>
-            <span>CSV</span>
-          </button>
-        </div>
-
-        <!-- Search Bar -->
-        <div class="relative">
-          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
-          <input type="text" id="history-search-input" placeholder="Search merchant, category, notes, or amount..." class="w-full bg-white border border-slate-200/90 rounded-2xl pl-9 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs">
-        </div>
-
-        <!-- Filter helper chip -->
-        <div class="flex items-center justify-between px-1 text-[11px]">
-          <span class="text-slate-400">Smart Billing Cycle tags applied automatically</span>
-          <button onclick="window.resetFilters()" class="text-indigo-600 font-semibold hover:underline">Clear Filters</button>
-        </div>
-
-        <!-- Transaction List Grouped by Date -->
-        <div id="history-tx-list"></div>
-      </section>
+      <section id="view-history" class="hidden"></section>
 
     </div>
 
     <!-- ============================================== -->
-    <!-- BOTTOM APP NAVIGATION BAR -->
+    <!-- FLOATING BOTTOM NAVIGATION (Revolut / Telda Style) -->
     <!-- ============================================== -->
-    <nav class="absolute bottom-0 left-0 right-0 h-[72px] bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-4 flex items-center justify-between z-30">
-      
-      <!-- Nav Item 1: Dashboard -->
-      <button data-tab="dashboard" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-emerald-600 transition-colors">
-        <div class="nav-icon-wrapper p-1.5 rounded-xl bg-emerald-50 text-emerald-600 transition-all">
-          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
-        </div>
-        <span class="nav-label text-[10px] font-bold tracking-tight">Dashboard</span>
-      </button>
-
-      <!-- Nav Item 2: Cards & Banks -->
-      <button data-tab="cards" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-slate-600 transition-colors">
-        <div class="nav-icon-wrapper p-1.5 rounded-xl transition-all">
-          <i data-lucide="credit-card" class="w-4 h-4"></i>
-        </div>
-        <span class="nav-label text-[10px] font-bold tracking-tight">Cards & Banks</span>
-      </button>
-
-      <!-- Nav Item 3: Center Floating Add Action Button -->
-      <div class="flex-1 flex items-center justify-center -mt-6">
-        <button id="fab-add-btn" class="w-13 h-13 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 active-press hover:scale-105 transition-all p-3" title="Add New Transaction or Card">
-          <i data-lucide="plus" class="w-6 h-6 stroke-[2.5]"></i>
-        </button>
-      </div>
-
-      <!-- Nav Item 4: History -->
-      <button data-tab="history" class="nav-btn flex-1 flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-slate-600 transition-colors">
-        <div class="nav-icon-wrapper p-1.5 rounded-xl transition-all">
-          <i data-lucide="receipt" class="w-4 h-4"></i>
-        </div>
-        <span class="nav-label text-[10px] font-bold tracking-tight">History</span>
-      </button>
-
+    <nav class="floating-bottom-nav">
+      <button data-tab="dashboard" class="floating-nav-tab active">Overview</button>
+      <button data-tab="cards" class="floating-nav-tab">Banks (3 max)</button>
+      <button data-tab="history" class="floating-nav-tab">History</button>
     </nav>
 
     <!-- ============================================== -->
     <!-- SLIDE-UP MODAL 1: QUICK ACTIONS -->
     <!-- ============================================== -->
     <div id="modal-quick-actions" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop absolute inset-0 bg-slate-900/50 backdrop-blur-xs"></div>
+      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
       
-      <div class="modal-sheet relative bg-white rounded-t-[32px] p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[430px] mx-auto w-full">
-        <!-- Handle -->
+      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full">
         <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"></div>
         
-        <h3 class="text-sm font-extrabold text-slate-900 mb-1">Quick Actions</h3>
-        <p class="text-xs text-slate-400 mb-4">Choose an action to perform</p>
+        <h3 class="text-sm font-extrabold text-slate-900 mb-1">Create New</h3>
+        <p class="text-xs text-slate-400 mb-4">Choose an item to add</p>
 
         <div class="space-y-2.5">
           <button id="qa-add-tx" class="w-full p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center gap-3 text-left transition-all active-press">
-            <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-              <i data-lucide="plus-circle" class="w-5 h-5"></i>
+            <div class="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+              <i data-lucide="plus" class="w-4 h-4"></i>
             </div>
             <div>
               <div class="text-xs font-bold text-slate-900">Log Transaction</div>
-              <div class="text-[11px] text-slate-400">Track purchase with smart billing statement cycle tagging</div>
+              <div class="text-[11px] text-slate-400">Automatic billing statement cycle tagging</div>
             </div>
           </button>
 
           <button id="qa-add-card" class="w-full p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center gap-3 text-left transition-all active-press">
-            <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-              <i data-lucide="credit-card" class="w-5 h-5"></i>
+            <div class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+              <i data-lucide="credit-card" class="w-4 h-4"></i>
             </div>
             <div>
               <div class="text-xs font-bold text-slate-900">Add Bank Card</div>
@@ -349,17 +187,17 @@
           </button>
 
           <button id="qa-add-bank" class="w-full p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center gap-3 text-left transition-all active-press">
-            <div class="w-10 h-10 rounded-xl bg-slate-200 text-slate-800 flex items-center justify-center shrink-0">
-              <i data-lucide="building-2" class="w-5 h-5"></i>
+            <div class="w-9 h-9 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center shrink-0">
+              <i data-lucide="building-2" class="w-4 h-4"></i>
             </div>
             <div>
               <div class="text-xs font-bold text-slate-900">Add New Bank</div>
-              <div class="text-[11px] text-slate-400">Define custom brand accent colors</div>
+              <div class="text-[11px] text-slate-400">Custom brand accent colors</div>
             </div>
           </button>
         </div>
 
-        <button data-close-modal="quickActions" class="mt-4 w-full py-2.5 text-center text-xs font-bold text-slate-400 hover:text-slate-600">
+        <button data-close-modal="quickActions" class="mt-4 w-full py-2.5 text-center text-xs font-bold text-slate-400 hover:text-slate-600 rounded-full">
           Cancel
         </button>
       </div>
@@ -369,15 +207,15 @@
     <!-- SLIDE-UP MODAL 2: LOG TRANSACTION -->
     <!-- ============================================== -->
     <div id="modal-transaction" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop absolute inset-0 bg-slate-900/50 backdrop-blur-xs"></div>
+      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
       
-      <div class="modal-sheet relative bg-white rounded-t-[32px] p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[430px] mx-auto w-full max-h-[90vh] overflow-y-auto">
+      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] overflow-y-auto">
         <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3"></div>
 
         <div class="flex items-center justify-between mb-3">
           <div>
-            <h3 class="text-sm font-extrabold text-slate-900">Log New Transaction</h3>
-            <p class="text-[11px] text-slate-400">Automatic billing statement month calculation</p>
+            <h3 class="text-sm font-extrabold text-slate-900">Log Transaction</h3>
+            <p class="text-[11px] text-slate-400">Auto-calculated billing statement cycle</p>
           </div>
           <button data-close-modal="transaction" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
             <i data-lucide="x" class="w-4 h-4"></i>
@@ -390,31 +228,30 @@
             <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Amount</label>
             <div class="relative">
               <span class="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">$ / EGP</span>
-              <input type="number" step="0.01" min="0.01" id="tx-amount" required placeholder="0.00" class="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-16 pr-3 py-2.5 text-base font-black text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <input type="number" step="0.01" min="0.01" id="tx-amount" required placeholder="0.00" class="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-16 pr-3 py-2.5 text-base font-black text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
             </div>
           </div>
 
           <!-- Merchant -->
           <div>
             <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Merchant / Description</label>
-            <input type="text" id="tx-merchant" required placeholder="e.g. Starbucks, Amazon, Carrefour" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <input type="text" id="tx-merchant" required placeholder="e.g. Carrefour, Starbucks, Amazon" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
             
             <!-- Quick Chips -->
             <div class="flex items-center gap-1.5 mt-1.5 overflow-x-auto no-scrollbar py-0.5">
-              <button type="button" class="quick-merchant-chip px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-medium shrink-0" data-merchant="Starbucks" data-category="food">☕ Starbucks</button>
-              <button type="button" class="quick-merchant-chip px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-medium shrink-0" data-merchant="Carrefour" data-category="groceries">🛒 Carrefour</button>
-              <button type="button" class="quick-merchant-chip px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-medium shrink-0" data-merchant="Amazon" data-category="shopping">📦 Amazon</button>
-              <button type="button" class="quick-merchant-chip px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-medium shrink-0" data-merchant="Uber" data-category="travel">🚗 Uber</button>
-              <button type="button" class="quick-merchant-chip px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-medium shrink-0" data-merchant="Netflix" data-category="services">🎬 Netflix</button>
+              <button type="button" class="quick-merchant-chip px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-semibold shrink-0" data-merchant="Carrefour Hypermarket" data-category="groceries">🛒 Carrefour</button>
+              <button type="button" class="quick-merchant-chip px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-semibold shrink-0" data-merchant="Talabat Order" data-category="food">🍔 Talabat</button>
+              <button type="button" class="quick-merchant-chip px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-semibold shrink-0" data-merchant="Starbucks" data-category="food">☕ Starbucks</button>
+              <button type="button" class="quick-merchant-chip px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-semibold shrink-0" data-merchant="Amazon" data-category="shopping">📦 Amazon</button>
             </div>
           </div>
 
           <!-- Category -->
           <div>
             <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Category</label>
-            <select id="tx-category" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
-              <option value="food">🍔 Food & Dining</option>
+            <select id="tx-category" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
               <option value="groceries">🛒 Groceries</option>
+              <option value="food">🍔 Food & Dining</option>
               <option value="shopping">🛍️ Shopping</option>
               <option value="utilities">💡 Bills & Utilities</option>
               <option value="entertainment">🎬 Entertainment</option>
@@ -428,35 +265,31 @@
           <!-- Date & Card Selection Row -->
           <div class="grid grid-cols-2 gap-2.5">
             <div>
-              <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Transaction Date</label>
-              <input type="date" id="tx-date" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Date</label>
+              <input type="date" id="tx-date" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
             </div>
 
             <div>
-              <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Select Card</label>
-              <select id="tx-card-select" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-2.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
+              <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Card</label>
+              <select id="tx-card-select" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-2.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
                 <!-- Injected via JS -->
               </select>
             </div>
           </div>
 
           <!-- DYNAMIC SMART BILLING CYCLE PREVIEW BOX -->
-          <div id="tx-cycle-preview-box" class="p-3 rounded-2xl bg-indigo-50/70 border border-indigo-200/60 flex items-start gap-2.5">
-            <i id="tx-cycle-preview-icon" data-lucide="zap" class="w-4 h-4 text-indigo-600 mt-0.5 shrink-0"></i>
-            <div>
-              <div id="tx-cycle-preview-badge"></div>
-              <div id="tx-cycle-preview-range"></div>
-            </div>
+          <div id="tx-cycle-preview-box" class="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200/70">
+            <div id="tx-cycle-preview-badge"></div>
+            <div id="tx-cycle-preview-range"></div>
           </div>
 
-          <!-- Notes (Optional) -->
+          <!-- Notes -->
           <div>
             <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Notes (Optional)</label>
-            <input type="text" id="tx-notes" placeholder="e.g. Split with Sarah, personal reward" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <input type="text" id="tx-notes" placeholder="Optional notes" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
           </div>
 
-          <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-2xl shadow-md shadow-emerald-600/20 active-press transition-all flex items-center justify-center gap-1.5">
-            <i data-lucide="check" class="w-4 h-4"></i>
+          <button type="submit" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white font-bold text-xs rounded-full shadow-md active-press transition-all flex items-center justify-center gap-1.5">
             <span>Log Transaction</span>
           </button>
         </form>
@@ -467,15 +300,15 @@
     <!-- SLIDE-UP MODAL 3: ADD BANK -->
     <!-- ============================================== -->
     <div id="modal-bank" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop absolute inset-0 bg-slate-900/50 backdrop-blur-xs"></div>
+      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
       
-      <div class="modal-sheet relative bg-white rounded-t-[32px] p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[430px] mx-auto w-full">
+      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full">
         <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3"></div>
 
         <div class="flex items-center justify-between mb-3">
           <div>
-            <h3 class="text-sm font-extrabold text-slate-900">Add New Bank</h3>
-            <p class="text-[11px] text-slate-400">Add an institution to hold up to 3 cards</p>
+            <h3 class="text-sm font-extrabold text-slate-900">Add Bank</h3>
+            <p class="text-[11px] text-slate-400">Max 3 cards can be added under each bank</p>
           </div>
           <button data-close-modal="bank" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
             <i data-lucide="x" class="w-4 h-4"></i>
@@ -485,55 +318,49 @@
         <form id="form-add-bank" class="space-y-3.5">
           <div>
             <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Bank Name</label>
-            <input type="text" id="bank-name" required placeholder="e.g. CIB, HSBC, Barclays, Chase" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900">
+            <input type="text" id="bank-name" required placeholder="e.g. CIB, QNB, HSBC, NBE" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900">
           </div>
 
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Short Code / Badge</label>
-            <input type="text" id="bank-code" maxlength="6" placeholder="e.g. CIB, HSBC, QNB" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 uppercase">
+            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Short Code</label>
+            <input type="text" id="bank-code" maxlength="6" placeholder="e.g. CIB, QNB" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 uppercase">
           </div>
 
-          <!-- Color Customization -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Custom Accent Color</label>
+            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Brand Accent Color</label>
             <div class="flex items-center gap-2 mb-2">
-              <input type="color" id="bank-color-custom" value="#002D62" class="w-8 h-8 rounded-xl border border-slate-200 cursor-pointer p-0">
-              <span class="text-xs text-slate-500 font-mono">Custom Hex Color</span>
+              <input type="color" id="bank-color-custom" value="#002D62" class="w-8 h-8 rounded-full border border-slate-200 cursor-pointer p-0">
+              <span class="text-xs text-slate-500 font-mono">Custom Color</span>
             </div>
 
-            <!-- Curated Bank Swatches -->
-            <span class="text-[10px] text-slate-400 block mb-1">Or choose a preset:</span>
             <div class="flex items-center gap-2 flex-wrap">
-              <button type="button" class="bank-color-swatch w-6 h-6 rounded-full bg-[#002D62] transition-transform shadow-xs" data-color="#002D62" title="CIB Navy"></button>
-              <button type="button" class="bank-color-swatch w-6 h-6 rounded-full bg-[#DB0011] transition-transform shadow-xs" data-color="#DB0011" title="HSBC Red"></button>
-              <button type="button" class="bank-color-swatch w-6 h-6 rounded-full bg-[#7C003D] transition-transform shadow-xs" data-color="#7C003D" title="QNB Burgundy"></button>
-              <button type="button" class="bank-color-swatch w-6 h-6 rounded-full bg-[#006837] transition-transform shadow-xs" data-color="#006837" title="NBE Emerald"></button>
-              <button type="button" class="bank-color-swatch w-6 h-6 rounded-full bg-[#117ACA] transition-transform shadow-xs" data-color="#117ACA" title="Chase Blue"></button>
-              <button type="button" class="bank-color-swatch w-6 h-6 rounded-full bg-[#00AEEF] transition-transform shadow-xs" data-color="#00AEEF" title="Barclays Cyan"></button>
-              <button type="button" class="bank-color-swatch w-6 h-6 rounded-full bg-[#0B3082] transition-transform shadow-xs" data-color="#0B3082" title="Emirates NBD"></button>
+              <button type="button" class="bank-color-swatch w-6 h-6 rounded-full bg-[#002D62] transition-transform shadow-xs" data-color="#002D62" title="CIB"></button>
+              <button type="button" class="bank-color-swatch w-6 h-6 rounded-full bg-[#7C003D] transition-transform shadow-xs" data-color="#7C003D" title="QNB"></button>
+              <button type="button" class="bank-color-swatch w-6 h-6 rounded-full bg-[#DB0011] transition-transform shadow-xs" data-color="#DB0011" title="HSBC"></button>
+              <button type="button" class="bank-color-swatch w-6 h-6 rounded-full bg-[#006837] transition-transform shadow-xs" data-color="#006837" title="NBE"></button>
+              <button type="button" class="bank-color-swatch w-6 h-6 rounded-full bg-[#4F46E5] transition-transform shadow-xs" data-color="#4F46E5" title="Indigo"></button>
             </div>
           </div>
 
-          <button type="submit" class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-2xl shadow-md active-press transition-all flex items-center justify-center gap-1.5">
-            <i data-lucide="building-2" class="w-4 h-4"></i>
-            <span>Create Bank</span>
+          <button type="submit" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white font-bold text-xs rounded-full shadow-md active-press transition-all flex items-center justify-center gap-1.5">
+            <span>Save Bank</span>
           </button>
         </form>
       </div>
     </div>
 
     <!-- ============================================== -->
-    <!-- SLIDE-UP MODAL 4: ADD CARD (WITH 3-CARD CAP & CYCLE) -->
+    <!-- SLIDE-UP MODAL 4: ADD CARD (3-CARD CAP ENFORCED) -->
     <!-- ============================================== -->
     <div id="modal-card" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop absolute inset-0 bg-slate-900/50 backdrop-blur-xs"></div>
+      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
       
-      <div class="modal-sheet relative bg-white rounded-t-[32px] p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[430px] mx-auto w-full max-h-[92vh] overflow-y-auto">
+      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[92vh] overflow-y-auto">
         <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3"></div>
 
         <div class="flex items-center justify-between mb-3">
           <div>
-            <h3 class="text-sm font-extrabold text-slate-900">Add New Card</h3>
+            <h3 class="text-sm font-extrabold text-slate-900">Add Card</h3>
             <p class="text-[11px] text-slate-400">Strict 3-card limit enforced per bank</p>
           </div>
           <button data-close-modal="card" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
@@ -542,104 +369,80 @@
         </div>
 
         <form id="form-add-card" class="space-y-3.5">
-          <!-- Bank Selection -->
+          <!-- Bank -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Parent Bank</label>
+            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Bank</label>
             <select id="card-bank-select" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer">
               <!-- Injected via JS -->
             </select>
           </div>
 
-          <!-- Card Nickname & Last 4 Digits -->
+          <!-- Name & Last 4 -->
           <div class="grid grid-cols-2 gap-2.5">
             <div>
-              <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Card Nickname</label>
-              <input type="text" id="card-name" required placeholder="e.g. Titanium Miles" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900">
+              <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Nickname</label>
+              <input type="text" id="card-name" required placeholder="e.g. Titanium" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900">
             </div>
 
             <div>
               <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Last 4 Digits</label>
-              <input type="text" id="card-last4" required maxlength="4" pattern="[0-9]{4}" placeholder="4921" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-slate-900">
+              <input type="text" id="card-last4" required maxlength="4" pattern="[0-9]{4}" placeholder="4910" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-slate-900">
             </div>
           </div>
 
-          <!-- Card Type (Credit, Debit, Prepaid) -->
+          <!-- Card Type -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Card Type</label>
+            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Type</label>
             <div class="grid grid-cols-3 gap-2">
               <div>
                 <input type="radio" id="type-credit" name="card-type" value="credit" checked class="hidden peer">
-                <label for="type-credit" class="flex flex-col items-center justify-center p-2 rounded-2xl border border-slate-200 bg-slate-50 peer-checked:bg-emerald-50 peer-checked:border-emerald-500 peer-checked:text-emerald-700 cursor-pointer transition-all">
-                  <i data-lucide="credit-card" class="w-4 h-4 mb-1"></i>
-                  <span class="text-[11px] font-bold">Credit</span>
+                <label for="type-credit" class="flex items-center justify-center py-2 px-2 rounded-full border border-slate-200 bg-slate-50 peer-checked:bg-[#111827] peer-checked:border-[#111827] peer-checked:text-white cursor-pointer transition-all text-xs font-bold">
+                  Credit
                 </label>
               </div>
 
               <div>
                 <input type="radio" id="type-debit" name="card-type" value="debit" class="hidden peer">
-                <label for="type-debit" class="flex flex-col items-center justify-center p-2 rounded-2xl border border-slate-200 bg-slate-50 peer-checked:bg-emerald-50 peer-checked:border-emerald-500 peer-checked:text-emerald-700 cursor-pointer transition-all">
-                  <i data-lucide="wallet" class="w-4 h-4 mb-1"></i>
-                  <span class="text-[11px] font-bold">Debit</span>
+                <label for="type-debit" class="flex items-center justify-center py-2 px-2 rounded-full border border-slate-200 bg-slate-50 peer-checked:bg-[#111827] peer-checked:border-[#111827] peer-checked:text-white cursor-pointer transition-all text-xs font-bold">
+                  Debit
                 </label>
               </div>
 
               <div>
                 <input type="radio" id="type-prepaid" name="card-type" value="prepaid" class="hidden peer">
-                <label for="type-prepaid" class="flex flex-col items-center justify-center p-2 rounded-2xl border border-slate-200 bg-slate-50 peer-checked:bg-emerald-50 peer-checked:border-emerald-500 peer-checked:text-emerald-700 cursor-pointer transition-all">
-                  <i data-lucide="coins" class="w-4 h-4 mb-1"></i>
-                  <span class="text-[11px] font-bold">Prepaid</span>
+                <label for="type-prepaid" class="flex items-center justify-center py-2 px-2 rounded-full border border-slate-200 bg-slate-50 peer-checked:bg-[#111827] peer-checked:border-[#111827] peer-checked:text-white cursor-pointer transition-all text-xs font-bold">
+                  Prepaid
                 </label>
               </div>
             </div>
           </div>
 
-          <!-- Monthly Spending Target / Limit -->
+          <!-- Target / Limit -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Monthly Spending Target / Limit</label>
-            <input type="number" id="card-target" required min="1" step="100" placeholder="e.g. 25000" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900">
+            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Spending Target / Limit</label>
+            <input type="number" id="card-target" required min="1" step="100" placeholder="15000" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900">
           </div>
 
-          <!-- DYNAMIC CREDIT CARD BILLING CYCLE SECTION (Mandatory when Card Type = Credit) -->
-          <div id="card-cycle-section" class="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/60 space-y-2.5">
-            <div class="flex items-center gap-1.5 text-indigo-900">
-              <i data-lucide="calendar-clock" class="w-4 h-4 text-indigo-600"></i>
-              <span class="text-xs font-bold">Credit Card Billing Cycle</span>
+          <!-- DYNAMIC CREDIT CARD CYCLE SECTION -->
+          <div id="card-cycle-section" class="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/60 space-y-2">
+            <span class="text-xs font-bold text-indigo-900 block">Billing Cycle Days (1–31)</span>
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="block text-[10px] font-bold text-indigo-900 uppercase mb-1">Start Day</label>
+                <input type="number" id="card-cycle-start" min="1" max="31" value="25" class="w-full bg-white border border-indigo-200 rounded-full px-3 py-1.5 text-xs font-bold text-indigo-950 font-mono text-center">
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-bold text-indigo-900 uppercase mb-1">End Day</label>
+                <input type="number" id="card-cycle-end" min="1" max="31" value="24" class="w-full bg-white border border-indigo-200 rounded-full px-3 py-1.5 text-xs font-bold text-indigo-950 font-mono text-center">
+              </div>
             </div>
-            <p class="text-[11px] text-slate-600 leading-tight">
-              Purchases between Start and End days will automatically be tagged to the corresponding statement month.
+            <p class="text-[10px] text-indigo-800/80">
+              Purchases after the start day roll into the next month's statement.
             </p>
-
-            <div class="grid grid-cols-2 gap-2.5 pt-1">
-              <div>
-                <label class="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider mb-1">Cycle Start Day (1-31)</label>
-                <input type="number" id="card-cycle-start" min="1" max="31" value="25" class="w-full bg-white border border-indigo-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-indigo-950 font-mono text-center focus:ring-1 focus:ring-indigo-500">
-              </div>
-
-              <div>
-                <label class="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider mb-1">Cycle End Day (1-31)</label>
-                <input type="number" id="card-cycle-end" min="1" max="31" value="24" class="w-full bg-white border border-indigo-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-indigo-950 font-mono text-center focus:ring-1 focus:ring-indigo-500">
-              </div>
-            </div>
-
-            <div class="text-[10px] text-indigo-800/80 bg-white/70 p-2 rounded-xl border border-indigo-100 flex items-center gap-1.5">
-              <i data-lucide="info" class="w-3.5 h-3.5 text-indigo-500 shrink-0"></i>
-              <span>Example: 25th to 24th tags Nov 27 to December Statement.</span>
-            </div>
           </div>
 
-          <!-- Network Badge Selection -->
-          <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Card Network</label>
-            <select id="card-network" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 cursor-pointer">
-              <option value="Visa">Visa</option>
-              <option value="Mastercard">Mastercard</option>
-              <option value="Meeza">Meeza (National)</option>
-              <option value="American Express">American Express</option>
-            </select>
-          </div>
-
-          <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-2xl shadow-md active-press transition-all flex items-center justify-center gap-1.5">
-            <i data-lucide="plus" class="w-4 h-4"></i>
+          <button type="submit" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white font-bold text-xs rounded-full shadow-md active-press transition-all flex items-center justify-center gap-1.5">
             <span>Add Card</span>
           </button>
         </form>
@@ -655,7 +458,7 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(err => {
-          console.log('ServiceWorker registration note:', err);
+          console.log('SW registration note:', err);
         });
       });
     }

@@ -1,21 +1,26 @@
 /* 
-  Crisp Light-Mode Fintech Theme & Mobile Viewport Styles
-  Slate-50 Background (#F8FAFC), Pure White Cards (#FFFFFF), 
-  High-Contrast Typography, Emerald/Rose Status Indicators
+  Visual Card-First Fintech Theme (Revolut & Telda Style)
+  - Background: #F9FAFB
+  - Cards: #FFFFFF
+  - Primary / Charcoal: #111827
+  - Emerald: #10B981
+  - Soft Rose: #F43F5E
+  - Amber Warning: #F59E0B
+  - Border Radius: rounded-3xl for primary cards, rounded-2xl for secondary pills, rounded-full for buttons & badges
+  - Floating Nav: bottom floating pill with backdrop-blur-md
 */
 
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
 
 :root {
-  --bg-slate: #F8FAFC;
+  --bg-slate: #F9FAFB;
   --surface-white: #FFFFFF;
-  --border-subtle: #E2E8F0;
-  --border-crisp: #CBD5E1;
-  --text-primary: #0F172A;
-  --text-secondary: #475569;
-  --text-muted: #94A3B8;
+  --border-subtle: #F3F4F6;
+  --border-card: #E5E7EB;
+  --text-charcoal: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #9CA3AF;
   --emerald-accent: #10B981;
-  --emerald-dark: #059669;
   --rose-accent: #F43F5E;
   --amber-accent: #F59E0B;
   --indigo-accent: #4F46E5;
@@ -28,8 +33,8 @@
 
 body {
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background-color: #F1F5F9;
-  color: var(--text-primary);
+  background-color: #E2E8F0;
+  color: var(--text-charcoal);
   margin: 0;
   padding: 0;
   min-height: 100vh;
@@ -63,25 +68,25 @@ body {
   scrollbar-width: none;
 }
 
-/* Mobile Viewport Container */
+/* Mobile Viewport Shell (390px viewport centered on desktop) */
 .mobile-app-shell {
   width: 100%;
-  max-width: 430px;
-  height: 900px;
+  max-width: 390px;
+  height: 844px;
   max-height: 96vh;
   background-color: var(--bg-slate);
   position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 46px;
-  border: 9px solid #1E293B;
-  box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.08);
+  border-radius: 44px;
+  border: 8px solid #111827;
+  box-shadow: 0 25px 60px -15px rgba(17, 24, 39, 0.25), 0 0 0 1px rgba(17, 24, 39, 0.08);
   transition: all 0.3s ease;
 }
 
-/* Standalone / Real Mobile Screen: fill 100% */
-@media (max-width: 480px) {
+/* Real mobile devices: 100% full screen */
+@media (max-width: 440px) {
   body {
     background-color: var(--bg-slate);
     align-items: flex-start;
@@ -96,11 +101,11 @@ body {
   }
 }
 
-/* Dynamic Island / Hardware Mockup Pill */
+/* Dynamic Island Mockup */
 .dynamic-island {
-  width: 110px;
-  height: 26px;
-  background-color: #0F172A;
+  width: 100px;
+  height: 24px;
+  background-color: #111827;
   border-radius: 20px;
   margin: 6px auto 0;
   display: flex;
@@ -108,23 +113,67 @@ body {
   justify-content: space-between;
   padding: 0 10px;
   color: #FFFFFF;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
   z-index: 50;
 }
 
 /* Status Bar */
 .mobile-status-bar {
-  height: 44px;
+  height: 38px;
   padding: 0 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-size: 11px;
   font-weight: 700;
-  color: #0F172A;
+  color: #111827;
   z-index: 40;
   background-color: var(--bg-slate);
   user-select: none;
+}
+
+/* Floating Navigation Bar (Revolut & Telda iOS style) */
+.floating-bottom-nav {
+  position: absolute;
+  bottom: 14px;
+  left: 16px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 9999px;
+  padding: 5px;
+  border: 1px solid rgba(229, 231, 235, 0.9);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 30;
+}
+
+.floating-nav-tab {
+  flex: 1;
+  text-align: center;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 9999px;
+  color: #9CA3AF;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.floating-nav-tab.active {
+  background-color: #111827;
+  color: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(17, 24, 39, 0.2);
+}
+
+.floating-nav-tab:not(.active):hover {
+  color: #374151;
 }
 
 /* Slide-Up Bottom Sheet Modal Transitions */
@@ -137,38 +186,10 @@ body {
   will-change: transform;
 }
 
-/* Pulse Animation for Target Exceeded Alert */
-@keyframes pulseSubtle {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 1px 2px 0 rgba(244, 63, 94, 0.1);
-  }
-  50% {
-    transform: scale(1.008);
-    box-shadow: 0 4px 14px 0 rgba(244, 63, 94, 0.2);
-  }
-}
-
-.animate-pulse-subtle {
-  animation: pulseSubtle 2.5s infinite ease-in-out;
-}
-
 /* Active tactile scale */
 .active-press:active {
-  transform: scale(0.97);
+  transform: scale(0.96);
   transition: transform 0.1s ease;
-}
-
-/* Card Emboss Effect */
-.card-emboss {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-/* Custom Checkbox / Radio styling */
-input[type="radio"]:checked + label {
-  border-color: #10B981;
-  background-color: #ECFDF5;
-  color: #065F46;
 }
 
 /* Monospace font utility */

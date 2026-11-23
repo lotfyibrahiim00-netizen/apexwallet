@@ -739,11 +739,16 @@ class WalletAppStore {
         const parts = (tx.date || '').split('-');
         const year = parts[0];
         const month = parts[1];
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
         const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const mIdx = parseInt(month, 10) - 1;
         const shortName = shortMonths[mIdx] || '';
+        const mName = monthNames[mIdx] || 'Current';
         statementInfo = {
           statementKey: `${year}-${month}`,
+          statementYear: parseInt(year, 10),
+          statementMonth: parseInt(month, 10),
+          statementMonthName: mName,
           statementBadge: `${shortName} ${year}`,
           statementFullBadge: `${shortName} ${year} Calendar Month`,
           cycleRange: `Calendar Month ${shortName} ${year}`,

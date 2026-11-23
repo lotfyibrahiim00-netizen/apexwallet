@@ -1,5 +1,5 @@
 // Service Worker for ApexWallet PWA
-const CACHE_NAME = 'apexwallet-v1';
+const CACHE_NAME = 'apexwallet-v2';
 const ASSETS = [
   './',
   './index.html',
