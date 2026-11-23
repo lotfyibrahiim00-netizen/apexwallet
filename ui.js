@@ -18,7 +18,8 @@ function initApp() {
   const views = {
     dashboard: document.getElementById('view-dashboard'),
     cards: document.getElementById('view-cards'),
-    history: document.getElementById('view-history')
+    history: document.getElementById('view-history'),
+    settings: document.getElementById('view-settings')
   };
 
   const navButtons = document.querySelectorAll('.floating-nav-tab');
@@ -91,6 +92,7 @@ function initApp() {
       if (targetTab === 'dashboard') headerTitle.textContent = 'Cards';
       else if (targetTab === 'cards') headerTitle.textContent = 'Banks';
       else if (targetTab === 'history') headerTitle.textContent = 'History';
+      else if (targetTab === 'settings') headerTitle.textContent = 'Settings';
     }
 
     renderCurrentView();
@@ -436,6 +438,8 @@ function initApp() {
       renderBanksView();
     } else if (store.activeTab === 'history') {
       renderHistoryView();
+    } else if (store.activeTab === 'settings') {
+      renderSettingsView();
     }
 
     if (window.lucide) {
@@ -1313,6 +1317,216 @@ function initApp() {
     openModal('card');
   };
 
+  // ==========================================
+  // VIEW 4: SETTINGS & BIOMETRICS VIEW
+  // ==========================================
+  async function renderSettingsView() {
+    const container = document.getElementById('view-settings');
+    if (!container) return;
+
+    const isBioSupported = window.WalletSecurity ? await window.WalletSecurity.isBiometricsAvailable() : false;
+    const isBioEnabled = window.WalletSecurity ? window.WalletSecurity.isBiometricsEnabled() : false;
+    const timeoutMs = window.WalletSecurity ? window.WalletSecurity.getAutoLockTimeout() : 180000;
+
+    container.innerHTML = `
+      <div class="space-y-3.5 pb-24">
+        
+        <!-- SECTION 1: SECURITY & BIOMETRIC AUTH -->
+        <div class="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-4">
+          <div class="flex items-center gap-2.5 pb-2 border-b border-slate-100">
+            <div class="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+              <i data-lucide="shield-check" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-xs font-extrabold text-slate-900 tracking-tight">Security & Biometrics</h3>
+              <p class="text-[10px] text-slate-400">Vault encryption and device unlock</p>
+            </div>
+          </div>
+
+          <!-- Biometric Toggle Row -->
+          <div class="flex items-center justify-between py-1">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <i data-lucide="fingerprint" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-slate-900">Biometric Unlock</div>
+                <div class="text-[10px] text-slate-400">
+                  ${isBioSupported ? (isBioEnabled ? 'Face ID / Fingerprint is Active' : 'Touch ID, Face ID or Fingerprint') : 'Hardware not detected in this browser'}
+                </div>
+              </div>
+            </div>
+            <div>
+              <label class="relative inline-flex items-center ${isBioSupported ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'}">
+                <input type="checkbox" id="settings-biometric-toggle" ${isBioEnabled ? 'checked' : ''} ${!isBioSupported ? 'disabled' : ''} class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Change PIN Row -->
+          <div class="flex items-center justify-between py-1 border-t border-slate-100 pt-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <i data-lucide="key-round" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-slate-900">4-Digit Security PIN</div>
+                <div class="text-[10px] text-slate-400">Master code for AES-256 decryption</div>
+              </div>
+            </div>
+            <button onclick="window.promptChangePin()" class="px-3.5 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold active-press transition-colors">
+              Change PIN
+            </button>
+          </div>
+
+          <!-- Auto-Lock Duration Row -->
+          <div class="flex items-center justify-between py-1 border-t border-slate-100 pt-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                <i data-lucide="timer" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-slate-900">Auto-Lock Timer</div>
+                <div class="text-[10px] text-slate-400">Locks when in background</div>
+              </div>
+            </div>
+            <select id="settings-autolock-select" onchange="window.updateAutoLockTimeout(this.value)" class="text-xs font-bold bg-slate-50 border border-slate-200 text-slate-700 rounded-full px-2.5 py-1 outline-none cursor-pointer">
+              <option value="0" ${timeoutMs === 0 ? 'selected' : ''}>Immediately</option>
+              <option value="60000" ${timeoutMs === 60000 ? 'selected' : ''}>1 minute</option>
+              <option value="180000" ${timeoutMs === 180000 ? 'selected' : ''}>3 minutes</option>
+              <option value="300000" ${timeoutMs === 300000 ? 'selected' : ''}>5 minutes</option>
+              <option value="900000" ${timeoutMs === 900000 ? 'selected' : ''}>15 minutes</option>
+            </select>
+          </div>
+
+          <!-- Vault Security Architecture Note -->
+          <div class="bg-slate-50 rounded-2xl p-3 border border-slate-100 flex items-start gap-2.5">
+            <i data-lucide="lock" class="w-4 h-4 text-emerald-600 mt-0.5 shrink-0"></i>
+            <div class="text-[10px] text-slate-500 leading-relaxed">
+              <strong class="text-slate-800">Military-Grade Encryption:</strong> Local vault is protected by AES-GCM (256-bit) and PBKDF2 (100,000 iterations). Your cards & data never touch an unencrypted server.
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 2: PREFERENCES -->
+        <div class="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-3">
+          <div class="flex items-center gap-2.5 pb-2 border-b border-slate-100">
+            <div class="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+              <i data-lucide="sliders" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-xs font-extrabold text-slate-900 tracking-tight">Preferences</h3>
+              <p class="text-[10px] text-slate-400">Display and currency format</p>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between py-1">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                <i data-lucide="coins" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-slate-900">Wallet Currency</div>
+                <div class="text-[10px] text-slate-400">Used for balances and expenses</div>
+              </div>
+            </div>
+            <select onchange="window.switchCurrency(this.value)" class="text-xs font-bold bg-slate-50 border border-slate-200 text-slate-700 rounded-full px-3 py-1 outline-none cursor-pointer">
+              <option value="EGP" ${currentCurrency === 'EGP' ? 'selected' : ''}>EGP</option>
+              <option value="USD" ${currentCurrency === 'USD' ? 'selected' : ''}>USD ($)</option>
+              <option value="EUR" ${currentCurrency === 'EUR' ? 'selected' : ''}>EUR (€)</option>
+              <option value="SAR" ${currentCurrency === 'SAR' ? 'selected' : ''}>SAR</option>
+              <option value="AED" ${currentCurrency === 'AED' ? 'selected' : ''}>AED</option>
+              <option value="GBP" ${currentCurrency === 'GBP' ? 'selected' : ''}>GBP (£)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- SECTION 3: DATA & ACTIONS -->
+        <div class="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-2.5">
+          <div class="flex items-center gap-2.5 pb-2 border-b border-slate-100">
+            <div class="w-7 h-7 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+              <i data-lucide="database" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-xs font-extrabold text-slate-900 tracking-tight">Data Management</h3>
+              <p class="text-[10px] text-slate-400">Export and session actions</p>
+            </div>
+          </div>
+
+          <button onclick="window.WalletSecurity && window.WalletSecurity.lock()" class="w-full p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-800 flex items-center justify-between text-xs font-bold border border-slate-200/70 transition-all active-press">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="lock" class="w-4 h-4 text-slate-600"></i>
+              <span>Lock Wallet Session</span>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+          </button>
+
+          <button onclick="window.exportTransactionsCSV()" class="w-full p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-800 flex items-center justify-between text-xs font-bold border border-slate-200/70 transition-all active-press">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="download" class="w-4 h-4 text-emerald-600"></i>
+              <span>Export Transactions (CSV)</span>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+          </button>
+
+          <button onclick="window.clearAllData()" class="w-full p-3 rounded-2xl bg-rose-50 hover:bg-rose-100/80 text-rose-700 border border-rose-100 flex items-center justify-between text-xs font-bold transition-all active-press">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="trash-2" class="w-4 h-4 text-rose-600"></i>
+              <span>Clear All Wallet Data</span>
+            </div>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-rose-400"></i>
+          </button>
+        </div>
+
+        <div class="text-center pt-2 text-[10px] text-slate-400 space-y-0.5">
+          <p class="font-bold text-slate-500">ApexWallet — Visual Card-First Tracker</p>
+          <p>Version 1.2 • Hardware Encrypted PWA</p>
+        </div>
+
+      </div>
+    `;
+
+    // Hook up Biometric toggle
+    const bioToggle = document.getElementById('settings-biometric-toggle');
+    if (bioToggle) {
+      bioToggle.addEventListener('change', async (e) => {
+        if (bioToggle.checked) {
+          const pin = prompt('Enter your 4-digit PIN to enable Biometrics (Face ID / Fingerprint):');
+          if (!pin || pin.length !== 4) {
+            bioToggle.checked = false;
+            showToast('Biometric setup cancelled', 'info');
+            return;
+          }
+          showToast('Scan your fingerprint or Face ID...', 'info');
+          const res = await window.WalletSecurity.enableBiometrics(pin);
+          if (res && res.success) {
+            showToast('Biometric unlock enabled successfully!', 'success');
+            renderSettingsView();
+          } else {
+            bioToggle.checked = false;
+            showToast((res && res.error) || 'Failed to enable Biometrics', 'error');
+          }
+        } else {
+          window.WalletSecurity.disableBiometrics();
+          showToast('Biometrics disabled', 'info');
+          renderSettingsView();
+        }
+      });
+    }
+
+    if (window.lucide) {
+      try { lucide.createIcons(); } catch (e) {}
+    }
+  }
+
+  window.updateAutoLockTimeout = (ms) => {
+    if (window.WalletSecurity) {
+      window.WalletSecurity.setAutoLockTimeout(ms);
+      showToast('Auto-lock timer updated', 'success');
+    }
+  };
+
   window.confirmDeleteBank = (bankId) => {
     const bank = store.getBank(bankId);
     if (!bank) return;
@@ -1485,13 +1699,25 @@ function initApp() {
     pinOverlay.classList.remove('opacity-0', 'pointer-events-none');
     if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
 
-    // Check biometric availability
-    if (window.WalletSecurity && typeof window.WalletSecurity.isBiometricsAvailable === 'function') {
-      window.WalletSecurity.isBiometricsAvailable().then(avail => {
-        if (!avail && pinBiometricBtn) {
-          pinBiometricBtn.style.visibility = 'hidden';
+    // Check biometric availability & status
+    if (window.WalletSecurity) {
+      const isBioEnabled = window.WalletSecurity.isBiometricsEnabled();
+      if (pinBiometricBtn) {
+        if (isBioEnabled) {
+          pinBiometricBtn.classList.add('bg-emerald-50', 'text-emerald-600', 'border', 'border-emerald-200');
+          pinBiometricBtn.style.visibility = 'visible';
+          if (pinFlow === 'unlock') {
+            setTimeout(() => triggerBiometricUnlock(), 350);
+          }
+        } else {
+          pinBiometricBtn.classList.remove('bg-emerald-50', 'text-emerald-600', 'border', 'border-emerald-200');
+          window.WalletSecurity.isBiometricsAvailable().then(avail => {
+            if (pinBiometricBtn) {
+              pinBiometricBtn.style.visibility = avail ? 'visible' : 'hidden';
+            }
+          });
         }
-      });
+      }
     }
   }
 
@@ -1637,10 +1863,39 @@ function initApp() {
     });
   }
 
+  async function triggerBiometricUnlock() {
+    if (!window.WalletSecurity) return;
+    if (!window.WalletSecurity.isBiometricsEnabled()) {
+      showToast('Enable Biometrics in Settings tab first', 'info');
+      return;
+    }
+    try {
+      const res = await window.WalletSecurity.unlockWithBiometrics();
+      if (res && res.success) {
+        flashPinDots('success');
+        store.loadFromDecrypted(res.data);
+        showToast('Unlocked with Biometrics!', 'success');
+        setTimeout(() => {
+          hidePinLock();
+          isPinBusy = false;
+          renderCurrentView();
+        }, 250);
+      } else if (res && res.error) {
+        if (!res.error.toLowerCase().includes('cancel')) {
+          triggerPinError(res.error);
+        } else {
+          showToast('Biometric cancelled. Enter PIN.', 'info');
+        }
+      }
+    } catch (err) {
+      console.warn('Biometric unlock caught:', err);
+    }
+  }
+
   if (pinBiometricBtn) {
-    pinBiometricBtn.addEventListener('click', async (e) => {
+    pinBiometricBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      showToast('Biometrics active: enter PIN to unlock', 'info');
+      triggerBiometricUnlock();
     });
   }
 
@@ -1683,7 +1938,7 @@ function initApp() {
 
   // Initial tab & modal
   const hash = window.location.hash.replace('#', '');
-  const initialTab = hash === 'cards' || hash === 'history' ? hash : 'dashboard';
+  const initialTab = hash === 'cards' || hash === 'history' || hash === 'settings' ? hash : 'dashboard';
   const initialModal = hash.startsWith('modal-') ? hash.replace('modal-', '') : null;
 
   switchView(initialTab);

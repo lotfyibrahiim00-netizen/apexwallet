@@ -7,6 +7,8 @@
   'use strict';
 
   const STORAGE_KEY = 'apexwallet_security_vault_v1';
+  const BIOMETRIC_KEY = 'apexwallet_biometrics_v1';
+  const AUTOLOCK_KEY = 'apexwallet_autolock_ms';
   const LEGACY_STORAGE_KEY = 'apexwallet_user_vault_v1';
   const PBKDF2_ITERATIONS = 100000;
 
@@ -41,8 +43,18 @@
       this.isLocked = true;
       this.onLockStateChange = null;
       this.lastActiveTime = Date.now();
-      this.autoLockTimeoutMs = 3 * 60 * 1000; // 3 minutes of background/inactivity
+      const savedTimeout = localStorage.getItem(AUTOLOCK_KEY);
+      this.autoLockTimeoutMs = savedTimeout !== null ? parseInt(savedTimeout, 10) : 3 * 60 * 1000;
       this._initAutoLock();
+    }
+
+    getAutoLockTimeout() {
+      return this.autoLockTimeoutMs;
+    }
+
+    setAutoLockTimeout(ms) {
+      this.autoLockTimeoutMs = parseInt(ms, 10);
+      localStorage.setItem(AUTOLOCK_KEY, String(this.autoLockTimeoutMs));
     }
 
     /**
@@ -273,15 +285,32 @@
       this.activeKey = null;
       this.isLocked = true;
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(BIOMETRIC_KEY);
+      localStorage.removeItem(AUTOLOCK_KEY);
       localStorage.removeItem(LEGACY_STORAGE_KEY);
       if (this.onLockStateChange) this.onLockStateChange(true);
+    }
+
+    /**
+     * Check if Biometrics is currently enabled by user
+     */
+    isBiometricsEnabled() {
+      const raw = localStorage.getItem(BIOMETRIC_KEY);
+      if (!raw) return false;
+      try {
+        const parsed = JSON.parse(raw);
+        return !!(parsed && parsed.credId && parsed.encryptedPin && parsed.bioKey);
+      } catch (e) {
+        return false;
+      }
     }
 
     /**
      * Check if device supports Biometrics (WebAuthn)
      */
     async isBiometricsAvailable() {
-      if (window.PublicKeyCredential &&
+      if (typeof window !== 'undefined' &&
+          window.PublicKeyCredential &&
           typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
         try {
           return await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
@@ -290,6 +319,171 @@
         }
       }
       return false;
+    }
+
+    /**
+     * Enable Biometrics (Face ID / Touch ID / Fingerprint / Windows Hello)
+     */
+    async enableBiometrics(currentPin) {
+      if (!this.isConfigured()) {
+        return { success: false, error: 'Security PIN is not set up' };
+      }
+
+      // Verify current PIN first
+      const rawVault = localStorage.getItem(STORAGE_KEY);
+      const securityRecord = JSON.parse(rawVault);
+      const calculatedVerifier = await this._computeVerifier(currentPin, securityRecord.salt);
+      if (calculatedVerifier !== securityRecord.verifier) {
+        return { success: false, error: 'Incorrect PIN' };
+      }
+
+      if (typeof navigator === 'undefined' || !navigator.credentials || !navigator.credentials.create) {
+        return { success: false, error: 'Biometric WebAuthn not supported on this browser' };
+      }
+
+      try {
+        const challenge = crypto.getRandomValues(new Uint8Array(32));
+        const userId = crypto.getRandomValues(new Uint8Array(16));
+
+        const credential = await navigator.credentials.create({
+          publicKey: {
+            challenge: challenge,
+            rp: {
+              name: 'ApexWallet',
+              id: window.location.hostname
+            },
+            user: {
+              id: userId,
+              name: 'apexwallet-owner',
+              displayName: 'ApexWallet User'
+            },
+            pubKeyCredParams: [
+              { alg: -7, type: 'public-key' },
+              { alg: -257, type: 'public-key' }
+            ],
+            authenticatorSelection: {
+              authenticatorAttachment: 'platform',
+              userVerification: 'required',
+              residentKey: 'preferred'
+            },
+            timeout: 60000,
+            attestation: 'none'
+          }
+        });
+
+        if (!credential) {
+          return { success: false, error: 'Biometric registration was cancelled' };
+        }
+
+        // Generate 256-bit local secret to encrypt PIN
+        const bioKeyBytes = crypto.getRandomValues(new Uint8Array(32));
+        const enc = new TextEncoder();
+        const bioCryptoKey = await crypto.subtle.importKey(
+          'raw',
+          bioKeyBytes,
+          { name: 'AES-GCM' },
+          false,
+          ['encrypt', 'decrypt']
+        );
+
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const encryptedPinBuffer = await crypto.subtle.encrypt(
+          { name: 'AES-GCM', iv: iv },
+          bioCryptoKey,
+          enc.encode(currentPin)
+        );
+
+        // Pack IV + ciphertext
+        const packed = new Uint8Array(iv.length + encryptedPinBuffer.byteLength);
+        packed.set(iv);
+        packed.set(new Uint8Array(encryptedPinBuffer), iv.length);
+
+        const bioRecord = {
+          credId: bufToB64(credential.rawId),
+          encryptedPin: bufToB64(packed),
+          bioKey: bufToB64(bioKeyBytes),
+          enabledAt: new Date().toISOString()
+        };
+
+        localStorage.setItem(BIOMETRIC_KEY, JSON.stringify(bioRecord));
+        return { success: true };
+      } catch (err) {
+        console.error('Biometric enable error:', err);
+        return { success: false, error: err.message || 'Biometric registration failed' };
+      }
+    }
+
+    /**
+     * Disable Biometrics
+     */
+    disableBiometrics() {
+      localStorage.removeItem(BIOMETRIC_KEY);
+      return { success: true };
+    }
+
+    /**
+     * Unlock using Biometrics (Face ID / Touch ID)
+     */
+    async unlockWithBiometrics() {
+      if (!this.isBiometricsEnabled()) {
+        return { success: false, error: 'Biometrics is not enabled' };
+      }
+
+      const bioData = JSON.parse(localStorage.getItem(BIOMETRIC_KEY));
+      if (typeof navigator === 'undefined' || !navigator.credentials || !navigator.credentials.get) {
+        return { success: false, error: 'WebAuthn not supported' };
+      }
+
+      try {
+        const challenge = crypto.getRandomValues(new Uint8Array(32));
+        const credIdBytes = b64ToBuf(bioData.credId);
+
+        const assertion = await navigator.credentials.get({
+          publicKey: {
+            challenge: challenge,
+            rpId: window.location.hostname,
+            allowCredentials: [{
+              id: credIdBytes,
+              type: 'public-key'
+            }],
+            userVerification: 'required',
+            timeout: 60000
+          }
+        });
+
+        if (!assertion) {
+          return { success: false, error: 'Biometric verification cancelled' };
+        }
+
+        // Decrypt PIN
+        const bioKeyBytes = b64ToBuf(bioData.bioKey);
+        const bioCryptoKey = await crypto.subtle.importKey(
+          'raw',
+          bioKeyBytes,
+          { name: 'AES-GCM' },
+          false,
+          ['decrypt']
+        );
+
+        const packed = b64ToBuf(bioData.encryptedPin);
+        const iv = packed.slice(0, 12);
+        const ciphertext = packed.slice(12);
+
+        const decryptedBuffer = await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: iv },
+          bioCryptoKey,
+          ciphertext
+        );
+
+        const dec = new TextDecoder();
+        const pin = dec.decode(decryptedBuffer);
+
+        // Unlock vault with decrypted PIN
+        return await this.unlock(pin);
+      } catch (err) {
+        console.error('Biometric assertion error:', err);
+        return { success: false, error: err.message || 'Biometric authentication cancelled' };
+      }
     }
 
     /**
