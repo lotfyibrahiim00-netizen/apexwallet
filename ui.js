@@ -203,10 +203,25 @@ function initApp() {
 
   document.getElementById('qa-add-tx')?.addEventListener('click', () => {
     closeModal('quickActions');
+    if (store.cards.length === 0) {
+      if (store.banks.length === 0) {
+        showToast('Please add a bank first!', 'info');
+        setTimeout(() => openModal('bank'), 150);
+      } else {
+        showToast('Please add a card first!', 'info');
+        setTimeout(() => openModal('card'), 150);
+      }
+      return;
+    }
     setTimeout(() => openModal('transaction'), 150);
   });
   document.getElementById('qa-add-card')?.addEventListener('click', () => {
     closeModal('quickActions');
+    if (store.banks.length === 0) {
+      showToast('Please add a bank first!', 'info');
+      setTimeout(() => openModal('bank'), 150);
+      return;
+    }
     setTimeout(() => openModal('card'), 150);
   });
   document.getElementById('qa-add-bank')?.addEventListener('click', () => {
@@ -436,14 +451,46 @@ function initApp() {
     if (!container) return;
 
     if (store.cards.length === 0) {
-      container.innerHTML = `
-        <div class="bg-white p-6 rounded-3xl border border-slate-200 text-center">
-          <p class="text-xs text-slate-500 font-semibold">No cards added yet</p>
-          <button onclick="window.openModal('card')" class="mt-3 px-4 py-2 bg-[#111827] text-white text-xs font-bold rounded-full">
-            + Add First Card
-          </button>
-        </div>
-      `;
+      if (store.banks.length === 0) {
+        container.innerHTML = `
+          <div class="bg-white p-7 rounded-3xl border border-slate-200/90 text-center shadow-xs space-y-4 my-auto mt-4">
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs">
+              <i data-lucide="building-2" class="w-7 h-7"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900">Your Wallet is Ready</h3>
+              <p class="text-xs text-slate-400 mt-1 max-w-[270px] mx-auto">Start by adding your bank, then add your cards (up to 3 per bank) and track your expenses.</p>
+            </div>
+            <div class="pt-2 max-w-[220px] mx-auto">
+              <button onclick="window.openModal('bank')" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white text-xs font-bold rounded-full shadow-md active-press flex items-center justify-center gap-1.5 transition-all">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Add Your Bank</span>
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="bg-white p-7 rounded-3xl border border-slate-200/90 text-center shadow-xs space-y-4 my-auto mt-4">
+            <div class="w-14 h-14 mx-auto rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs">
+              <i data-lucide="credit-card" class="w-7 h-7"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900">No Cards Added Yet</h3>
+              <p class="text-xs text-slate-400 mt-1 max-w-[270px] mx-auto">You have banks linked. Now add a credit, debit, or prepaid card to start tracking your statements.</p>
+            </div>
+            <div class="pt-2 max-w-[220px] mx-auto">
+              <button onclick="window.openModal('card')" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white text-xs font-bold rounded-full shadow-md active-press flex items-center justify-center gap-1.5 transition-all">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Add Your First Card</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      if (window.lucide) {
+        try { lucide.createIcons({ root: container }); } catch (e) {}
+      }
       return;
     }
 
@@ -1040,7 +1087,21 @@ function initApp() {
         </div>
 
         <div class="space-y-4">
-          ${store.banks.map(bank => {
+          ${store.banks.length === 0 ? `
+            <div class="bg-white p-7 rounded-3xl border border-slate-200/90 text-center shadow-xs space-y-3 mt-2">
+              <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center shadow-2xs">
+                <i data-lucide="building-2" class="w-6 h-6"></i>
+              </div>
+              <div>
+                <h3 class="text-xs font-bold text-slate-800">No Banks Added Yet</h3>
+                <p class="text-[11px] text-slate-400 mt-0.5">Add your bank (CIB, HSBC, QNB, NBE, Banque Misr, etc.) to manage up to 3 cards per bank.</p>
+              </div>
+              <button onclick="window.openModal('bank')" class="px-4 py-2 bg-[#111827] text-white text-xs font-bold rounded-full shadow-xs active-press inline-flex items-center gap-1.5 mt-1">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span>Add Bank</span>
+              </button>
+            </div>
+          ` : store.banks.map(bank => {
             const cards = store.getCardsForBank(bank.id);
             const isCapReached = cards.length >= 3;
 
@@ -1173,8 +1234,18 @@ function initApp() {
         <!-- Transaction Items -->
         <div class="space-y-2 pt-1">
           ${filtered.length === 0 ? `
-            <div class="bg-white p-6 rounded-3xl text-center text-xs text-slate-400 border border-slate-200">
-              No matching transactions found
+            <div class="bg-white p-7 rounded-3xl text-center border border-slate-200/90 shadow-2xs space-y-3 mt-2">
+              <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shadow-2xs">
+                <i data-lucide="receipt" class="w-6 h-6"></i>
+              </div>
+              <div>
+                <h3 class="text-xs font-bold text-slate-800">No Transactions Yet</h3>
+                <p class="text-[11px] text-slate-400 mt-0.5">When you log an expense, it will appear here with automatic statement tags.</p>
+              </div>
+              <button onclick="window.openModal('transaction')" class="px-4 py-2 bg-[#111827] text-white text-xs font-bold rounded-full shadow-xs active-press inline-flex items-center gap-1.5 mt-1">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span>Log Expense</span>
+              </button>
             </div>
           ` : filtered.map(tx => {
             const isCredit = tx.card && tx.card.cardType === 'credit';
@@ -1279,6 +1350,15 @@ function initApp() {
     if (currBadge) currBadge.textContent = newCurr;
     showToast(`Currency: ${newCurr}`, 'success');
     renderCurrentView();
+  };
+
+  window.clearAllData = () => {
+    if (confirm('Are you sure you want to delete all cards, banks, and transactions?')) {
+      store.clearAllData();
+      activeFeaturedCardId = null;
+      showToast('All data cleared successfully!', 'success');
+      renderCurrentView();
+    }
   };
 
   window.resetSampleData = () => {

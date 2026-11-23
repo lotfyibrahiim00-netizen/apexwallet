@@ -550,7 +550,7 @@ function getInitialSampleData() {
 // --- App State ---
 class WalletAppStore {
   constructor() {
-    this.storageKey = 'fintech_wallet_store_v1';
+    this.storageKey = 'apexwallet_user_vault_v1';
     this.loadState();
     this.activeTab = 'dashboard';
     this.selectedAccountFilter = 'all'; // 'all' | 'bank:{id}' | 'card:{id}'
@@ -560,6 +560,11 @@ class WalletAppStore {
   }
 
   loadState() {
+    // Purge old demo storage keys from user browser
+    try {
+      localStorage.removeItem('fintech_wallet_store_v1');
+    } catch (e) {}
+
     const raw = localStorage.getItem(this.storageKey);
     if (raw) {
       try {
@@ -567,26 +572,22 @@ class WalletAppStore {
         this.banks = parsed.banks || [];
         this.cards = parsed.cards || [];
         this.transactions = parsed.transactions || [];
-        // Ensure colorPreset is present on older saved cards
-        this.cards.forEach(c => {
-          if (!c.colorPreset && !c.customColor) {
-            if (c.bankId === 'bank_cib') c.colorPreset = c.cardType === 'credit' ? 'cib' : 'indigo';
-            else if (c.bankId === 'bank_hsbc') c.colorPreset = c.cardType === 'credit' ? 'hsbc' : 'midnight';
-            else if (c.bankId === 'bank_qnb') c.colorPreset = 'qnb';
-            else if (c.bankId === 'bank_nbe') c.colorPreset = c.cardType === 'credit' ? 'gold' : (c.cardType === 'prepaid' ? 'nbe' : 'emerald');
-            else c.colorPreset = 'indigo';
-          }
-        });
         return;
       } catch (e) {
         console.error('Error parsing stored wallet data:', e);
       }
     }
-    // Initialize sample data
-    const initial = getInitialSampleData();
-    this.banks = initial.banks;
-    this.cards = initial.cards;
-    this.transactions = initial.transactions;
+    // Clean initial state: ZERO mock / rush / test data
+    this.banks = [];
+    this.cards = [];
+    this.transactions = [];
+    this.saveState();
+  }
+
+  clearAllData() {
+    this.banks = [];
+    this.cards = [];
+    this.transactions = [];
     this.saveState();
   }
 
