@@ -36,9 +36,10 @@ body {
   background-color: #E2E8F0;
   color: var(--text-charcoal);
   margin: 0;
-  padding: 0;
+  padding: 20px 0;
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   overflow-x: hidden;
@@ -73,7 +74,7 @@ body {
   width: 100%;
   max-width: 390px;
   height: 844px;
-  max-height: 96vh;
+  max-height: 94vh;
   background-color: var(--bg-slate);
   position: relative;
   display: flex;
@@ -90,6 +91,7 @@ body {
   body {
     background-color: var(--bg-slate);
     align-items: flex-start;
+    padding: 0;
   }
   .mobile-app-shell {
     max-width: 100%;
@@ -101,26 +103,10 @@ body {
   }
 }
 
-/* Dynamic Island Mockup */
-.dynamic-island {
-  width: 100px;
-  height: 24px;
-  background-color: #111827;
-  border-radius: 20px;
-  margin: 6px auto 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 10px;
-  color: #FFFFFF;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-  z-index: 50;
-}
-
 /* Status Bar */
 .mobile-status-bar {
-  height: 38px;
-  padding: 0 20px;
+  height: 44px;
+  padding: 6px 22px 0;
   display: flex;
   align-items: center;
   justify-content: space-between;

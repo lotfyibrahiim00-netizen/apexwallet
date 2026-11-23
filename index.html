@@ -61,10 +61,10 @@
   <!-- Custom Styles -->
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-slate-200 flex justify-center min-h-screen font-sans antialiased select-none">
+<body class="bg-slate-200 min-h-screen font-sans antialiased select-none flex flex-col items-center justify-center py-4">
 
   <!-- Desktop Presentation Bar (Hidden on Mobile) -->
-  <div class="fixed top-3 left-1/2 -translate-x-1/2 z-50 hidden md:flex items-center gap-3 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full border border-slate-300/80 shadow-md text-xs">
+  <div class="mb-3 hidden md:flex items-center gap-3 bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-full border border-slate-300 shadow-sm text-xs z-50">
     <div class="flex items-center gap-1.5 font-bold text-slate-800">
       <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
       <span>Visual Card-First (390px)</span>
@@ -94,25 +94,24 @@
   </div>
 
   <!-- Toast Notification Container -->
-  <div id="toast-container" class="fixed top-10 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-[360px] pointer-events-none flex flex-col gap-2"></div>
+  <div id="toast-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-[360px] pointer-events-none flex flex-col gap-2"></div>
 
   <!-- ============================================== -->
   <!-- SMARTPHONE VIEWPORT CONTAINER (MAX-WIDTH 390px) -->
   <!-- ============================================== -->
   <main class="mobile-app-shell">
     
-    <!-- Dynamic Island / Top Mockup -->
-    <div class="dynamic-island">
-      <span class="w-2 h-2 rounded-full bg-slate-800"></span>
-      <span class="w-2 h-2 rounded-full bg-slate-900 border border-slate-700/60"></span>
-    </div>
-
-    <!-- Mobile Status Bar -->
+    <!-- Mobile Status Bar (Clean iOS Style) -->
     <div class="mobile-status-bar">
       <span id="status-bar-clock" class="tracking-tight font-mono">10:44</span>
       <div class="flex items-center gap-1.5 text-slate-800">
         <i data-lucide="signal" class="w-3.5 h-3.5"></i>
         <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
+        <div class="w-5 h-2.5 border border-slate-800 rounded-[3px] p-[1px] flex items-center">
+          <div class="w-3.5 h-1.5 bg-slate-900 rounded-[1px]"></div>
+        </div>
+      </div>
+    </div>
         <div class="w-5 h-2.5 border border-slate-800 rounded-[3px] p-[1px] flex items-center">
           <div class="w-3.5 h-1.5 bg-slate-900 rounded-[1px]"></div>
         </div>
