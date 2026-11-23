@@ -1346,8 +1346,8 @@ function initApp() {
   window.switchCurrency = (newCurr) => {
     currentCurrency = newCurr;
     localStorage.setItem('wallet_currency', newCurr);
-    const currBadge = document.getElementById('current-currency-display');
-    if (currBadge) currBadge.textContent = newCurr;
+    const currSelect = document.getElementById('header-currency-select');
+    if (currSelect) currSelect.value = newCurr;
     showToast(`Currency: ${newCurr}`, 'success');
     renderCurrentView();
   };
@@ -1398,6 +1398,10 @@ function initApp() {
     document.body.removeChild(link);
     showToast('Exported CSV file!', 'success');
   };
+
+  // Sync currency dropdown in header
+  const currSelect = document.getElementById('header-currency-select');
+  if (currSelect) currSelect.value = currentCurrency;
 
   // Initial tab & modal
   const hash = window.location.hash.replace('#', '');
