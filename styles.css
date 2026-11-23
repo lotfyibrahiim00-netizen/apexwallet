@@ -69,6 +69,18 @@ body {
   scrollbar-width: none;
 }
 
+/* Cards Carousel Single-Step Snap Control */
+#cards-carousel {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+#cards-carousel > [data-card-id] {
+  scroll-snap-align: center;
+  scroll-snap-stop: always !important;
+}
+
 /* Mobile Viewport Shell (390px viewport centered on desktop) */
 .mobile-app-shell {
   width: 100%;

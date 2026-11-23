@@ -494,7 +494,7 @@ function initApp() {
             const isSelected = card.id === activeFeaturedCardId;
 
             return `
-              <div id="card-carousel-item-${card.id}" data-card-id="${card.id}" class="min-w-[315px] w-[88%] snap-center shrink-0 p-5 rounded-3xl text-white shadow-lg shadow-slate-900/10 transition-all duration-300 relative overflow-hidden select-none cursor-pointer ${isSelected ? 'ring-2 ring-[#111827]/40 scale-100' : 'scale-[0.98] opacity-95'}" style="background: ${gradient};" onclick="window.scrollToCard('${card.id}')">
+              <div id="card-carousel-item-${card.id}" data-card-id="${card.id}" class="min-w-[315px] w-[88%] snap-center snap-always shrink-0 p-5 rounded-3xl text-white shadow-lg shadow-slate-900/10 transition-all duration-300 relative overflow-hidden select-none cursor-pointer ${isSelected ? 'ring-2 ring-[#111827]/40 scale-100' : 'scale-[0.98] opacity-95'}" style="background: ${gradient};" onclick="window.scrollToCard('${card.id}')">
                 <!-- Subtle glow circle -->
                 <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
 
@@ -778,15 +778,32 @@ function initApp() {
     }
   }
 
-  // --- Carousel Scroll Listener ---
+  // --- Carousel Scroll & Single-Step Swipe Controller ---
   function setupCarouselScrollListener() {
     const carousel = document.getElementById('cards-carousel');
     if (!carousel) return;
 
+    let isGesturePaging = false;
+    let gesturePagingTimer = null;
+
+    function lockGesturePaging() {
+      isGesturePaging = true;
+      clearTimeout(gesturePagingTimer);
+      gesturePagingTimer = setTimeout(() => {
+        isGesturePaging = false;
+      }, 420);
+    }
+
+    // 1. Regular scroll listener to update dots and UI when cards settle
     let scrollTimeout = null;
     carousel.addEventListener('scroll', () => {
+      // If a single-step swipe is currently animating, ignore intermediate scroll events
+      if (isGesturePaging) return;
+
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(() => {
+        if (isGesturePaging) return;
+
         const carouselRect = carousel.getBoundingClientRect();
         const carouselCenter = carouselRect.left + carouselRect.width / 2;
 
@@ -806,8 +823,115 @@ function initApp() {
         if (closestCardId && closestCardId !== activeFeaturedCardId) {
           updateActiveCardUI(closestCardId, false);
         }
-      }, 70);
+      }, 60);
     }, { passive: true });
+
+    // 2. Strict Single-Card Swipe Lock for Touch Devices (Advances exactly 1 card per swipe)
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let activeIndexOnStart = 0;
+    let isTouching = false;
+
+    carousel.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      activeIndexOnStart = store.cards.findIndex(c => c.id === activeFeaturedCardId);
+      if (activeIndexOnStart < 0) activeIndexOnStart = 0;
+      isTouching = true;
+    }, { passive: true });
+
+    carousel.addEventListener('touchend', (e) => {
+      if (!isTouching) return;
+      isTouching = false;
+      if (!e.changedTouches || e.changedTouches.length === 0) return;
+
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+
+      // Check if this was a predominantly horizontal swipe
+      if (Math.abs(deltaX) > 25 && Math.abs(deltaX) > Math.abs(deltaY) * 0.7) {
+        let targetIndex = activeIndexOnStart;
+        if (deltaX < 0) {
+          // Swiped left -> Advance to next card (+1 only, regardless of swipe velocity!)
+          targetIndex = Math.min(activeIndexOnStart + 1, store.cards.length - 1);
+        } else {
+          // Swiped right -> Go back to previous card (-1 only!)
+          targetIndex = Math.max(activeIndexOnStart - 1, 0);
+        }
+
+        const targetCard = store.cards[targetIndex];
+        if (targetCard && targetIndex !== activeIndexOnStart) {
+          lockGesturePaging();
+          scrollToCard(targetCard.id);
+        }
+      }
+    }, { passive: true });
+
+    // 3. Pointer / Mouse Drag Fallback (Desktop / Emulation)
+    let pointerStartX = 0;
+    let pointerStartY = 0;
+    let pointerStartIndex = 0;
+    let isPointerDragging = false;
+
+    carousel.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      pointerStartX = e.clientX;
+      pointerStartY = e.clientY;
+      pointerStartIndex = store.cards.findIndex(c => c.id === activeFeaturedCardId);
+      if (pointerStartIndex < 0) pointerStartIndex = 0;
+      isPointerDragging = true;
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      if (!isPointerDragging) return;
+      isPointerDragging = false;
+      const deltaX = e.clientX - pointerStartX;
+      const deltaY = e.clientY - pointerStartY;
+
+      if (Math.abs(deltaX) > 30 && Math.abs(deltaX) > Math.abs(deltaY) * 0.7) {
+        let targetIndex = pointerStartIndex;
+        if (deltaX < 0) {
+          targetIndex = Math.min(pointerStartIndex + 1, store.cards.length - 1);
+        } else {
+          targetIndex = Math.max(pointerStartIndex - 1, 0);
+        }
+        const targetCard = store.cards[targetIndex];
+        if (targetCard && targetIndex !== pointerStartIndex) {
+          lockGesturePaging();
+          scrollToCard(targetCard.id);
+        }
+      }
+    });
+
+    // 4. Trackpad / Precision Wheel Horizontal Swipe Lock
+    let wheelCooldown = false;
+    carousel.addEventListener('wheel', (e) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 15) {
+        e.preventDefault();
+        if (wheelCooldown) return;
+        wheelCooldown = true;
+
+        const currentIndex = store.cards.findIndex(c => c.id === activeFeaturedCardId);
+        let targetIndex = currentIndex >= 0 ? currentIndex : 0;
+
+        if (e.deltaX > 0) {
+          targetIndex = Math.min(targetIndex + 1, store.cards.length - 1);
+        } else {
+          targetIndex = Math.max(targetIndex - 1, 0);
+        }
+
+        const targetCard = store.cards[targetIndex];
+        if (targetCard) {
+          lockGesturePaging();
+          scrollToCard(targetCard.id);
+        }
+
+        setTimeout(() => { wheelCooldown = false; }, 400);
+      }
+    }, { passive: false });
   }
 
   // Scroll carousel smoothly to card
