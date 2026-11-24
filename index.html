@@ -21,28 +21,23 @@
       theme: {
         extend: {
           colors: {
-            charcoal: '#111827',
-            emerald: {
-              50: '#ECFDF5',
-              100: '#D1FAE5',
-              500: '#10B981',
-              600: '#059669',
-              700: '#047857',
-            },
-            rose: {
-              50: '#FFF1F2',
-              100: '#FFE4E6',
-              200: '#FECDD3',
-              500: '#F43F5E',
-              600: '#E11D48',
-              700: '#BE123C',
-            },
+            darkbg: '#16171A',
+            surface: '#1F2024',
+            'surface-raised': '#26272B',
+            'border-dark': '#3A3C42',
+            'border-subtle': '#2F3136',
+            txt: '#F3F1EC',
+            'txt-muted': '#9A9CA3',
             amber: {
               50: '#FFFBEB',
               100: '#FEF3C7',
-              500: '#F59E0B',
-              600: '#D97706',
-            }
+              500: '#F5B700',
+              600: '#D49700',
+              accent: '#F5B700',
+            },
+            'on-accent': '#111111',
+            destructive: '#E6A8A8',
+            charcoal: '#16171A',
           }
         }
       }
@@ -61,7 +56,7 @@
   <!-- Custom Styles -->
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="font-sans antialiased select-none">
+<body class="font-sans antialiased select-none bg-[#0d0e10] text-[#F3F1EC]">
 
   <!-- Toast Notification Container -->
   <div id="toast-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-[360px] pointer-events-none flex flex-col gap-2"></div>
@@ -69,27 +64,24 @@
   <!-- ============================================== -->
   <!-- SMARTPHONE VIEWPORT CONTAINER (MAX-WIDTH 390px) -->
   <!-- ============================================== -->
-  <main class="mobile-app-shell">
+  <main class="mobile-app-shell bg-[#16171A]">
 
-    <!-- Top Bar (Revolut / Telda Style) -->
-    <header class="px-5 pt-5 pb-3 flex justify-between items-center bg-slate-50 border-b border-slate-100/60 shrink-0">
-      <div class="min-w-0 flex-1 pr-2">
-        <h1 id="header-title" class="text-xl font-extrabold text-slate-900 tracking-tight leading-tight truncate">Cards</h1>
-        <p id="header-subtitle" class="text-xs text-slate-400 font-medium truncate">0 transactions • 0.00 EGP spent</p>
-      </div>
-      <div class="flex items-center gap-1.5 shrink-0">
-        <button id="header-lock-btn" onclick="window.WalletSecurity && window.WalletSecurity.lock()" class="w-8 h-8 rounded-full bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center shadow-2xs active-press transition-all" title="Lock Wallet">
-          <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+    <!-- Top Bar (Revolut / Telda Style - Dark Charcoal & Amber) -->
+    <header class="px-5 pt-5 pb-3 flex justify-between items-center bg-[#16171A] border-b border-[#2F3136] shrink-0 z-20">
+      <div class="min-w-0 flex items-center gap-2.5">
+        <button id="header-back-btn" class="w-9 h-9 rounded-full bg-[#1F2024] hover:bg-[#26272B] border border-[#2F3136] text-[#F3F1EC] flex items-center justify-center active-press transition-all hidden" title="Back">
+          <i data-lucide="chevron-left" class="w-4 h-4 rtl-flip"></i>
         </button>
-        <select id="header-currency-select" onchange="window.switchCurrency(this.value)" class="text-[11px] font-bold bg-white border border-slate-200 text-slate-700 rounded-full px-2 py-1 outline-none cursor-pointer shadow-2xs hover:border-slate-300 transition-colors">
-          <option value="EGP">EGP</option>
-          <option value="USD">USD ($)</option>
-          <option value="EUR">EUR (€)</option>
-          <option value="SAR">SAR</option>
-          <option value="AED">AED</option>
-          <option value="GBP">GBP (£)</option>
-        </select>
-        <button id="top-add-btn" class="w-8 h-8 rounded-full bg-[#111827] hover:bg-slate-800 text-white font-bold text-base flex items-center justify-center shadow-sm active-press transition-all" title="Add Transaction, Card or Bank">
+        <div class="min-w-0">
+          <h1 id="header-title" class="text-xl font-extrabold text-[#F3F1EC] tracking-tight leading-tight truncate">Home</h1>
+          <p id="header-subtitle" class="text-[11px] text-[#9A9CA3] font-medium truncate hidden"></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="header-settings-btn" class="w-9 h-9 rounded-full bg-[#1F2024] hover:bg-[#26272B] border border-[#2F3136] text-[#F3F1EC] flex items-center justify-center shadow-xs active-press transition-all" title="Settings">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+        </button>
+        <button id="top-add-btn" class="w-9 h-9 rounded-full bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] font-bold text-lg flex items-center justify-center shadow-md active-press transition-all" title="Create New">
           +
         </button>
       </div>
@@ -98,22 +90,22 @@
     <!-- ============================================== -->
     <!-- PIN SECURITY LOCK OVERLAY (Full Shell)         -->
     <!-- ============================================== -->
-    <div id="pin-lock-overlay" class="absolute inset-0 z-[80] bg-slate-50 flex flex-col justify-between p-6 select-none transition-all duration-300">
+    <div id="pin-lock-overlay" class="absolute inset-0 z-[80] bg-[#16171A] flex flex-col justify-between p-6 select-none transition-all duration-300">
       <!-- Cancel Button for Change PIN Flow -->
-      <button type="button" id="pin-cancel-btn" class="absolute top-5 right-5 text-xs font-bold text-slate-500 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200/80 px-3 py-1.5 rounded-full shadow-2xs transition-all hidden active-press">
+      <button type="button" id="pin-cancel-btn" class="absolute top-5 right-5 text-xs font-bold text-[#9A9CA3] hover:text-[#F3F1EC] bg-[#1F2024] hover:bg-[#26272B] border border-[#3A3C42] px-3.5 py-1.5 rounded-full shadow-xs transition-all hidden active-press">
         Cancel
       </button>
 
       <!-- Top Branding & Status -->
       <div class="flex flex-col items-center pt-8 text-center">
-        <div class="w-16 h-16 rounded-3xl bg-[#111827] text-white flex items-center justify-center shadow-lg shadow-slate-900/15 mb-4 relative">
-          <i data-lucide="shield-check" class="w-8 h-8 text-emerald-400"></i>
-          <div id="pin-security-badge" class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-white">
-            <i data-lucide="lock" class="w-3 h-3 text-white"></i>
+        <div class="w-16 h-16 rounded-3xl bg-[#1F2024] border border-[#3A3C42] text-[#F5B700] flex items-center justify-center shadow-xl mb-4 relative">
+          <i data-lucide="shield-check" class="w-8 h-8 text-[#F5B700]"></i>
+          <div id="pin-security-badge" class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#F5B700] border-2 border-[#16171A] flex items-center justify-center text-[#111111]">
+            <i data-lucide="lock" class="w-3 h-3 text-[#111111]"></i>
           </div>
         </div>
-        <h2 id="pin-lock-title" class="text-xl font-extrabold text-slate-900 tracking-tight">Security Lock</h2>
-        <p id="pin-lock-subtitle" class="text-xs text-slate-500 font-medium mt-1 max-w-[260px]">Enter your 4-digit PIN to unlock your vault</p>
+        <h2 id="pin-lock-title" class="text-xl font-extrabold text-[#F3F1EC] tracking-tight">Security Lock</h2>
+        <p id="pin-lock-subtitle" class="text-xs text-[#9A9CA3] font-medium mt-1 max-w-[260px]">Enter your 4-digit PIN to unlock your vault</p>
         
         <!-- 4 PIN Dots -->
         <div id="pin-dots-container" class="flex items-center justify-center gap-4 mt-7">
@@ -124,7 +116,7 @@
         </div>
 
         <!-- Feedback / Error Message -->
-        <p id="pin-feedback-msg" class="text-xs font-bold text-rose-500 mt-3 min-h-[18px] opacity-0 transition-opacity">Incorrect PIN. Try again.</p>
+        <p id="pin-feedback-msg" class="text-xs font-bold text-[#E6A8A8] mt-3 min-h-[18px] opacity-0 transition-opacity">Incorrect PIN. Try again.</p>
       </div>
 
       <!-- Keypad Grid (1-9, Biometric, 0, Backspace) -->
@@ -140,29 +132,32 @@
           <button type="button" data-pin-key="8" class="pin-key-btn">8</button>
           <button type="button" data-pin-key="9" class="pin-key-btn">9</button>
           <button type="button" id="pin-biometric-btn" class="pin-aux-btn" title="Biometric Unlock">
-            <i data-lucide="fingerprint" class="w-6 h-6 text-slate-700"></i>
+            <i data-lucide="fingerprint" class="w-6 h-6 text-[#9A9CA3]"></i>
           </button>
           <button type="button" data-pin-key="0" class="pin-key-btn">0</button>
           <button type="button" id="pin-backspace-btn" class="pin-aux-btn" title="Delete">
-            <i data-lucide="delete" class="w-6 h-6 text-slate-700"></i>
+            <i data-lucide="delete" class="w-6 h-6 text-[#9A9CA3]"></i>
           </button>
         </div>
       </div>
     </div>
 
     <!-- Scrollable Main Content -->
-    <div id="mobile-scroll-body" class="flex-1 overflow-y-auto px-5 py-2 pb-24 bg-slate-50">
+    <div id="mobile-scroll-body" class="flex-1 overflow-y-auto px-4 py-2 pb-24 bg-[#16171A]">
       
-      <!-- VIEW 1: OVERVIEW (Visual Card-First Hero) -->
+      <!-- VIEW 1: HOME / DASHBOARD (Visual Card-First Hero) -->
       <section id="view-dashboard"></section>
 
-      <!-- VIEW 2: BANKS (3 max per bank) -->
-      <section id="view-cards" class="hidden"></section>
-
-      <!-- VIEW 3: HISTORY -->
+      <!-- VIEW 2: ACTIVITY / HISTORY -->
       <section id="view-history" class="hidden"></section>
 
-      <!-- VIEW 4: SETTINGS (Security, Biometrics, Vault) -->
+      <!-- VIEW 3: REVIEW / SMS INBOX -->
+      <section id="view-review" class="hidden"></section>
+
+      <!-- VIEW 4: WALLETS / BANKS -->
+      <section id="view-cards" class="hidden"></section>
+
+      <!-- VIEW 5: SETTINGS (Security, SMS Intake, Vault & General) -->
       <section id="view-settings" class="hidden"></section>
 
     </div>
@@ -171,87 +166,100 @@
     <!-- FLOATING BOTTOM NAVIGATION (Revolut / Telda Style) -->
     <!-- ============================================== -->
     <nav class="floating-bottom-nav">
-      <button data-tab="dashboard" class="floating-nav-tab active">Overview</button>
-      <button data-tab="cards" class="floating-nav-tab">Banks</button>
-      <button data-tab="history" class="floating-nav-tab">History</button>
-      <button data-tab="settings" class="floating-nav-tab">Settings</button>
+      <button data-tab="dashboard" class="floating-nav-tab active" title="Home">
+        <i data-lucide="home" class="w-4 h-4"></i>
+        <span class="tab-label">Home</span>
+      </button>
+      <button data-tab="history" class="floating-nav-tab" title="Activity">
+        <i data-lucide="list" class="w-4 h-4"></i>
+        <span class="tab-label hidden">Activity</span>
+      </button>
+      <button data-tab="review" class="floating-nav-tab relative" title="Review">
+        <i data-lucide="inbox" class="w-4 h-4"></i>
+        <span class="tab-label hidden">Review</span>
+        <span id="dock-review-badge" class="nav-badge hidden">0</span>
+      </button>
+      <button data-tab="cards" class="floating-nav-tab" title="Wallets">
+        <i data-lucide="credit-card" class="w-4 h-4"></i>
+        <span class="tab-label hidden">Wallets</span>
+      </button>
     </nav>
 
     <!-- ============================================== -->
     <!-- SLIDE-UP MODAL 1: QUICK ACTIONS -->
     <!-- ============================================== -->
     <div id="modal-quick-actions" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      <div class="modal-backdrop absolute inset-0 bg-black/70 backdrop-blur-xs"></div>
       
-      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full">
-        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"></div>
+      <div class="modal-sheet relative bg-[#1F2024] rounded-t-[28px] p-5 pb-8 shadow-2xl border-t border-[#3A3C42] transform translate-y-full transition-transform max-w-[390px] mx-auto w-full">
+        <div class="sheet-drag-handle"></div>
         
-        <h3 class="text-sm font-extrabold text-slate-900 mb-1">Create New</h3>
-        <p class="text-xs text-slate-400 mb-4">Choose an item to add</p>
+        <h3 class="text-sm font-extrabold text-[#F3F1EC] mb-1">Create New</h3>
+        <p class="text-xs text-[#9A9CA3] mb-4">Choose an item to add</p>
 
         <div class="space-y-2.5">
-          <button id="qa-add-tx" class="w-full p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center gap-3 text-left transition-all active-press">
-            <div class="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+          <button id="qa-add-tx" class="w-full p-3.5 rounded-2xl bg-[#16171A] hover:bg-[#26272B] border border-[#2F3136] flex items-center gap-3 text-start transition-all active-press">
+            <div class="w-9 h-9 rounded-full bg-[#F5B700] text-[#111111] flex items-center justify-center shrink-0 font-bold">
               <i data-lucide="plus" class="w-4 h-4"></i>
             </div>
             <div>
-              <div class="text-xs font-bold text-slate-900">Log Transaction</div>
-              <div class="text-[11px] text-slate-400">Automatic billing statement cycle tagging</div>
+              <div class="text-xs font-bold text-[#F3F1EC]">Log Transaction</div>
+              <div class="text-[11px] text-[#9A9CA3]">Automatic billing statement cycle tagging</div>
             </div>
           </button>
 
-          <button id="qa-add-card" class="w-full p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center gap-3 text-left transition-all active-press">
-            <div class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+          <button id="qa-add-card" class="w-full p-3.5 rounded-2xl bg-[#16171A] hover:bg-[#26272B] border border-[#2F3136] flex items-center gap-3 text-start transition-all active-press">
+            <div class="w-9 h-9 rounded-full bg-[#26272B] border border-[#3A3C42] text-[#F5B700] flex items-center justify-center shrink-0">
               <i data-lucide="credit-card" class="w-4 h-4"></i>
             </div>
             <div>
-              <div class="text-xs font-bold text-slate-900">Add Bank Card</div>
-              <div class="text-[11px] text-slate-400">Credit, Debit, or Prepaid (Max 3 per bank)</div>
+              <div class="text-xs font-bold text-[#F3F1EC]">Add Bank Card</div>
+              <div class="text-[11px] text-[#9A9CA3]">Credit, Debit, or Prepaid (Max 3 per bank)</div>
             </div>
           </button>
 
-          <button id="qa-add-bank" class="w-full p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center gap-3 text-left transition-all active-press">
-            <div class="w-9 h-9 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center shrink-0">
+          <button id="qa-add-bank" class="w-full p-3.5 rounded-2xl bg-[#16171A] hover:bg-[#26272B] border border-[#2F3136] flex items-center gap-3 text-start transition-all active-press">
+            <div class="w-9 h-9 rounded-full bg-[#26272B] border border-[#3A3C42] text-[#F3F1EC] flex items-center justify-center shrink-0">
               <i data-lucide="building-2" class="w-4 h-4"></i>
             </div>
             <div>
-              <div class="text-xs font-bold text-slate-900">Add New Bank</div>
-              <div class="text-[11px] text-slate-400">Custom brand accent colors</div>
+              <div class="text-xs font-bold text-[#F3F1EC]">Add New Bank</div>
+              <div class="text-[11px] text-[#9A9CA3]">Custom brand accent colors</div>
             </div>
           </button>
 
-          <button id="qa-lock-wallet" onclick="window.WalletSecurity && window.WalletSecurity.lock(); window.closeModal('quickActions');" class="w-full p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center gap-3 text-left transition-all active-press">
-            <div class="w-9 h-9 rounded-full bg-slate-800 text-white flex items-center justify-center shrink-0">
+          <button id="qa-lock-wallet" onclick="window.WalletSecurity && window.WalletSecurity.lock(); window.closeModal('quickActions');" class="w-full p-3.5 rounded-2xl bg-[#16171A] hover:bg-[#26272B] border border-[#2F3136] flex items-center gap-3 text-start transition-all active-press">
+            <div class="w-9 h-9 rounded-full bg-[#26272B] border border-[#3A3C42] text-[#9A9CA3] flex items-center justify-center shrink-0">
               <i data-lucide="lock" class="w-4 h-4"></i>
             </div>
             <div>
-              <div class="text-xs font-bold text-slate-900">Lock Wallet Now</div>
-              <div class="text-[11px] text-slate-400">Lock session with your 4-digit PIN</div>
+              <div class="text-xs font-bold text-[#F3F1EC]">Lock Wallet Now</div>
+              <div class="text-[11px] text-[#9A9CA3]">Lock session with your 4-digit PIN</div>
             </div>
           </button>
 
-          <button id="qa-change-pin" onclick="window.promptChangePin(); window.closeModal('quickActions');" class="w-full p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center gap-3 text-left transition-all active-press">
-            <div class="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+          <button id="qa-change-pin" onclick="window.promptChangePin(); window.closeModal('quickActions');" class="w-full p-3.5 rounded-2xl bg-[#16171A] hover:bg-[#26272B] border border-[#2F3136] flex items-center gap-3 text-start transition-all active-press">
+            <div class="w-9 h-9 rounded-full bg-[#26272B] border border-[#3A3C42] text-[#F5B700] flex items-center justify-center shrink-0">
               <i data-lucide="key-round" class="w-4 h-4"></i>
             </div>
             <div>
-              <div class="text-xs font-bold text-slate-900">Change Security PIN</div>
-              <div class="text-[11px] text-slate-400">Update your 4-digit master PIN</div>
+              <div class="text-xs font-bold text-[#F3F1EC]">Change Security PIN</div>
+              <div class="text-[11px] text-[#9A9CA3]">Update your 4-digit master PIN</div>
             </div>
           </button>
 
-          <button id="qa-clear-data" onclick="window.clearAllData(); window.closeModal('quickActions');" class="w-full p-3 rounded-2xl bg-rose-50/70 hover:bg-rose-100/80 border border-rose-100 flex items-center gap-3 text-left transition-all active-press">
-            <div class="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+          <button id="qa-clear-data" onclick="window.clearAllData(); window.closeModal('quickActions');" class="w-full p-3 rounded-2xl bg-[#16171A] hover:bg-[#26272B] border border-[#3A3C42] flex items-center gap-3 text-start transition-all active-press">
+            <div class="w-8 h-8 rounded-full bg-[#26272B] text-[#E6A8A8] flex items-center justify-center shrink-0">
               <i data-lucide="trash-2" class="w-4 h-4"></i>
             </div>
             <div>
-              <div class="text-xs font-bold text-rose-700">Clear All Wallet Data</div>
-              <div class="text-[10px] text-rose-500">Reset everything back to zero</div>
+              <div class="text-xs font-bold text-[#E6A8A8]">Clear All Wallet Data</div>
+              <div class="text-[10px] text-[#9A9CA3]">Reset everything back to zero</div>
             </div>
           </button>
         </div>
 
-        <button data-close-modal="quickActions" class="mt-4 w-full py-2.5 text-center text-xs font-bold text-slate-400 hover:text-slate-600 rounded-full">
+        <button data-close-modal="quickActions" class="mt-4 w-full py-2.5 text-center text-xs font-bold text-[#9A9CA3] hover:text-[#F3F1EC] rounded-full">
           Cancel
         </button>
       </div>
@@ -261,126 +269,124 @@
     <!-- SLIDE-UP MODAL 2: LOG TRANSACTION -->
     <!-- ============================================== -->
     <div id="modal-transaction" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      <div class="modal-backdrop absolute inset-0 bg-black/70 backdrop-blur-xs"></div>
       
-      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] overflow-y-auto">
-        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3"></div>
+      <div class="modal-sheet relative bg-[#1F2024] rounded-t-[28px] p-5 pb-8 shadow-2xl border-t border-[#3A3C42] transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] overflow-y-auto">
+        <div class="sheet-drag-handle"></div>
 
         <div class="flex items-center justify-between mb-3">
           <div>
-            <h3 class="text-sm font-extrabold text-slate-900">Log Transaction</h3>
-            <p class="text-[11px] text-slate-400">Auto-calculated billing statement cycle</p>
+            <h3 class="text-sm font-extrabold text-[#F3F1EC]">Log Transaction</h3>
+            <p class="text-[11px] text-[#9A9CA3]">Auto-calculated billing statement cycle</p>
           </div>
-          <button data-close-modal="transaction" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
+          <button data-close-modal="transaction" class="w-7 h-7 rounded-full bg-[#26272B] text-[#9A9CA3] hover:text-[#F3F1EC] flex items-center justify-center">
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
 
         <form id="form-add-transaction" class="space-y-3.5">
-          <!-- Amount -->
+          <!-- Operation Type Selection (Mockup style pills) -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Amount</label>
-            <div class="relative">
-              <span class="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">$ / EGP</span>
-              <input type="number" step="0.01" min="0.01" id="tx-amount" required placeholder="0.00" class="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-16 pr-3 py-2.5 text-base font-black text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <input type="radio" id="tx-op-purchase" name="tx-op-type" value="purchase" checked class="hidden peer">
+                <label for="tx-op-purchase" class="flex items-center justify-center py-2.5 px-2 rounded-xl border border-[#2F3136] bg-[#16171A] text-[#F3F1EC] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] cursor-pointer transition-all text-xs font-bold text-center">
+                  شراء
+                </label>
+              </div>
+              <div>
+                <input type="radio" id="tx-op-transfer" name="tx-op-type" value="transfer" class="hidden peer">
+                <label for="tx-op-transfer" class="flex items-center justify-center py-2.5 px-2 rounded-xl border border-[#2F3136] bg-[#16171A] text-[#F3F1EC] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] cursor-pointer transition-all text-xs font-bold text-center">
+                  تحويل
+                </label>
+              </div>
+              <div>
+                <input type="radio" id="tx-op-withdrawal" name="tx-op-type" value="withdrawal" class="hidden peer">
+                <label for="tx-op-withdrawal" class="flex items-center justify-center py-2.5 px-2 rounded-xl border border-[#2F3136] bg-[#16171A] text-[#F3F1EC] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] cursor-pointer transition-all text-xs font-bold text-center">
+                  سحب نقدي
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Amount -->
+          <div class="bg-[#16171A] p-3 rounded-2xl border border-[#2F3136]">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">المبلغ (Amount)</label>
+            <div class="relative flex items-center">
+              <input type="number" step="0.01" min="0.01" id="tx-amount" required placeholder="0.00" class="w-full bg-transparent border-none text-2xl font-black text-[#F3F1EC] font-mono outline-none tracking-tight">
+              <span id="tx-currency-label" class="text-sm font-bold text-[#9A9CA3] ml-2">EGP</span>
             </div>
           </div>
 
           <!-- Merchant -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Merchant / Description</label>
-            <input type="text" id="tx-merchant" required placeholder="e.g. Carrefour, Starbucks, Amazon" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">التاجر / الوصف (Merchant)</label>
+            <input type="text" id="tx-merchant" required placeholder="Carrefour, Starbucks, Amazon..." class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2.5 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700]">
             
             <!-- Quick Chips -->
             <div class="flex items-center gap-1.5 mt-1.5 overflow-x-auto no-scrollbar py-0.5">
-              <button type="button" class="quick-merchant-chip px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-semibold shrink-0" data-merchant="Carrefour Hypermarket" data-category="groceries">🛒 Carrefour</button>
-              <button type="button" class="quick-merchant-chip px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-semibold shrink-0" data-merchant="Talabat Order" data-category="food">🍔 Talabat</button>
-              <button type="button" class="quick-merchant-chip px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-semibold shrink-0" data-merchant="Starbucks" data-category="food">☕ Starbucks</button>
-              <button type="button" class="quick-merchant-chip px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-semibold shrink-0" data-merchant="Amazon" data-category="shopping">📦 Amazon</button>
+              <button type="button" class="quick-merchant-chip px-2.5 py-1 rounded-full bg-[#26272B] hover:bg-[#3A3C42] text-[#F3F1EC] text-[10px] font-semibold shrink-0" data-merchant="Carrefour Hypermarket" data-category="groceries">🛒 Carrefour</button>
+              <button type="button" class="quick-merchant-chip px-2.5 py-1 rounded-full bg-[#26272B] hover:bg-[#3A3C42] text-[#F3F1EC] text-[10px] font-semibold shrink-0" data-merchant="Talabat Order" data-category="food">🍔 Talabat</button>
+              <button type="button" class="quick-merchant-chip px-2.5 py-1 rounded-full bg-[#26272B] hover:bg-[#3A3C42] text-[#F3F1EC] text-[10px] font-semibold shrink-0" data-merchant="Starbucks" data-category="food">☕ Starbucks</button>
+              <button type="button" class="quick-merchant-chip px-2.5 py-1 rounded-full bg-[#26272B] hover:bg-[#3A3C42] text-[#F3F1EC] text-[10px] font-semibold shrink-0" data-merchant="Amazon" data-category="shopping">📦 Amazon</button>
             </div>
           </div>
 
-          <!-- Transaction Operation Type -->
+          <!-- Card Selection -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">نوع العملية (Operation Type)</label>
-            <div class="grid grid-cols-3 gap-1.5">
-              <div>
-                <input type="radio" id="tx-op-purchase" name="tx-op-type" value="purchase" checked class="hidden peer">
-                <label for="tx-op-purchase" class="flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-slate-50 peer-checked:bg-[#111827] peer-checked:border-[#111827] peer-checked:text-white cursor-pointer transition-all text-[11px] font-bold text-center">
-                  🛍️ شراء
-                </label>
-              </div>
-              <div>
-                <input type="radio" id="tx-op-transfer" name="tx-op-type" value="transfer" class="hidden peer">
-                <label for="tx-op-transfer" class="flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-slate-50 peer-checked:bg-[#111827] peer-checked:border-[#111827] peer-checked:text-white cursor-pointer transition-all text-[11px] font-bold text-center">
-                  🔁 تحويل
-                </label>
-              </div>
-              <div>
-                <input type="radio" id="tx-op-withdrawal" name="tx-op-type" value="withdrawal" class="hidden peer">
-                <label for="tx-op-withdrawal" class="flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-slate-50 peer-checked:bg-[#111827] peer-checked:border-[#111827] peer-checked:text-white cursor-pointer transition-all text-[11px] font-bold text-center">
-                  🏧 سحب نقدي
-                </label>
-              </div>
-            </div>
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">الكارت / الحساب (Card / Account)</label>
+            <select id="tx-card-select" required class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2.5 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700] cursor-pointer">
+              <!-- Injected via JS -->
+            </select>
           </div>
 
           <!-- Category -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Category</label>
-            <select id="tx-category" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
-              <option value="groceries">🛒 Groceries</option>
-              <option value="food">🍔 Food & Dining</option>
-              <option value="shopping">🛍️ Shopping</option>
-              <option value="utilities">💡 Bills & Utilities</option>
-              <option value="entertainment">🎬 Entertainment</option>
-              <option value="travel">✈️ Travel & Commute</option>
-              <option value="health">💊 Health & Medical</option>
-              <option value="services">💼 Services & Subscriptions</option>
-              <option value="other">📦 Other</option>
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">الفئة (Category)</label>
+            <select id="tx-category" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2.5 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700] cursor-pointer">
+              <option value="groceries">🛒 بقالة (Groceries)</option>
+              <option value="food">🍔 طعام ومطاعم (Food & Dining)</option>
+              <option value="shopping">🛍️ تسوق (Shopping)</option>
+              <option value="utilities">💡 فواتير وخدمات (Bills & Utilities)</option>
+              <option value="entertainment">🎬 ترفيه (Entertainment)</option>
+              <option value="travel">✈️ سفر ومواصلات (Travel)</option>
+              <option value="health">💊 صحة وطب (Health & Medical)</option>
+              <option value="services">💼 اشتراكات وخدمات (Subscriptions)</option>
+              <option value="other">📦 أخرى (Other)</option>
             </select>
           </div>
 
-          <!-- Date & Card Selection Row -->
-          <div class="grid grid-cols-2 gap-2.5">
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Date</label>
-              <input type="date" id="tx-date" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            </div>
-
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Card</label>
-              <select id="tx-card-select" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-2.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
-                <!-- Injected via JS -->
-              </select>
-            </div>
+          <!-- Date -->
+          <div>
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">التاريخ (Date)</label>
+            <input type="date" id="tx-date" required class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700]">
           </div>
 
           <!-- DYNAMIC SMART BILLING CYCLE PREVIEW BOX -->
-          <div id="tx-cycle-preview-box" class="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200/70">
-            <div id="tx-cycle-preview-badge"></div>
-            <div id="tx-cycle-preview-range"></div>
+          <div id="tx-cycle-preview-box" class="p-3 rounded-2xl bg-[#16171A] border border-[#2F3136]">
+            <div id="tx-cycle-preview-badge" class="text-xs font-bold text-[#F5B700]"></div>
+            <div id="tx-cycle-preview-range" class="text-[11px] text-[#9A9CA3] mt-0.5"></div>
           </div>
 
-          <!-- DYNAMIC ACCOUNT BALANCE PREVIEW & NEGATIVE WARNING BOX (Item 3) -->
-          <div id="tx-balance-preview-box" class="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs hidden space-y-1">
-            <div class="flex items-center justify-between font-bold text-[11px] text-slate-700">
+          <!-- DYNAMIC ACCOUNT BALANCE PREVIEW & NEGATIVE WARNING BOX -->
+          <div id="tx-balance-preview-box" class="p-3 rounded-2xl bg-[#16171A] border border-[#2F3136] text-xs hidden space-y-1">
+            <div class="flex items-center justify-between font-bold text-[11px] text-[#C8CAD0]">
               <span id="tx-balance-before">الرصيد الحالي: -</span>
               <span id="tx-balance-after" class="font-mono">الرصيد بعد: -</span>
             </div>
-            <div id="tx-balance-negative-warn" class="hidden text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2 mt-1">
+            <div id="tx-balance-negative-warn" class="hidden text-[11px] font-bold text-[#E6A8A8] bg-[#26272B] border border-[#E6A8A8]/30 rounded-xl p-2.5 mt-1">
               ⚠️ تحذير: هذه العملية ستجعل رصيد الحساب بالسالب!
             </div>
           </div>
 
           <!-- Notes -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Notes (Optional)</label>
-            <input type="text" id="tx-notes" placeholder="Optional notes" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">ملاحظة (Notes - Optional)</label>
+            <input type="text" id="tx-notes" placeholder="—" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs text-[#F3F1EC] focus:outline-none focus:border-[#F5B700]">
           </div>
 
-          <button type="submit" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white font-bold text-xs rounded-full shadow-md active-press transition-all flex items-center justify-center gap-1.5">
-            <span>Log Transaction</span>
+          <button type="submit" class="w-full py-3.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] font-bold text-xs rounded-2xl shadow-md active-press transition-all flex items-center justify-center gap-1.5">
+            <span>حفظ (Save)</span>
           </button>
         </form>
       </div>
@@ -390,37 +396,37 @@
     <!-- SLIDE-UP MODAL 3: ADD BANK -->
     <!-- ============================================== -->
     <div id="modal-bank" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      <div class="modal-backdrop absolute inset-0 bg-black/70 backdrop-blur-xs"></div>
       
-      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full">
-        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3"></div>
+      <div class="modal-sheet relative bg-[#1F2024] rounded-t-[28px] p-5 pb-8 shadow-2xl border-t border-[#3A3C42] transform translate-y-full transition-transform max-w-[390px] mx-auto w-full">
+        <div class="sheet-drag-handle"></div>
 
         <div class="flex items-center justify-between mb-3">
           <div>
-            <h3 class="text-sm font-extrabold text-slate-900">Add Bank</h3>
-            <p class="text-[11px] text-slate-400">Max 3 cards can be added under each bank</p>
+            <h3 class="text-sm font-extrabold text-[#F3F1EC]">Add Bank</h3>
+            <p class="text-[11px] text-[#9A9CA3]">Max 3 cards can be added under each bank</p>
           </div>
-          <button data-close-modal="bank" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
+          <button data-close-modal="bank" class="w-7 h-7 rounded-full bg-[#26272B] text-[#9A9CA3] hover:text-[#F3F1EC] flex items-center justify-center">
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
 
         <form id="form-add-bank" class="space-y-3.5">
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Bank Name</label>
-            <input type="text" id="bank-name" required placeholder="e.g. CIB, QNB, HSBC, NBE" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">Bank Name</label>
+            <input type="text" id="bank-name" required placeholder="e.g. CIB, QNB, HSBC, NBE" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700]">
           </div>
 
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Short Code</label>
-            <input type="text" id="bank-code" maxlength="6" placeholder="e.g. CIB, QNB" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 uppercase">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">Short Code</label>
+            <input type="text" id="bank-code" maxlength="6" placeholder="e.g. CIB, QNB" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700] uppercase">
           </div>
 
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Brand Accent Color</label>
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">Brand Accent Color</label>
             <div class="flex items-center gap-2 mb-2">
-              <input type="color" id="bank-color-custom" value="#002D62" class="w-8 h-8 rounded-full border border-slate-200 cursor-pointer p-0">
-              <span class="text-xs text-slate-500 font-mono">Custom Color</span>
+              <input type="color" id="bank-color-custom" value="#002D62" class="w-8 h-8 rounded-full border border-[#3A3C42] cursor-pointer p-0 bg-transparent">
+              <span class="text-xs text-[#9A9CA3] font-mono">Custom Color</span>
             </div>
 
             <div class="flex items-center gap-2 flex-wrap">
@@ -432,7 +438,7 @@
             </div>
           </div>
 
-          <button type="submit" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white font-bold text-xs rounded-full shadow-md active-press transition-all flex items-center justify-center gap-1.5">
+          <button type="submit" class="w-full py-3.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] font-bold text-xs rounded-2xl shadow-md active-press transition-all flex items-center justify-center gap-1.5">
             <span>Save Bank</span>
           </button>
         </form>
@@ -443,17 +449,17 @@
     <!-- SLIDE-UP MODAL 4: ADD CARD (3-CARD CAP ENFORCED) -->
     <!-- ============================================== -->
     <div id="modal-card" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      <div class="modal-backdrop absolute inset-0 bg-black/70 backdrop-blur-xs"></div>
       
-      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[92vh] overflow-y-auto">
-        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3"></div>
+      <div class="modal-sheet relative bg-[#1F2024] rounded-t-[28px] p-5 pb-8 shadow-2xl border-t border-[#3A3C42] transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[92vh] overflow-y-auto">
+        <div class="sheet-drag-handle"></div>
 
         <div class="flex items-center justify-between mb-3">
           <div>
-            <h3 class="text-sm font-extrabold text-slate-900">Add Card / Account</h3>
-            <p class="text-[11px] text-slate-400">Add cards or bank accounts for auto SMS matching</p>
+            <h3 class="text-sm font-extrabold text-[#F3F1EC]">Add Card / Account</h3>
+            <p class="text-[11px] text-[#9A9CA3]">Add cards or bank accounts for auto SMS matching</p>
           </div>
-          <button data-close-modal="card" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
+          <button data-close-modal="card" class="w-7 h-7 rounded-full bg-[#26272B] text-[#9A9CA3] hover:text-[#F3F1EC] flex items-center justify-center">
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
@@ -461,40 +467,40 @@
         <form id="form-add-card" class="space-y-3.5">
           <!-- Bank -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Bank</label>
-            <select id="card-bank-select" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">Bank</label>
+            <select id="card-bank-select" required class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700] cursor-pointer">
               <!-- Injected via JS -->
             </select>
           </div>
 
           <!-- Entity / Type -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Type</label>
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1.5">Type</label>
             <div class="grid grid-cols-4 gap-1.5">
               <div>
                 <input type="radio" id="type-credit" name="card-type" value="credit" checked class="hidden peer">
-                <label for="type-credit" class="flex items-center justify-center py-2 px-1 rounded-full border border-slate-200 bg-slate-50 peer-checked:bg-[#111827] peer-checked:border-[#111827] peer-checked:text-white cursor-pointer transition-all text-[11px] font-bold">
+                <label for="type-credit" class="flex items-center justify-center py-2 px-1 rounded-xl border border-[#2F3136] bg-[#16171A] text-[#F3F1EC] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] cursor-pointer transition-all text-[11px] font-bold">
                   Credit
                 </label>
               </div>
 
               <div>
                 <input type="radio" id="type-debit" name="card-type" value="debit" class="hidden peer">
-                <label for="type-debit" class="flex items-center justify-center py-2 px-1 rounded-full border border-slate-200 bg-slate-50 peer-checked:bg-[#111827] peer-checked:border-[#111827] peer-checked:text-white cursor-pointer transition-all text-[11px] font-bold">
+                <label for="type-debit" class="flex items-center justify-center py-2 px-1 rounded-xl border border-[#2F3136] bg-[#16171A] text-[#F3F1EC] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] cursor-pointer transition-all text-[11px] font-bold">
                   Debit
                 </label>
               </div>
 
               <div>
                 <input type="radio" id="type-account" name="card-type" value="account" class="hidden peer">
-                <label for="type-account" class="flex items-center justify-center py-2 px-1 rounded-full border border-slate-200 bg-slate-50 peer-checked:bg-[#111827] peer-checked:border-[#111827] peer-checked:text-white cursor-pointer transition-all text-[11px] font-bold">
+                <label for="type-account" class="flex items-center justify-center py-2 px-1 rounded-xl border border-[#2F3136] bg-[#16171A] text-[#F3F1EC] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] cursor-pointer transition-all text-[11px] font-bold">
                   Account
                 </label>
               </div>
 
               <div>
                 <input type="radio" id="type-prepaid" name="card-type" value="prepaid" class="hidden peer">
-                <label for="type-prepaid" class="flex items-center justify-center py-2 px-1 rounded-full border border-slate-200 bg-slate-50 peer-checked:bg-[#111827] peer-checked:border-[#111827] peer-checked:text-white cursor-pointer transition-all text-[11px] font-bold">
+                <label for="type-prepaid" class="flex items-center justify-center py-2 px-1 rounded-xl border border-[#2F3136] bg-[#16171A] text-[#F3F1EC] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] cursor-pointer transition-all text-[11px] font-bold">
                   Prepaid
                 </label>
               </div>
@@ -504,77 +510,77 @@
           <!-- Name & 4 Digits -->
           <div class="grid grid-cols-2 gap-2.5">
             <div>
-              <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Nickname</label>
-              <input type="text" id="card-name" required placeholder="e.g. Titanium" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900">
+              <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">Nickname</label>
+              <input type="text" id="card-name" required placeholder="e.g. Titanium" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700]">
             </div>
 
             <div>
-              <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">4 Identifier Digits</label>
-              <input type="text" id="card-last4" required maxlength="4" pattern="[0-9]{4}" placeholder="4910" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-slate-900">
+              <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">4 Identifier Digits</label>
+              <input type="text" id="card-last4" required maxlength="4" pattern="[0-9]{4}" placeholder="4910" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-bold text-[#F3F1EC] font-mono tracking-widest text-center focus:outline-none focus:border-[#F5B700]">
             </div>
           </div>
 
           <!-- Position Selector & Explanatory Hint -->
-          <div class="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+          <div class="p-2.5 rounded-2xl bg-[#16171A] border border-[#2F3136] space-y-1.5">
             <div class="flex items-center justify-between">
-              <span class="text-[11px] font-bold text-slate-700">موضع الأرقام في رسائل البنك:</span>
+              <span class="text-[11px] font-bold text-[#C8CAD0]">موضع الأرقام في رسائل البنك:</span>
               <div class="flex items-center gap-2">
-                <label class="text-[11px] font-semibold text-slate-600 flex items-center gap-1 cursor-pointer">
-                  <input type="radio" name="card-digits-position" value="last" checked class="text-slate-900">
+                <label class="text-[11px] font-semibold text-[#F3F1EC] flex items-center gap-1 cursor-pointer">
+                  <input type="radio" name="card-digits-position" value="last" checked class="accent-[#F5B700]">
                   <span>آخر الرقم</span>
                 </label>
-                <label class="text-[11px] font-semibold text-slate-600 flex items-center gap-1 cursor-pointer">
-                  <input type="radio" name="card-digits-position" value="first" class="text-slate-900">
+                <label class="text-[11px] font-semibold text-[#F3F1EC] flex items-center gap-1 cursor-pointer">
+                  <input type="radio" name="card-digits-position" value="first" class="accent-[#F5B700]">
                   <span>أول الرقم</span>
                 </label>
               </div>
             </div>
-            <p class="text-[10px] text-slate-500 leading-tight">
+            <p class="text-[10px] text-[#9A9CA3] leading-tight">
               أدخل الأرقام المعرفة كما تظهر في رسائل بنكك النصية (مثال: المنتهي بـ 1234 أو تبدأ بـ 1234).
             </p>
           </div>
 
           <!-- Linked Account (Visible for Debit Cards) -->
           <div id="card-linked-account-section" class="hidden">
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Linked Bank Account (Optional)</label>
-            <select id="card-linked-account" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">Linked Bank Account (Optional)</label>
+            <select id="card-linked-account" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700] cursor-pointer">
               <option value="">None (Independent Debit)</option>
             </select>
           </div>
 
           <!-- Bank Credit Limit (Visible for Credit Cards) -->
           <div id="card-credit-limit-section" class="hidden">
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Bank Credit Limit (الحد الائتماني البنكي)</label>
-            <input type="number" id="card-credit-limit" min="0" step="500" placeholder="اختياري (مثال: 50000)" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">Bank Credit Limit (الحد الائتماني البنكي)</label>
+            <input type="number" id="card-credit-limit" min="0" step="500" placeholder="اختياري (مثال: 50000)" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-bold text-[#F3F1EC] font-mono focus:outline-none focus:border-[#F5B700]">
           </div>
 
           <!-- Target / Personal Spending Budget -->
           <div id="card-target-section">
-            <label id="card-target-label" class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Personal Spending Budget (ميزانية الصرف للدورة)</label>
-            <input type="number" id="card-target" min="0" step="100" placeholder="20000" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900">
-            <p id="card-target-help" class="text-[10px] text-slate-500 mt-1.5 hidden"></p>
+            <label id="card-target-label" class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">Personal Spending Budget (ميزانية الصرف للدورة)</label>
+            <input type="number" id="card-target" min="0" step="100" placeholder="20000" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-bold text-[#F3F1EC] font-mono focus:outline-none focus:border-[#F5B700]">
+            <p id="card-target-help" class="text-[10px] text-[#9A9CA3] mt-1.5 hidden"></p>
           </div>
 
           <!-- DYNAMIC CREDIT CARD CYCLE SECTION -->
-          <div id="card-cycle-section" class="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/60 space-y-2">
-            <span class="text-xs font-bold text-indigo-900 block">Billing Cycle Days (1–31)</span>
+          <div id="card-cycle-section" class="p-3.5 rounded-2xl bg-[#16171A] border border-[#2F3136] space-y-2">
+            <span class="text-xs font-bold text-[#F5B700] block">Billing Cycle Days (1–31)</span>
             <div class="grid grid-cols-2 gap-2.5">
               <div>
-                <label class="block text-[10px] font-bold text-indigo-900 uppercase mb-1">Start Day</label>
-                <input type="number" id="card-cycle-start" min="1" max="31" value="25" class="w-full bg-white border border-indigo-200 rounded-full px-3 py-1.5 text-xs font-bold text-indigo-950 font-mono text-center">
+                <label class="block text-[10px] font-bold text-[#9A9CA3] uppercase mb-1">Start Day</label>
+                <input type="number" id="card-cycle-start" min="1" max="31" value="25" class="w-full bg-[#1F2024] border border-[#3A3C42] rounded-full px-3 py-1.5 text-xs font-bold text-[#F3F1EC] font-mono text-center">
               </div>
 
               <div>
-                <label class="block text-[10px] font-bold text-indigo-900 uppercase mb-1">End Day</label>
-                <input type="number" id="card-cycle-end" min="1" max="31" value="24" class="w-full bg-white border border-indigo-200 rounded-full px-3 py-1.5 text-xs font-bold text-indigo-950 font-mono text-center">
+                <label class="block text-[10px] font-bold text-[#9A9CA3] uppercase mb-1">End Day</label>
+                <input type="number" id="card-cycle-end" min="1" max="31" value="24" class="w-full bg-[#1F2024] border border-[#3A3C42] rounded-full px-3 py-1.5 text-xs font-bold text-[#F3F1EC] font-mono text-center">
               </div>
             </div>
-            <p class="text-[10px] text-indigo-800/80">
+            <p class="text-[10px] text-[#9A9CA3]">
               Purchases after the start day roll into the next month's statement.
             </p>
           </div>
 
-          <button type="submit" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white font-bold text-xs rounded-full shadow-md active-press transition-all flex items-center justify-center gap-1.5">
+          <button type="submit" class="w-full py-3.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] font-bold text-xs rounded-2xl shadow-md active-press transition-all flex items-center justify-center gap-1.5">
             <span id="card-submit-button-text">Save Card / Account</span>
           </button>
         </form>
@@ -585,26 +591,26 @@
     <!-- SLIDE-UP MODAL 5: CUSTOMIZE CARD THEME -->
     <!-- ============================================== -->
     <div id="modal-customize-card" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      <div class="modal-backdrop absolute inset-0 bg-black/70 backdrop-blur-xs"></div>
       
-      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] overflow-y-auto">
-        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3"></div>
+      <div class="modal-sheet relative bg-[#1F2024] rounded-t-[28px] p-5 pb-8 shadow-2xl border-t border-[#3A3C42] transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] overflow-y-auto">
+        <div class="sheet-drag-handle"></div>
 
         <div class="flex items-center justify-between mb-3">
           <div>
-            <h3 class="text-sm font-extrabold text-slate-900">Customize Card Color</h3>
-            <p id="customize-card-subtitle" class="text-[11px] text-slate-400">Choose real bank colors or custom gradient</p>
+            <h3 class="text-sm font-extrabold text-[#F3F1EC]">Customize Card Color</h3>
+            <p id="customize-card-subtitle" class="text-[11px] text-[#9A9CA3]">Choose real bank colors or custom gradient</p>
           </div>
-          <button data-close-modal="customizeCard" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
+          <button data-close-modal="customizeCard" class="w-7 h-7 rounded-full bg-[#26272B] text-[#9A9CA3] hover:text-[#F3F1EC] flex items-center justify-center">
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
 
         <!-- Live Preview of Card being edited -->
-        <div id="customize-card-preview" class="p-4 rounded-2xl text-white mb-4 shadow-md transition-all">
+        <div id="customize-card-preview" class="p-4 rounded-2xl text-white mb-4 shadow-md transition-all border border-[#3A3C42]">
           <div class="flex justify-between items-center text-xs font-semibold">
             <span id="customize-preview-name">Card Nickname</span>
-            <span id="customize-preview-type" class="text-[9px] bg-white/20 px-2 py-0.5 rounded-full uppercase">CREDIT</span>
+            <span id="customize-preview-type" class="text-[9px] bg-black/30 px-2 py-0.5 rounded-full uppercase">CREDIT</span>
           </div>
           <p id="customize-preview-amount" class="text-xl font-bold mt-2 font-mono">0.00 EGP</p>
           <div class="w-full h-1 bg-white/20 rounded-full mt-2 overflow-hidden">
@@ -619,80 +625,80 @@
         <div class="space-y-4">
           <!-- Real Bank Colors -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">🏛️ Official Bank Colors</label>
+            <label class="block text-[11px] font-bold text-[#C8CAD0] uppercase tracking-wider mb-2">🏛️ Official Bank Colors</label>
             <div class="grid grid-cols-3 gap-2">
-              <button type="button" onclick="window.applyCardThemePreset('cib')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+              <button type="button" onclick="window.applyCardThemePreset('cib')" class="theme-preset-btn p-2 rounded-xl border border-[#2F3136] bg-[#16171A] flex items-center gap-2 text-start hover:border-[#F5B700] transition-all">
                 <span class="w-4 h-4 rounded-full bg-[#002D62] shrink-0 shadow-xs"></span>
-                <span class="text-[11px] font-bold text-slate-800">CIB Navy</span>
+                <span class="text-[11px] font-bold text-[#F3F1EC]">CIB Navy</span>
               </button>
-              <button type="button" onclick="window.applyCardThemePreset('hsbc')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+              <button type="button" onclick="window.applyCardThemePreset('hsbc')" class="theme-preset-btn p-2 rounded-xl border border-[#2F3136] bg-[#16171A] flex items-center gap-2 text-start hover:border-[#F5B700] transition-all">
                 <span class="w-4 h-4 rounded-full bg-[#DB0011] shrink-0 shadow-xs"></span>
-                <span class="text-[11px] font-bold text-slate-800">HSBC Red</span>
+                <span class="text-[11px] font-bold text-[#F3F1EC]">HSBC Red</span>
               </button>
-              <button type="button" onclick="window.applyCardThemePreset('qnb')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+              <button type="button" onclick="window.applyCardThemePreset('qnb')" class="theme-preset-btn p-2 rounded-xl border border-[#2F3136] bg-[#16171A] flex items-center gap-2 text-start hover:border-[#F5B700] transition-all">
                 <span class="w-4 h-4 rounded-full bg-[#7C003D] shrink-0 shadow-xs"></span>
-                <span class="text-[11px] font-bold text-slate-800">QNB Wine</span>
+                <span class="text-[11px] font-bold text-[#F3F1EC]">QNB Wine</span>
               </button>
-              <button type="button" onclick="window.applyCardThemePreset('nbe')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+              <button type="button" onclick="window.applyCardThemePreset('nbe')" class="theme-preset-btn p-2 rounded-xl border border-[#2F3136] bg-[#16171A] flex items-center gap-2 text-start hover:border-[#F5B700] transition-all">
                 <span class="w-4 h-4 rounded-full bg-[#006837] shrink-0 shadow-xs"></span>
-                <span class="text-[11px] font-bold text-slate-800">NBE Green</span>
+                <span class="text-[11px] font-bold text-[#F3F1EC]">NBE Green</span>
               </button>
-              <button type="button" onclick="window.applyCardThemePreset('bm')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+              <button type="button" onclick="window.applyCardThemePreset('bm')" class="theme-preset-btn p-2 rounded-xl border border-[#2F3136] bg-[#16171A] flex items-center gap-2 text-start hover:border-[#F5B700] transition-all">
                 <span class="w-4 h-4 rounded-full bg-[#991B1E] shrink-0 shadow-xs"></span>
-                <span class="text-[11px] font-bold text-slate-800">Banque Misr</span>
+                <span class="text-[11px] font-bold text-[#F3F1EC]">Banque Misr</span>
               </button>
-              <button type="button" onclick="window.applyCardThemePreset('enbd')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+              <button type="button" onclick="window.applyCardThemePreset('enbd')" class="theme-preset-btn p-2 rounded-xl border border-[#2F3136] bg-[#16171A] flex items-center gap-2 text-start hover:border-[#F5B700] transition-all">
                 <span class="w-4 h-4 rounded-full bg-[#0B3082] shrink-0 shadow-xs"></span>
-                <span class="text-[11px] font-bold text-slate-800">Emirates NBD</span>
+                <span class="text-[11px] font-bold text-[#F3F1EC]">Emirates NBD</span>
               </button>
             </div>
           </div>
 
           <!-- Luxury Gradient Presets -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">💎 Luxury Gradients</label>
+            <label class="block text-[11px] font-bold text-[#C8CAD0] uppercase tracking-wider mb-2">💎 Luxury Gradients</label>
             <div class="grid grid-cols-3 gap-2">
-              <button type="button" onclick="window.applyCardThemePreset('indigo')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+              <button type="button" onclick="window.applyCardThemePreset('indigo')" class="theme-preset-btn p-2 rounded-xl border border-[#2F3136] bg-[#16171A] flex items-center gap-2 text-start hover:border-[#F5B700] transition-all">
                 <span class="w-4 h-4 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-600 shrink-0 shadow-xs"></span>
-                <span class="text-[11px] font-bold text-slate-800">Indigo</span>
+                <span class="text-[11px] font-bold text-[#F3F1EC]">Indigo</span>
               </button>
-              <button type="button" onclick="window.applyCardThemePreset('midnight')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+              <button type="button" onclick="window.applyCardThemePreset('midnight')" class="theme-preset-btn p-2 rounded-xl border border-[#2F3136] bg-[#16171A] flex items-center gap-2 text-start hover:border-[#F5B700] transition-all">
                 <span class="w-4 h-4 rounded-full bg-gradient-to-tr from-slate-900 to-zinc-800 shrink-0 shadow-xs"></span>
-                <span class="text-[11px] font-bold text-slate-800">Obsidian</span>
+                <span class="text-[11px] font-bold text-[#F3F1EC]">Obsidian</span>
               </button>
-              <button type="button" onclick="window.applyCardThemePreset('emerald')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+              <button type="button" onclick="window.applyCardThemePreset('emerald')" class="theme-preset-btn p-2 rounded-xl border border-[#2F3136] bg-[#16171A] flex items-center gap-2 text-start hover:border-[#F5B700] transition-all">
                 <span class="w-4 h-4 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-600 shrink-0 shadow-xs"></span>
-                <span class="text-[11px] font-bold text-slate-800">Emerald</span>
+                <span class="text-[11px] font-bold text-[#F3F1EC]">Emerald</span>
               </button>
-              <button type="button" onclick="window.applyCardThemePreset('rose')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+              <button type="button" onclick="window.applyCardThemePreset('rose')" class="theme-preset-btn p-2 rounded-xl border border-[#2F3136] bg-[#16171A] flex items-center gap-2 text-start hover:border-[#F5B700] transition-all">
                 <span class="w-4 h-4 rounded-full bg-gradient-to-tr from-rose-600 to-pink-600 shrink-0 shadow-xs"></span>
-                <span class="text-[11px] font-bold text-slate-800">Rose</span>
+                <span class="text-[11px] font-bold text-[#F3F1EC]">Rose</span>
               </button>
-              <button type="button" onclick="window.applyCardThemePreset('gold')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+              <button type="button" onclick="window.applyCardThemePreset('gold')" class="theme-preset-btn p-2 rounded-xl border border-[#2F3136] bg-[#16171A] flex items-center gap-2 text-start hover:border-[#F5B700] transition-all">
                 <span class="w-4 h-4 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-600 shrink-0 shadow-xs"></span>
-                <span class="text-[11px] font-bold text-slate-800">Gold VIP</span>
+                <span class="text-[11px] font-bold text-[#F3F1EC]">Gold VIP</span>
               </button>
-              <button type="button" onclick="window.applyCardThemePreset('cyan')" class="theme-preset-btn p-2 rounded-xl border border-slate-200 flex items-center gap-2 text-left hover:border-slate-400 transition-all">
+              <button type="button" onclick="window.applyCardThemePreset('cyan')" class="theme-preset-btn p-2 rounded-xl border border-[#2F3136] bg-[#16171A] flex items-center gap-2 text-start hover:border-[#F5B700] transition-all">
                 <span class="w-4 h-4 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 shrink-0 shadow-xs"></span>
-                <span class="text-[11px] font-bold text-slate-800">Cyan</span>
+                <span class="text-[11px] font-bold text-[#F3F1EC]">Cyan</span>
               </button>
             </div>
           </div>
 
           <!-- Custom Color Picker -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">🎨 Custom Color</label>
-            <div class="flex items-center gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
-              <input type="color" id="customize-custom-color" value="#4F46E5" oninput="window.applyCardCustomColor(this.value)" onchange="window.applyCardCustomColor(this.value)" class="w-8 h-8 rounded-full border border-slate-300 cursor-pointer p-0">
+            <label class="block text-[11px] font-bold text-[#C8CAD0] uppercase tracking-wider mb-2">🎨 Custom Color</label>
+            <div class="flex items-center gap-3 bg-[#16171A] p-3 rounded-2xl border border-[#2F3136]">
+              <input type="color" id="customize-custom-color" value="#4F46E5" oninput="window.applyCardCustomColor(this.value)" onchange="window.applyCardCustomColor(this.value)" class="w-8 h-8 rounded-full border border-[#3A3C42] cursor-pointer p-0 bg-transparent">
               <div>
-                <span class="text-xs font-bold text-slate-800 block">Pick Custom Color</span>
-                <span class="text-[10px] text-slate-400">Creates matching rich gradient</span>
+                <span class="text-xs font-bold text-[#F3F1EC] block">Pick Custom Color</span>
+                <span class="text-[10px] text-[#9A9CA3]">Creates matching rich gradient</span>
               </div>
             </div>
           </div>
         </div>
 
-        <button data-close-modal="customizeCard" class="mt-4 w-full py-2.5 bg-[#111827] text-white text-xs font-bold rounded-full shadow-md active-press transition-all">
+        <button data-close-modal="customizeCard" class="mt-4 w-full py-3 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-xs font-bold rounded-2xl shadow-md active-press transition-all">
           Done
         </button>
       </div>
@@ -702,31 +708,31 @@
     <!-- SLIDE-UP MODAL 6: SMS TRANSACTION REVIEW INBOX -->
     <!-- ============================================== -->
     <div id="modal-sms-review" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      <div class="modal-backdrop absolute inset-0 bg-black/70 backdrop-blur-xs"></div>
       
-      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] flex flex-col">
-        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3 shrink-0"></div>
+      <div class="modal-sheet relative bg-[#1F2024] rounded-t-[28px] p-5 pb-8 shadow-2xl border-t border-[#3A3C42] transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] flex flex-col">
+        <div class="sheet-drag-handle"></div>
 
         <div class="flex items-center justify-between mb-3 shrink-0">
           <div>
             <div class="flex items-center gap-2">
-              <h3 class="text-sm font-extrabold text-slate-900">SMS Transaction Inbox</h3>
-              <span id="sms-inbox-counter" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">0 New</span>
+              <h3 class="text-sm font-extrabold text-[#F3F1EC]">SMS Transaction Inbox</h3>
+              <span id="sms-inbox-counter" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#F5B700] text-[#111111]">0 New</span>
             </div>
-            <p class="text-[11px] text-slate-400">Review and approve parsed bank transactions</p>
+            <p class="text-[11px] text-[#9A9CA3]">Review and approve parsed bank transactions</p>
           </div>
-          <button data-close-modal="smsReview" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
+          <button data-close-modal="smsReview" class="w-7 h-7 rounded-full bg-[#26272B] text-[#9A9CA3] hover:text-[#F3F1EC] flex items-center justify-center">
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
 
         <!-- Controls: Approve Verified / Clear All -->
         <div id="sms-inbox-batch-actions" class="flex items-center justify-between gap-2 mb-3 shrink-0">
-          <button type="button" onclick="window.approveAllVerifiedSms()" class="flex-1 py-1.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold rounded-xl border border-emerald-200 flex items-center justify-center gap-1.5 transition-all">
-            <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
+          <button type="button" onclick="window.approveAllVerifiedSms()" class="flex-1 py-2 px-3 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm active-press">
+            <i data-lucide="check-check" class="w-4 h-4"></i>
             <span>Approve Verified</span>
           </button>
-          <button type="button" onclick="window.clearAllPendingSms()" class="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold rounded-xl transition-all">
+          <button type="button" onclick="window.clearAllPendingSms()" class="py-2 px-3 bg-[#26272B] hover:bg-[#2F3136] text-[#C8CAD0] text-xs font-bold rounded-xl transition-all active-press">
             <span>Clear All</span>
           </button>
         </div>
@@ -736,7 +742,7 @@
           <!-- Dynamically populated via ui.js -->
         </div>
 
-        <button data-close-modal="smsReview" class="mt-3 w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition-all shrink-0">
+        <button data-close-modal="smsReview" class="mt-3 w-full py-2.5 bg-[#26272B] hover:bg-[#2F3136] text-[#C8CAD0] text-xs font-bold rounded-full transition-all shrink-0">
           Close Inbox
         </button>
       </div>
@@ -746,22 +752,22 @@
     <!-- SLIDE-UP MODAL 7: SMS DIAGNOSTICS & STATUS LOG -->
     <!-- ============================================== -->
     <div id="modal-sms-diagnostics" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      <div class="modal-backdrop absolute inset-0 bg-black/70 backdrop-blur-xs"></div>
       
-      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] flex flex-col">
-        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3 shrink-0"></div>
+      <div class="modal-sheet relative bg-[#1F2024] rounded-t-[28px] p-5 pb-8 shadow-2xl border-t border-[#3A3C42] transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] flex flex-col">
+        <div class="sheet-drag-handle"></div>
 
         <div class="flex items-center justify-between mb-3 shrink-0">
           <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div class="w-8 h-8 rounded-xl bg-[#26272B] border border-[#3A3C42] text-[#F5B700] flex items-center justify-center">
               <i data-lucide="activity" class="w-4 h-4"></i>
             </div>
             <div>
-              <h3 class="text-sm font-extrabold text-slate-900">تشخيص واستقبال رسائل البنوك</h3>
-              <p class="text-[10px] text-slate-400">سجل وحالة استقبال الـ SMS لحظياً</p>
+              <h3 class="text-sm font-extrabold text-[#F3F1EC]">تشخيص واستقبال رسائل البنوك</h3>
+              <p class="text-[10px] text-[#9A9CA3]">سجل وحالة استقبال الـ SMS لحظياً</p>
             </div>
           </div>
-          <button data-close-modal="smsDiagnostics" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
+          <button data-close-modal="smsDiagnostics" class="w-7 h-7 rounded-full bg-[#26272B] text-[#9A9CA3] hover:text-[#F3F1EC] flex items-center justify-center">
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
@@ -770,7 +776,7 @@
           <!-- Dynamically populated via ui.js -->
         </div>
 
-        <button data-close-modal="smsDiagnostics" class="mt-3 w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition-all shrink-0">
+        <button data-close-modal="smsDiagnostics" class="mt-3 w-full py-2.5 bg-[#26272B] hover:bg-[#2F3136] text-[#C8CAD0] text-xs font-bold rounded-full transition-all shrink-0">
           إغلاق
         </button>
       </div>
@@ -780,22 +786,22 @@
     <!-- SLIDE-UP MODAL 8: HISTORICAL BANK SMS IMPORT   -->
     <!-- ============================================== -->
     <div id="modal-sms-historical" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      <div class="modal-backdrop absolute inset-0 bg-black/70 backdrop-blur-xs"></div>
       
-      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] flex flex-col">
-        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3 shrink-0"></div>
+      <div class="modal-sheet relative bg-[#1F2024] rounded-t-[28px] p-5 pb-8 shadow-2xl border-t border-[#3A3C42] transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] flex flex-col">
+        <div class="sheet-drag-handle"></div>
 
         <div class="flex items-center justify-between mb-3 shrink-0">
           <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <div class="w-8 h-8 rounded-xl bg-[#26272B] border border-[#3A3C42] text-[#F5B700] flex items-center justify-center">
               <i data-lucide="history" class="w-4 h-4"></i>
             </div>
             <div>
-              <h3 class="text-sm font-extrabold text-slate-900">استيراد الرسائل البنكية السابقة</h3>
-              <p class="text-[10px] text-slate-400">فحص آمن لصندوق الرسائل القديم بدفعات صغيرة</p>
+              <h3 class="text-sm font-extrabold text-[#F3F1EC]">استيراد الرسائل البنكية السابقة</h3>
+              <p class="text-[10px] text-[#9A9CA3]">فحص آمن لصندوق الرسائل القديم بدفعات صغيرة</p>
             </div>
           </div>
-          <button data-close-modal="smsHistorical" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
+          <button data-close-modal="smsHistorical" class="w-7 h-7 rounded-full bg-[#26272B] text-[#9A9CA3] hover:text-[#F3F1EC] flex items-center justify-center">
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
@@ -804,7 +810,7 @@
           <!-- Dynamically populated via ui.js -->
         </div>
 
-        <button data-close-modal="smsHistorical" class="mt-3 w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition-all shrink-0">
+        <button data-close-modal="smsHistorical" class="mt-3 w-full py-2.5 bg-[#26272B] hover:bg-[#2F3136] text-[#C8CAD0] text-xs font-bold rounded-full transition-all shrink-0">
           إغلاق
         </button>
       </div>
@@ -812,57 +818,57 @@
 
     <!-- MODAL 9: NEW BILLING CYCLE BUDGET PROMPT -->
     <div id="modal-cycle-budget-prompt" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
-      <div class="modal-sheet bg-white rounded-t-[32px] p-6 max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl relative z-10 transform translate-y-full transition-transform duration-300 space-y-4">
+      <div class="modal-backdrop fixed inset-0 bg-black/70 backdrop-blur-xs"></div>
+      <div class="modal-sheet bg-[#1F2024] rounded-t-[32px] p-6 max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl relative z-10 transform translate-y-full transition-transform duration-300 space-y-4 border-t border-[#3A3C42]">
         <!-- Drag Handle -->
-        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto -mt-1 mb-2"></div>
+        <div class="sheet-drag-handle"></div>
 
         <!-- Header -->
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+          <div class="w-10 h-10 rounded-2xl bg-[#26272B] border border-[#3A3C42] flex items-center justify-center text-[#F5B700] shrink-0">
             <i data-lucide="calendar" class="w-5 h-5"></i>
           </div>
           <div>
-            <h3 class="text-sm font-extrabold text-slate-900">بدء دورة كشف جديدة</h3>
-            <p id="cycle-prompt-card-name" class="text-xs text-slate-500 font-medium"></p>
+            <h3 class="text-sm font-extrabold text-[#F3F1EC]">بدء دورة كشف جديدة</h3>
+            <p id="cycle-prompt-card-name" class="text-xs text-[#9A9CA3] font-medium"></p>
           </div>
         </div>
 
         <!-- Cycle Info Box -->
-        <div class="bg-slate-50 rounded-2xl p-3.5 text-xs space-y-2 border border-slate-100">
-          <div class="flex justify-between items-center text-slate-600">
+        <div class="bg-[#16171A] rounded-2xl p-3.5 text-xs space-y-2 border border-[#2F3136]">
+          <div class="flex justify-between items-center text-[#C8CAD0]">
             <span>دورة الفوترة:</span>
-            <span id="cycle-prompt-statement" class="font-bold text-slate-900"></span>
+            <span id="cycle-prompt-statement" class="font-bold text-[#F3F1EC]"></span>
           </div>
-          <div class="flex justify-between items-center text-slate-600">
+          <div class="flex justify-between items-center text-[#C8CAD0]">
             <span>ميزانية الدورة السابقة:</span>
-            <span id="cycle-prompt-prev-budget" class="font-bold text-slate-900 font-mono"></span>
+            <span id="cycle-prompt-prev-budget" class="font-bold text-[#F5B700] font-mono"></span>
           </div>
-          <div class="flex justify-between items-center text-slate-600" id="cycle-prompt-limit-row">
+          <div class="flex justify-between items-center text-[#C8CAD0]" id="cycle-prompt-limit-row">
             <span>الحد الائتماني البنكي:</span>
-            <span id="cycle-prompt-limit" class="font-bold text-slate-900 font-mono"></span>
+            <span id="cycle-prompt-limit" class="font-bold text-[#F3F1EC] font-mono"></span>
           </div>
         </div>
 
         <!-- Option 1: Continue with previous budget -->
-        <button type="button" id="btn-cycle-continue" class="w-full py-3 px-4 bg-[#111827] hover:bg-slate-800 text-white rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active-press">
-          <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+        <button type="button" id="btn-cycle-continue" class="w-full py-3 px-4 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active-press">
+          <i data-lucide="check" class="w-4 h-4 text-[#111111]"></i>
           <span>الاستمرار على ميزانية الدورة السابقة</span>
         </button>
 
         <!-- Divider -->
         <div class="relative flex py-1 items-center">
-          <div class="flex-grow border-t border-slate-200"></div>
-          <span class="flex-shrink mx-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider">أو تحديد ميزانية جديدة</span>
-          <div class="flex-grow border-t border-slate-200"></div>
+          <div class="flex-grow border-t border-[#2F3136]"></div>
+          <span class="flex-shrink mx-3 text-[10px] text-[#9A9CA3] font-bold uppercase tracking-wider">أو تحديد ميزانية جديدة</span>
+          <div class="flex-grow border-t border-[#2F3136]"></div>
         </div>
 
         <!-- Option 2: Enter new budget -->
         <div class="space-y-2">
-          <label class="block text-[11px] font-bold text-slate-700">ميزانية جديدة لهذه الدورة فقط:</label>
+          <label class="block text-[11px] font-bold text-[#C8CAD0]">ميزانية جديدة لهذه الدورة فقط:</label>
           <div class="flex gap-2">
-            <input type="number" id="input-cycle-new-budget" min="0" step="100" placeholder="المبلغ بالجنيه" class="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold text-slate-900 font-mono outline-none focus:ring-2 focus:ring-indigo-500">
-            <button type="button" id="btn-cycle-save-new" class="py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all active-press">
+            <input type="number" id="input-cycle-new-budget" min="0" step="100" placeholder="المبلغ بالجنيه" class="flex-1 bg-[#16171A] border border-[#2F3136] rounded-2xl px-3.5 py-2.5 text-xs font-bold text-[#F3F1EC] font-mono outline-none focus:border-[#F5B700]">
+            <button type="button" id="btn-cycle-save-new" class="py-2.5 px-4 bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-[#F5B700] rounded-2xl text-xs font-bold transition-all active-press">
               تأكيد
             </button>
           </div>
@@ -872,17 +878,17 @@
 
     <!-- MODAL 10: EDIT BANK ACCOUNT & ADJUST BALANCE -->
     <div id="modal-edit-account" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
-      <div class="modal-sheet bg-white rounded-t-[32px] p-6 max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl relative z-10 transform translate-y-full transition-transform duration-300 space-y-4 max-w-[420px] mx-auto w-full">
+      <div class="modal-backdrop fixed inset-0 bg-black/70 backdrop-blur-xs"></div>
+      <div class="modal-sheet bg-[#1F2024] rounded-t-[32px] p-6 max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl relative z-10 transform translate-y-full transition-transform duration-300 space-y-4 max-w-[420px] mx-auto w-full border-t border-[#3A3C42]">
         <!-- Drag Handle -->
-        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto -mt-1 mb-1"></div>
+        <div class="sheet-drag-handle"></div>
 
-        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div class="flex items-center justify-between pb-2 border-b border-[#2F3136]">
           <div>
-            <h3 class="text-sm font-extrabold text-slate-900">تعديل الحساب وتصحيح الرصيد</h3>
-            <p id="edit-account-bank-header" class="text-xs text-slate-400 font-medium"></p>
+            <h3 class="text-sm font-extrabold text-[#F3F1EC]">تعديل الحساب وتصحيح الرصيد</h3>
+            <p id="edit-account-bank-header" class="text-xs text-[#9A9CA3] font-medium"></p>
           </div>
-          <button data-close-modal="editAccount" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
+          <button data-close-modal="editAccount" class="w-7 h-7 rounded-full bg-[#26272B] text-[#9A9CA3] hover:text-[#F3F1EC] flex items-center justify-center">
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
@@ -892,27 +898,27 @@
 
           <!-- Account Nickname -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">اسم الحساب</label>
-            <input type="text" id="edit-account-name" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">اسم الحساب</label>
+            <input type="text" id="edit-account-name" required class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700]">
           </div>
 
           <!-- Current Balance Input -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">الرصيد الفعلي الحالي (Corrected Balance)</label>
-            <input type="number" id="edit-account-balance" step="0.01" required placeholder="0.00" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900">
-            <p class="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">الرصيد الفعلي الحالي (Corrected Balance)</label>
+            <input type="number" id="edit-account-balance" step="0.01" required placeholder="0.00" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-bold text-[#F3F1EC] font-mono focus:outline-none focus:border-[#F5B700]">
+            <p class="text-[10px] text-[#9A9CA3] mt-1.5 leading-relaxed">
               💡 تعديل الرصيد يُحفظ كحركة تسوية رصيد في السجل توثق الرصيد السابق والجديد دون تعديل أو حذف أي عمليات تاريخية.
             </p>
           </div>
 
           <!-- Notes -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">سبب التسوية / ملاحظات (اختياري)</label>
-            <input type="text" id="edit-account-notes" placeholder="مثال: مطابقة مع كشف حساب البنك" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">سبب التسوية / ملاحظات (اختياري)</label>
+            <input type="text" id="edit-account-notes" placeholder="مثال: مطابقة مع كشف حساب البنك" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-medium text-[#F3F1EC] focus:outline-none focus:border-[#F5B700]">
           </div>
 
-          <button type="submit" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white font-bold text-xs rounded-full shadow-md active-press transition-all flex items-center justify-center gap-1.5 mt-2">
-            <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+          <button type="submit" class="w-full py-3.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] font-bold text-xs rounded-2xl shadow-md active-press transition-all flex items-center justify-center gap-1.5 mt-2">
+            <i data-lucide="check" class="w-4 h-4 text-[#111111]"></i>
             <span>حفظ التعديلات وتسوية الرصيد</span>
           </button>
         </form>
@@ -921,17 +927,17 @@
 
     <!-- MODAL 11: EDIT CARD & LINKED ACCOUNT -->
     <div id="modal-edit-card" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
-      <div class="modal-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
-      <div class="modal-sheet bg-white rounded-t-[32px] p-6 max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl relative z-10 transform translate-y-full transition-transform duration-300 space-y-4 max-w-[420px] mx-auto w-full">
+      <div class="modal-backdrop fixed inset-0 bg-black/70 backdrop-blur-xs"></div>
+      <div class="modal-sheet bg-[#1F2024] rounded-t-[32px] p-6 max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl relative z-10 transform translate-y-full transition-transform duration-300 space-y-4 max-w-[420px] mx-auto w-full border-t border-[#3A3C42]">
         <!-- Drag Handle -->
-        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto -mt-1 mb-1"></div>
+        <div class="sheet-drag-handle"></div>
 
-        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div class="flex items-center justify-between pb-2 border-b border-[#2F3136]">
           <div>
-            <h3 class="text-sm font-extrabold text-slate-900">تعديل بيانات الكارت</h3>
-            <p id="edit-card-bank-header" class="text-xs text-slate-400 font-medium"></p>
+            <h3 class="text-sm font-extrabold text-[#F3F1EC]">تعديل بيانات الكارت</h3>
+            <p id="edit-card-bank-header" class="text-xs text-[#9A9CA3] font-medium"></p>
           </div>
-          <button data-close-modal="editCard" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
+          <button data-close-modal="editCard" class="w-7 h-7 rounded-full bg-[#26272B] text-[#9A9CA3] hover:text-[#F3F1EC] flex items-center justify-center">
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
@@ -941,35 +947,35 @@
 
           <!-- Card Name -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">اسم الكارت</label>
-            <input type="text" id="edit-card-name" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">اسم الكارت</label>
+            <input type="text" id="edit-card-name" required class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700]">
           </div>
 
           <!-- Linked Account (For Debit Cards) -->
           <div id="edit-card-linked-section">
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">الحساب البنكي المرتبط (خصم الرصيد)</label>
-            <select id="edit-card-linked-account" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">الحساب البنكي المرتبط (خصم الرصيد)</label>
+            <select id="edit-card-linked-account" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700] cursor-pointer">
               <!-- Injected via JS -->
             </select>
-            <p class="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
+            <p class="text-[10px] text-[#9A9CA3] mt-1.5 leading-relaxed">
               💡 الربط يسري على العمليات الجديدة فقط من الآن فصاعداً ولا يمس العمليات التاريخية المسجلة مسبقاً.
             </p>
           </div>
 
           <!-- Spending Budget -->
           <div>
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">ميزانية الصرف الشهرية (Personal Spending Budget)</label>
-            <input type="number" id="edit-card-target" min="0" step="100" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">ميزانية الصرف الشهرية (Personal Spending Budget)</label>
+            <input type="number" id="edit-card-target" min="0" step="100" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-bold text-[#F3F1EC] font-mono focus:outline-none focus:border-[#F5B700]">
           </div>
 
           <!-- Credit Limit (For Credit Cards) -->
           <div id="edit-card-credit-limit-section">
-            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">الحد الائتماني البنكي (Bank Credit Limit)</label>
-            <input type="number" id="edit-card-credit-limit" min="0" step="500" placeholder="اختياري (اتركه فارغاً إذا لم ترغب)" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900">
+            <label class="block text-[11px] font-bold text-[#9A9CA3] uppercase tracking-wider mb-1">الحد الائتماني البنكي (Bank Credit Limit)</label>
+            <input type="number" id="edit-card-credit-limit" min="0" step="500" placeholder="اختياري (اتركه فارغاً إذا لم ترغب)" class="w-full bg-[#16171A] border border-[#2F3136] rounded-2xl px-3 py-2 text-xs font-bold text-[#F3F1EC] font-mono focus:outline-none focus:border-[#F5B700]">
           </div>
 
-          <button type="submit" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white font-bold text-xs rounded-full shadow-md active-press transition-all flex items-center justify-center gap-1.5 mt-2">
-            <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+          <button type="submit" class="w-full py-3.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] font-bold text-xs rounded-2xl shadow-md active-press transition-all flex items-center justify-center gap-1.5 mt-2">
+            <i data-lucide="check" class="w-4 h-4 text-[#111111]"></i>
             <span>حفظ تعديلات الكارت</span>
           </button>
         </form>

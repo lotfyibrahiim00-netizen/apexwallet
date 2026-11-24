@@ -1,24 +1,252 @@
 /**
  * ApexWallet UI & Interaction Controller
- * Visual Card-First Aesthetic (Revolut & Telda Style)
- * - rounded-3xl for primary cards & sheets
- * - rounded-full for buttons, badges, and floating bottom nav
- * - Colors: #F9FAFB, #FFFFFF, #111827 (Charcoal), #10B981 (Emerald), #F43F5E (Soft Rose)
+ * Visual Card-First Aesthetic (Dark Charcoal & Amber Gold Direction)
+ * - Hero Card: Tilted card object (-4deg in RTL, +4deg in LTR)
+ * - Colors: #16171A (Dark bg), #1F2024 (Surface), #26272B (Raised / Dock), #F5B700 (Amber Accent)
+ * - Text: #F3F1EC (Main), #9A9CA3 (Muted), #E6A8A8 (Destructive)
+ * - Bilingual: Pure Arabic RTL / Pure English LTR
  */
+
+// ==========================================
+// BILINGUAL & I18N LAYER (Pure Arabic RTL / English LTR)
+// ==========================================
+const I18N = {
+  ar: {
+    home: 'الرئيسية',
+    activity: 'النشاط',
+    review: 'المراجعة',
+    wallets: 'المحافظ',
+    settings: 'الإعدادات',
+    cards: 'الكروت',
+    banks: 'البنوك',
+    history: 'السجل',
+    security: 'الأمان',
+    sms_intake: 'استقبال الرسائل',
+    backup_general: 'النسخ الاحتياطي والعام',
+    left_of: 'متبقي من',
+    cycle_purchases: 'مشتريات الدورة',
+    cash_advance_debt: 'سحب نقدي (التزام)',
+    total_owed: 'إجمالي الالتزام',
+    bank_messages_ready: '{n} رسالة بنكية جاهزة',
+    review_btn: 'مراجعة',
+    recent_activity: 'النشاط الأخير',
+    no_activity: 'لا توجد حركات مسجلة حتى الآن',
+    all_history: 'عرض كل الحركات',
+    pin_code: 'رمز PIN',
+    digits_4: '4 أرقام',
+    change: 'تغيير',
+    biometric_unlock: 'فتح بالبصمة',
+    not_enabled: 'غير مفعلة',
+    enabled: 'مفعلة',
+    auto_lock: 'القفل التلقائي',
+    minutes_3: '3 دقائق',
+    minutes_1: 'دقيقة واحدة',
+    minutes_5: '5 دقائق',
+    minutes_15: '15 دقيقة',
+    immediately: 'فوراً',
+    lock_wallet_now: 'قفل المحفظة الآن',
+    read_bank_sms: 'قراءة رسائل البنك',
+    active_perm_granted: 'مفعّل • الإذن مسموح',
+    inactive_or_no_perm: 'غير مفعّل أو بدون إذن',
+    allowed_banks: 'البنوك المسموحة',
+    check_reception_status: 'فحص حالة الاستقبال',
+    import_past_sms: 'استيراد الرسائل القديمة',
+    export_encrypted_backup: 'تصدير نسخة مشفّرة',
+    passphrase_8_chars: 'عبارة مرور 8 أحرف أو أكثر',
+    import_backup: 'استيراد نسخة',
+    replaces_data_after_confirm: 'يستبدل البيانات الحالية بعد تأكيدك',
+    language: 'اللغة',
+    all_screen_one_lang: 'الشاشة كلها بلغة واحدة',
+    currency: 'العملة',
+    export_csv: 'تصدير الحركات CSV',
+    developer_tools: 'أدوات المطوّر والمحاكاة',
+    clear_all_data: 'مسح كل البيانات',
+    create_new: 'حركة جديدة',
+    purchase: 'شراء',
+    transfer: 'تحويل',
+    withdrawal: 'سحب نقدي',
+    amount: 'المبلغ',
+    card_account: 'الكارت / الحساب',
+    category: 'الفئة',
+    notes: 'ملاحظة',
+    save: 'حفظ',
+    cancel: 'إلغاء',
+    close: 'إغلاق',
+    approve_verified: 'اعتماد المؤكد',
+    clear_all: 'مسح الكل',
+    unmatched: 'غير مطابق',
+    approve: 'اعتماد',
+    reject: 'استبعاد',
+    over_limit: 'تجاوز للميزانية',
+    warning_limit: 'قارب على الحد',
+    add_bank: 'إضافة بنك',
+    add_card: 'إضافة كارت',
+    add_account: 'إضافة حساب',
+    correct_balance: 'تصحيح الرصيد',
+    edit_card: 'تعديل الكارت',
+    delete: 'حذف',
+    your_wallet_ready: 'محفظتك جاهزة',
+    no_cards_yet: 'لا توجد كروت مسجلة حتى الآن',
+    no_banks_yet: 'لا توجد بنوك مسجلة حتى الآن',
+    add_first_bank: 'أضف أول بنك',
+    add_first_card: 'أضف أول كارت',
+    card_n_of_total: '{current} من {total} كروت',
+    cards_under_bank: '{n} من 3 كروت',
+    max_3_reached: 'الحد الأقصى 3 كروت لهذا البنك',
+    bank_accounts_count: 'الحسابات البنكية ({n})',
+    no_accounts_for_bank: 'لا توجد حسابات بنكية مسجلة لهذا البنك',
+    registered_cards: 'الكروت المسجلة',
+    inbox_empty: 'صندوق المراجعة فارغ',
+    inbox_empty_desc: 'ستظهر الرسائل البنكية الواردة الجديدة هنا تلقائياً.',
+    all_cycles: 'كل الدورات',
+    search_placeholder: 'بحث في الحركات أو التجار...',
+    no_transactions_yet: 'لا توجد حركات مسجلة',
+    log_first_expense: 'تسجيل حركة جديدة',
+  },
+  en: {
+    home: 'Home',
+    activity: 'Activity',
+    review: 'Review',
+    wallets: 'Wallets',
+    settings: 'Settings',
+    cards: 'Cards',
+    banks: 'Banks',
+    history: 'History',
+    security: 'Security',
+    sms_intake: 'SMS Intake',
+    backup_general: 'Backup & General',
+    left_of: 'left of',
+    cycle_purchases: 'Cycle purchases',
+    cash_advance_debt: 'Cash advance (debt)',
+    total_owed: 'Total owed',
+    bank_messages_ready: '{n} bank messages ready',
+    review_btn: 'Review',
+    recent_activity: 'Recent activity',
+    no_activity: 'No activity recorded yet',
+    all_history: 'All History',
+    pin_code: 'PIN Code',
+    digits_4: '4 digits',
+    change: 'Change',
+    biometric_unlock: 'Biometric Unlock',
+    not_enabled: 'Disabled',
+    enabled: 'Enabled',
+    auto_lock: 'Auto-Lock',
+    minutes_3: '3 minutes',
+    minutes_1: '1 minute',
+    minutes_5: '5 minutes',
+    minutes_15: '15 minutes',
+    immediately: 'Immediately',
+    lock_wallet_now: 'Lock Wallet Now',
+    read_bank_sms: 'Read Bank SMS',
+    active_perm_granted: 'Active • Permission granted',
+    inactive_or_no_perm: 'Inactive or no permission',
+    allowed_banks: 'Allowed Banks',
+    check_reception_status: 'Check Reception Status',
+    import_past_sms: 'Import Past Messages',
+    export_encrypted_backup: 'Export Encrypted Backup',
+    passphrase_8_chars: 'Passphrase 8+ chars',
+    import_backup: 'Import Backup',
+    replaces_data_after_confirm: 'Replaces current data after confirm',
+    language: 'Language',
+    all_screen_one_lang: 'Entire screen in one language',
+    currency: 'Currency',
+    export_csv: 'Export Transactions CSV',
+    developer_tools: 'Developer & Simulation Tools',
+    clear_all_data: 'Clear All Data',
+    create_new: 'New Transaction',
+    purchase: 'Purchase',
+    transfer: 'Transfer',
+    withdrawal: 'Cash withdrawal',
+    amount: 'Amount',
+    card_account: 'Card / Account',
+    category: 'Category',
+    notes: 'Notes',
+    save: 'Save',
+    cancel: 'Cancel',
+    close: 'Close',
+    approve_verified: 'Approve Verified',
+    clear_all: 'Clear All',
+    unmatched: 'Unmatched',
+    approve: 'Approve',
+    reject: 'Reject',
+    over_limit: 'Over Limit',
+    warning_limit: 'Near Limit',
+    add_bank: 'Add Bank',
+    add_card: 'Add Card',
+    add_account: 'Add Account',
+    correct_balance: 'Correct Balance',
+    edit_card: 'Edit Card',
+    delete: 'Delete',
+    your_wallet_ready: 'Your Wallet is Ready',
+    no_cards_yet: 'No Cards Added Yet',
+    no_banks_yet: 'No Banks Added Yet',
+    add_first_bank: 'Add Your Bank',
+    add_first_card: 'Add Your First Card',
+    card_n_of_total: '{current} of {total} cards',
+    cards_under_bank: '{n} of 3 cards',
+    max_3_reached: 'Maximum 3 cards reached for this bank',
+    bank_accounts_count: 'Bank Accounts ({n})',
+    no_accounts_for_bank: 'No bank accounts added for this bank',
+    registered_cards: 'Registered Cards',
+    inbox_empty: 'Review Inbox is Empty',
+    inbox_empty_desc: 'New incoming bank transactions will automatically appear here.',
+    all_cycles: 'All Cycles',
+    search_placeholder: 'Search transactions...',
+    no_transactions_yet: 'No transactions recorded yet',
+    log_first_expense: 'Log First Expense',
+  }
+};
+
+function getLang() {
+  return localStorage.getItem('apexwallet_lang_pref') || 'ar';
+}
+
+function setLang(newLang) {
+  localStorage.setItem('apexwallet_lang_pref', newLang);
+  applyDocumentLanguage();
+  if (typeof renderCurrentView === 'function') {
+    renderCurrentView();
+  }
+}
+
+function applyDocumentLanguage() {
+  const lang = getLang();
+  if (typeof document !== 'undefined' && document.documentElement) {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = (lang === 'ar' ? 'rtl' : 'ltr');
+  }
+}
+
+function t(key, params = {}) {
+  const lang = getLang();
+  let str = (I18N[lang] && I18N[lang][key]) || (I18N['en'] && I18N['en'][key]) || key;
+  Object.keys(params).forEach(k => {
+    str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), params[k]);
+  });
+  return str;
+}
+
+window.getLang = getLang;
+window.setLang = setLang;
+window.t = t;
 
 function initApp() {
   try {
     const store = window.walletStore || window.store;
 
+  applyDocumentLanguage();
+
   // Selected featured card on Overview
   let activeFeaturedCardId = store.cards.length > 0 ? store.cards[0].id : null;
   let editingCardId = null;
+  let previousTab = 'dashboard';
 
   // --- Element Selectors ---
   const views = {
     dashboard: document.getElementById('view-dashboard'),
     cards: document.getElementById('view-cards'),
     history: document.getElementById('view-history'),
+    review: document.getElementById('view-review'),
     settings: document.getElementById('view-settings')
   };
 
@@ -73,17 +301,37 @@ function initApp() {
   }
   window.showToast = showToast;
 
+  function updateReviewBadge() {
+    const count = (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates) ? window.BankSmsEngine.pendingCandidates.length : 0;
+    const badge = document.getElementById('dock-review-badge');
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+  }
+  window.updateReviewBadge = updateReviewBadge;
+
   // --- Navigation & View Switching ---
   function switchView(targetTab) {
+    if (store.activeTab && store.activeTab !== 'settings') {
+      previousTab = store.activeTab;
+    }
     store.activeTab = targetTab;
     
     // Update floating nav buttons
     navButtons.forEach(btn => {
       const tab = btn.dataset.tab;
+      const label = btn.querySelector('.tab-label');
       if (tab === targetTab) {
         btn.classList.add('active');
+        if (label) label.classList.remove('hidden');
       } else {
         btn.classList.remove('active');
+        if (label) label.classList.add('hidden');
       }
     });
 
@@ -98,16 +346,26 @@ function initApp() {
       }
     });
 
-    // Update Top Bar Title
+    // Update Top Bar Title & Back Button
     const headerTitle = document.getElementById('header-title');
+    const headerBackBtn = document.getElementById('header-back-btn');
+    if (headerBackBtn) {
+      if (targetTab === 'settings') {
+        headerBackBtn.classList.remove('hidden');
+      } else {
+        headerBackBtn.classList.add('hidden');
+      }
+    }
     if (headerTitle) {
-      if (targetTab === 'dashboard') headerTitle.textContent = 'Cards';
-      else if (targetTab === 'cards') headerTitle.textContent = 'Banks';
-      else if (targetTab === 'history') headerTitle.textContent = 'History';
-      else if (targetTab === 'settings') headerTitle.textContent = 'Settings';
+      if (targetTab === 'dashboard') headerTitle.textContent = t('home');
+      else if (targetTab === 'cards') headerTitle.textContent = t('wallets');
+      else if (targetTab === 'history') headerTitle.textContent = t('activity');
+      else if (targetTab === 'review') headerTitle.textContent = t('review');
+      else if (targetTab === 'settings') headerTitle.textContent = t('settings');
     }
 
     renderCurrentView();
+    updateReviewBadge();
 
     // Scroll mobile viewport to top
     const scrollContainer = document.getElementById('mobile-scroll-body');
@@ -122,6 +380,22 @@ function initApp() {
       if (tab) switchView(tab);
     });
   });
+
+  const headerSettingsBtn = document.getElementById('header-settings-btn');
+  if (headerSettingsBtn) {
+    headerSettingsBtn.addEventListener('click', () => switchView('settings'));
+  }
+
+  const headerBackBtn = document.getElementById('header-back-btn');
+  if (headerBackBtn) {
+    headerBackBtn.addEventListener('click', () => {
+      if (store.activeTab === 'settings') {
+        switchView(previousTab || 'dashboard');
+      } else {
+        switchView('dashboard');
+      }
+    });
+  }
 
   // --- Modal Management ---
   function openModal(modalId) {
@@ -685,7 +959,6 @@ function initApp() {
 
   // --- Render Current View ---
   function renderCurrentView() {
-    // Update Top Subtitle (Total Transactions & Amount Spent)
     const stats = store.getOverallStats();
     const topSubtitle = document.getElementById('header-subtitle');
     if (topSubtitle) {
@@ -698,9 +971,13 @@ function initApp() {
       renderBanksView();
     } else if (store.activeTab === 'history') {
       renderHistoryView();
+    } else if (store.activeTab === 'review') {
+      renderReviewView();
     } else if (store.activeTab === 'settings') {
       renderSettingsView();
     }
+
+    updateReviewBadge();
 
     if (window.lucide) {
       try { lucide.createIcons(); } catch(e) { console.warn('Lucide icon error:', e); }
@@ -712,75 +989,53 @@ function initApp() {
     const count = (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates) ? window.BankSmsEngine.pendingCandidates.length : 0;
     if (count === 0) return '';
     return `
-      <div id="sms-inbox-banner" onclick="window.openSmsReviewInbox()" class="cursor-pointer bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-3.5 rounded-3xl shadow-sm border border-indigo-700/50 flex items-center justify-between active-press transition-all hover:border-indigo-400">
+      <div id="sms-inbox-banner" onclick="window.switchTab('review')" class="cursor-pointer bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] p-3.5 rounded-2xl shadow-md flex items-center justify-between active-press transition-all">
         <div class="flex items-center gap-3 min-w-0">
-          <div class="w-9 h-9 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
-            <i data-lucide="mail-check" class="w-4 h-4 text-emerald-400"></i>
+          <div class="w-8 h-8 rounded-xl bg-[#16171A] text-[#F5B700] flex items-center justify-center shrink-0">
+            <i data-lucide="mail-check" class="w-4 h-4 text-[#F5B700]"></i>
           </div>
           <div class="min-w-0 pr-1">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-extrabold text-white">Bank SMS Import</span>
-              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white shrink-0">${count} Ready</span>
-            </div>
-            <p class="text-[10px] text-slate-300 truncate mt-0.5">Review parsed bank transactions & assign cards</p>
+            <span class="text-xs font-black text-[#111111] block">${t('bank_messages_ready', { n: count })}</span>
           </div>
         </div>
-        <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 shrink-0"></i>
+        <button type="button" class="px-3.5 py-1.5 rounded-xl bg-[#16171A] text-[#F5B700] font-bold text-xs shrink-0">${t('review_btn')}</button>
       </div>
     `;
   }
 
   // ==========================================
-  // VIEW 1: OVERVIEW (SWIPEABLE CARDS CAROUSEL)
+  // VIEW 1: OVERVIEW (TILTED CARD OBJECT HERO)
   // ==========================================
   function renderOverviewView() {
     const container = document.getElementById('view-dashboard');
     if (!container) return;
 
+    const pendingCandidates = (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates) ? window.BankSmsEngine.pendingCandidates : [];
+
     if (store.cards.length === 0) {
-      if (store.banks.length === 0) {
-        container.innerHTML = `
-          <div class="space-y-4">
-            ${renderSmsBannerHtml()}
-            <div class="bg-white p-7 rounded-3xl border border-slate-200/90 text-center shadow-xs space-y-4 my-auto mt-4">
-              <div class="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs">
-                <i data-lucide="building-2" class="w-7 h-7"></i>
-              </div>
-              <div>
-                <h3 class="text-base font-extrabold text-slate-900">Your Wallet is Ready</h3>
-                <p class="text-xs text-slate-400 mt-1 max-w-[270px] mx-auto">Start by adding your bank, then add your cards (up to 3 per bank) and track your expenses.</p>
-              </div>
-              <div class="pt-2 max-w-[220px] mx-auto">
-                <button onclick="window.openModal('bank')" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white text-xs font-bold rounded-full shadow-md active-press flex items-center justify-center gap-1.5 transition-all">
-                  <i data-lucide="plus" class="w-4 h-4"></i>
-                  <span>Add Your Bank</span>
-                </button>
-              </div>
+      container.innerHTML = `
+        <div class="space-y-4 py-6">
+          ${pendingCandidates.length > 0 ? renderSmsBannerHtml() : ''}
+
+          <div class="bg-[#1F2024] p-8 rounded-3xl border border-[#2F3136] text-center shadow-lg space-y-4">
+            <div class="w-16 h-16 mx-auto rounded-3xl bg-[#26272B] text-[#F5B700] flex items-center justify-center border border-[#3A3C42]">
+              <i data-lucide="credit-card" class="w-8 h-8 text-[#F5B700]"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-extrabold text-[#F3F1EC]">${store.banks.length === 0 ? t('your_wallet_ready') : t('no_cards_yet')}</h3>
+              <p class="text-xs text-[#9A9CA3] mt-1 max-w-[280px] mx-auto">
+                ${store.banks.length === 0 ? (getLang() === 'ar' ? 'ابدأ بإضافة البنك، ثم أضف كروتك وتتبع مصروفاتك.' : 'Start by adding your bank, then add your cards.') : (getLang() === 'ar' ? 'البنوك مسجلة. أضف كارت كريدت أو ديبت للبدء.' : 'Add your first card to begin tracking.')}
+              </p>
+            </div>
+            <div class="pt-2 max-w-[220px] mx-auto">
+              <button onclick="window.openModal('${store.banks.length === 0 ? 'bank' : 'card'}')" class="w-full py-3 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-xs font-extrabold rounded-full shadow-md active-press flex items-center justify-center gap-1.5 transition-all">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>${store.banks.length === 0 ? t('add_first_bank') : t('add_first_card')}</span>
+              </button>
             </div>
           </div>
-        `;
-      } else {
-        container.innerHTML = `
-          <div class="space-y-4">
-            ${renderSmsBannerHtml()}
-            <div class="bg-white p-7 rounded-3xl border border-slate-200/90 text-center shadow-xs space-y-4 my-auto mt-4">
-              <div class="w-14 h-14 mx-auto rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs">
-                <i data-lucide="credit-card" class="w-7 h-7"></i>
-              </div>
-              <div>
-                <h3 class="text-base font-extrabold text-slate-900">No Cards Added Yet</h3>
-                <p class="text-xs text-slate-400 mt-1 max-w-[270px] mx-auto">You have banks linked. Now add a credit, debit, or prepaid card to start tracking your statements.</p>
-              </div>
-              <div class="pt-2 max-w-[220px] mx-auto">
-                <button onclick="window.openModal('card')" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white text-xs font-bold rounded-full shadow-md active-press flex items-center justify-center gap-1.5 transition-all">
-                  <i data-lucide="plus" class="w-4 h-4"></i>
-                  <span>Add Your First Card</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        `;
-      }
+        </div>
+      `;
       if (window.lucide) {
         try { lucide.createIcons({ root: container }); } catch (e) {}
       }
@@ -791,224 +1046,156 @@ function initApp() {
     if (!activeFeaturedCardId || !store.getCard(activeFeaturedCardId)) {
       activeFeaturedCardId = store.cards[0].id;
     }
-    const activeIndex = store.cards.findIndex(c => c.id === activeFeaturedCardId);
+    const card = store.getCard(activeFeaturedCardId) || store.cards[0];
+    const bank = store.getBank(card.bankId);
+    const cardStat = store.getCardSpendingStats(card.id);
 
     container.innerHTML = `
-      <div class="space-y-4">
+      <div class="space-y-3 pb-8">
         
-        <!-- PENDING BANK SMS NOTIFICATION BANNER -->
-        ${renderSmsBannerHtml()}
+        <!-- 1. TILTED HERO CARD OBJECT (Direction Approved) -->
+        <div class="tilted-hero-wrapper my-2" id="hero-card-touch-zone">
+          <div class="tilted-card-container" id="hero-card-tilted-box">
+            <div class="bank-card-face cursor-pointer" onclick="window.toggleCardStraighten(this)">
+              <!-- Top Row: Bank Short Code & Card Name/Tier -->
+              <div class="flex justify-between items-center z-10">
+                <span class="text-sm font-black text-[#F5B700] tracking-wider">${bank ? bank.shortCode : ''}</span>
+                <span class="text-xs font-bold text-[#F5B700] opacity-90">${card.name}</span>
+              </div>
 
-        <!-- Header Subtitle with Active Card Info & Carousel Hint -->
-        <div class="flex justify-between items-center px-1">
-          <div class="flex items-center gap-1.5">
-            <span class="text-xs font-bold text-slate-800">Your Cards</span>
-            <span id="card-counter-badge" class="text-[10px] bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded-full font-bold">
-              ${activeIndex + 1}/${store.cards.length}
-            </span>
-          </div>
-          <span class="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-            <span>Swipe Card or Tap Tabs</span>
-            <span>&rarr;</span>
-          </span>
-        </div>
+              <!-- Golden-Amber Chip -->
+              <div class="bank-card-chip my-2 z-10"></div>
 
-        <!-- Quick Card Selector Pills (Scrollable horizontally from top) -->
-        <div id="card-selector-tabs" class="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-5 px-5 scroll-smooth">
-          ${store.cards.map((c) => {
-            const isSel = c.id === activeFeaturedCardId;
-            const cStat = store.getCardSpendingStats(c.id);
-            return `
-              <button type="button" data-tab-card-id="${c.id}" onclick="window.scrollToCard('${c.id}')" class="px-3.5 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 ${isSel ? 'bg-[#111827] text-white shadow-xs' : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-300'}">
-                <span>${c.name}</span>
-                ${cStat.isExceeded ? '<span class="text-rose-400 text-[10px]">⚠️</span>' : ''}
-              </button>
-            `;
-          }).join('')}
-        </div>
+              <!-- Middle: Masked Digits -->
+              <div class="flex items-center gap-2 text-xs font-mono tracking-widest text-[#9A9CA3] z-10" dir="ltr">
+                <span>••••</span><span>••••</span><span>••••</span><span class="text-[#F3F1EC] font-bold">${card.last4}</span>
+              </div>
 
-        <!-- 1. SWIPEABLE CARDS CAROUSEL (EXACT DESIGN MATCH) -->
-        <div id="cards-carousel" class="flex gap-3 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-1 pt-1 -mx-5 px-5 scroll-smooth">
-          ${store.cards.map((card) => {
-            const cardStat = store.getCardSpendingStats(card.id);
-            const bank = store.getBank(card.bankId);
-            const gradient = getCardGradientStyle(card, bank);
-            const isCredit = card.cardType === 'credit';
-            const isSelected = card.id === activeFeaturedCardId;
-
-            return `
-              <div id="card-carousel-item-${card.id}" data-card-id="${card.id}" class="min-w-[315px] w-[88%] snap-center snap-always shrink-0 p-5 rounded-3xl text-white shadow-lg shadow-slate-900/10 transition-all duration-300 relative overflow-hidden select-none cursor-pointer ${isSelected ? 'ring-2 ring-[#111827]/40 scale-100' : 'scale-[0.98] opacity-95'}" style="background: ${gradient};" onclick="window.scrollToCard('${card.id}')">
-                <!-- Subtle glow circle -->
-                <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
-
-                <!-- Top Row: Bank + Nickname & Custom Color Button -->
-                <div class="flex justify-between items-center relative z-10">
-                  <span class="text-xs font-semibold opacity-90 tracking-wide">${bank ? bank.shortCode : ''} ${card.name}</span>
-                  <div class="flex items-center gap-1.5">
-                    <button type="button" onclick="window.openCustomizeCardModal('${card.id}', event)" class="px-2 py-0.5 rounded-full bg-white/20 hover:bg-white/30 text-[10px] font-bold flex items-center gap-1 backdrop-blur-xs transition-all active:scale-95 shadow-2xs" title="Customize Card Color">
-                      <span>🎨</span>
-                      <span>Color</span>
-                    </button>
-                    <span class="text-[9px] bg-white/20 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider backdrop-blur-xs">
-                      ${card.cardType}
+              <!-- Bottom Row: Budget & Remaining Amount -->
+              <div class="flex justify-between items-end mt-2 z-10">
+                <div class="min-w-0 pr-2">
+                  <span class="text-[11px] text-[#9A9CA3] block">
+                    ${cardStat.isExceeded ? t('over_limit') : `${t('left_of')} ${formatCurrency(cardStat.target)}`}
+                  </span>
+                  ${cardStat.cashAdvance > 0 ? `
+                    <span class="text-[10px] text-[#F5B700] block mt-0.5 font-medium">
+                      ${t('cash_advance_debt')}: ${formatCurrency(cardStat.cashAdvance)}
                     </span>
-                  </div>
+                  ` : ''}
                 </div>
-
-                <!-- Spent vs Budget / Credit Limit (Dual Budget Model) -->
-                ${isCredit ? `
-                  <div class="mt-2.5 relative z-10">
-                    <p class="text-2xl font-bold font-mono tracking-tight leading-tight">
-                      ${cardStat.isExceeded 
-                        ? `<span class="text-rose-200">+${formatCurrency(cardStat.overAmount)}</span> <span class="text-xs font-normal opacity-90 text-rose-200">تجاوز للميزانية</span>` 
-                        : `${formatCurrency(cardStat.remaining)} <span class="text-xs font-normal opacity-90">متبقي من الميزانية</span>`}
-                    </p>
-                    <div class="flex items-center justify-between text-[10.5px] opacity-90 mt-1 font-medium">
-                      <span>مصروف الدورة: ${formatCurrency(cardStat.spent)} من ميزانية ${formatCurrency(cardStat.target)}${cardStat.cashAdvance > 0 ? ` • سحب كاش: ${formatCurrency(cardStat.cashAdvance)}` : ''}</span>
-                      <button type="button" onclick="window.promptSetCycleBudget('${card.id}', event)" class="px-1.5 py-0.5 rounded-full bg-white/20 hover:bg-white/30 text-[9px] font-bold backdrop-blur-xs transition-all active:scale-95 shadow-2xs" title="تعديل ميزانية هذه الدورة">
-                        تعديل
-                      </button>
-                    </div>
-                    ${cardStat.cashAdvance > 0 ? `
-                      <p class="text-[10px] text-amber-200/90 font-medium mt-0.5">
-                        إجمالي الالتزام للدورة: ${formatCurrency(cardStat.totalObligations)} (مشتريات + سحب نقدي)
-                      </p>
-                    ` : ''}
-                  </div>
-                ` : `
-                  <div class="mt-2.5 relative z-10">
-                    <p class="text-2xl font-bold font-mono tracking-tight leading-tight">
-                      ${formatCurrency(cardStat.spent)}
-                      ${cardStat.target > 0 ? `<span class="text-xs font-normal opacity-80">/ ${formatCurrency(cardStat.target)}</span>` : ''}
-                    </p>
-                    <p class="text-[10.5px] opacity-80 mt-1 font-medium">
-                      ${cardStat.target > 0 ? `متبقي: ${formatCurrency(cardStat.remaining)}` : 'إجمالي المصروفات'}
-                    </p>
-                  </div>
-                `}
-
-                <!-- Slim Progress Bar -->
-                <div class="w-full h-1.5 bg-white/20 rounded-full mt-2.5 overflow-hidden relative z-10">
-                  <div class="${cardStat.isExceeded ? 'bg-rose-400' : (cardStat.isWarning ? 'bg-amber-400' : 'bg-white')} h-full rounded-full transition-all duration-500 shadow-sm" style="width: ${cardStat.percentage}%;"></div>
-                </div>
-
-                <!-- Bottom Row: Last 4 & Billing Cycle / Credit Limit Badge -->
-                <div class="flex justify-between items-center text-[11px] opacity-90 mt-2.5 font-medium relative z-10">
-                  <span class="font-mono">•••• ${card.last4}</span>
-                  ${isCredit ? `
-                    <div class="flex items-center gap-1.5">
-                      <span class="px-2 py-0.5 rounded-full bg-black/25 text-[10px] font-semibold backdrop-blur-xs">
-                        الحد البنكي: ${cardStat.creditLimit !== null ? formatCurrency(cardStat.creditLimit) : 'غير مسجل'}
-                      </span>
-                      ${card.cycleStartDay ? `
-                        <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-semibold">
-                          دورة ${card.cycleStartDay}
-                        </span>
-                      ` : ''}
-                    </div>
-                  ` : `
-                    <span>${card.network || 'VISA'}</span>
-                  `}
+                <div class="text-end shrink-0">
+                  <span class="text-xl font-extrabold font-mono ${cardStat.isExceeded ? 'text-[#E6A8A8]' : 'text-[#F3F1EC]'}" dir="ltr">
+                    ${cardStat.isExceeded ? `+${formatCurrency(cardStat.overAmount)}` : formatCurrency(cardStat.remaining)}
+                  </span>
                 </div>
               </div>
-            `;
-          }).join('')}
+            </div>
+          </div>
         </div>
 
-        <!-- Carousel Pagination Dots / Pills -->
-        <div id="carousel-pagination-dots" class="flex justify-center items-center gap-1.5 pt-0.5">
-          ${store.cards.map((c, idx) => `
-            <button type="button" data-dot-card-id="${c.id}" onclick="window.scrollToCard('${c.id}')" class="h-1.5 rounded-full transition-all duration-300 ${
-              c.id === activeFeaturedCardId ? 'w-6 bg-[#111827]' : 'w-2 bg-slate-300 hover:bg-slate-400'
-            }" title="Card ${idx + 1}"></button>
-          `).join('')}
+        <!-- Indicator Dots below Card -->
+        ${store.cards.length > 1 ? `
+          <div class="flex justify-center items-center gap-1.5 py-0.5">
+            ${store.cards.map(c => `
+              <button type="button" onclick="window.selectFeaturedCard('${c.id}')" class="h-1.5 rounded-full transition-all duration-300 ${
+                c.id === card.id ? 'w-6 bg-[#F5B700]' : 'w-2 bg-[#3A3C42] hover:bg-[#9A9CA3]'
+              }" title="${c.name}"></button>
+            `).join('')}
+          </div>
+        ` : ''}
+
+        <!-- 2. SUMMARY TILES (Cycle purchases, Cash advance, Total owed) -->
+        <div class="grid grid-cols-3 gap-2 mt-2">
+          <div class="bg-[#1F2024] border border-[#2F3136] rounded-2xl p-3 flex flex-col justify-between shadow-2xs">
+            <span class="text-[11px] text-[#9A9CA3] font-medium leading-tight">${t('cycle_purchases')}</span>
+            <span class="text-sm font-extrabold text-[#F3F1EC] font-mono mt-2" dir="ltr">${formatCurrency(cardStat.spent)}</span>
+          </div>
+          <div class="bg-[#1F2024] border border-[#2F3136] rounded-2xl p-3 flex flex-col justify-between shadow-2xs">
+            <span class="text-[11px] text-[#9A9CA3] font-medium leading-tight">${t('cash_advance_debt')}</span>
+            <span class="text-sm font-extrabold text-[#F3F1EC] font-mono mt-2" dir="ltr">${formatCurrency(cardStat.cashAdvance)}</span>
+          </div>
+          <div class="bg-[#1F2024] border border-[#2F3136] rounded-2xl p-3 flex flex-col justify-between shadow-2xs">
+            <span class="text-[11px] text-[#9A9CA3] font-medium leading-tight">${t('total_owed')}</span>
+            <span class="text-sm font-extrabold text-[#F3F1EC] font-mono mt-2" dir="ltr">${formatCurrency(cardStat.totalObligations)}</span>
+          </div>
         </div>
 
-        <!-- 2. SECONDARY CARD MINI PILLS (OVER LIMIT / WARNING STATES) -->
-        <div id="overview-secondary-cards" class="space-y-2.5 pt-1"></div>
+        <!-- 3. AMBER REVIEW ALERT BANNER (If pending messages exist) -->
+        ${pendingCandidates.length > 0 ? `
+          <div onclick="window.switchTab('review')" class="mt-3.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] p-3.5 rounded-2xl flex items-center justify-between cursor-pointer active-press shadow-md transition-all">
+            <span class="font-extrabold text-xs text-[#111111]">${t('bank_messages_ready', { n: pendingCandidates.length })}</span>
+            <button type="button" class="px-4 py-1.5 rounded-xl bg-[#16171A] text-[#F5B700] font-extrabold text-xs shrink-0">${t('review_btn')}</button>
+          </div>
+        ` : ''}
 
-        <!-- 3. CLEAN ACTIVITY FOR CURRENT CARD -->
-        <div id="overview-activity-container" class="space-y-2.5 pt-1"></div>
+        <!-- 4. RECENT ACTIVITY LIST -->
+        <div class="mt-4 space-y-2">
+          <div class="flex justify-between items-center px-1">
+            <span class="text-xs font-bold text-[#9A9CA3] uppercase tracking-wider">${t('recent_activity')}</span>
+            <button onclick="window.switchTab('history')" class="text-xs font-bold text-[#F5B700] hover:underline">${t('all_history')} &rarr;</button>
+          </div>
+          <div id="overview-activity-container" class="space-y-1"></div>
+        </div>
 
       </div>
     `;
 
-    // Populate dynamic secondary cards & activity without re-rendering carousel
-    renderSecondaryCards(activeFeaturedCardId);
-    renderCardActivity(activeFeaturedCardId);
+    renderCardActivity(card.id);
+    setupHeroCardSwipeListener();
 
-    // Attach scroll listener to carousel to auto-detect centered card
-    setupCarouselScrollListener();
-
-    // Scroll carousel to initial active card position
-    const initialEl = document.getElementById('card-carousel-item-' + activeFeaturedCardId);
-    if (initialEl) {
-      initialEl.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
-    }
-
-    // Auto-check and prompt for any new billing cycles
     setTimeout(() => {
       checkAndPromptPendingCycleBudgets();
     }, 350);
+
+    if (window.lucide) {
+      try { lucide.createIcons({ root: container }); } catch (e) {}
+    }
   }
 
-  // --- Dynamic Sub-Renderers (Smooth updates without wiping carousel DOM) ---
-  function renderSecondaryCards(activeCardId) {
-    const container = document.getElementById('overview-secondary-cards');
-    if (!container) return;
+  function setupHeroCardSwipeListener() {
+    const zone = document.getElementById('hero-card-touch-zone');
+    if (!zone || store.cards.length <= 1) return;
 
-    // Show warning/over-limit cards as alert pills (like in the design spec)
-    const alertCards = store.cards.filter(c => {
-      if (c.id === activeCardId) return false;
-      const cStat = store.getCardSpendingStats(c.id);
-      return cStat.isExceeded || cStat.isWarning;
-    });
+    let touchStartX = 0;
+    let touchStartY = 0;
 
-    if (alertCards.length === 0) {
-      container.innerHTML = '';
-      return;
+    zone.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    zone.addEventListener('touchend', (e) => {
+      if (!e.changedTouches || e.changedTouches.length === 0) return;
+      const deltaX = e.changedTouches[0].clientX - touchStartX;
+      const deltaY = e.changedTouches[0].clientY - touchStartY;
+
+      if (Math.abs(deltaX) > 35 && Math.abs(deltaX) > Math.abs(deltaY) * 0.7) {
+        const curIdx = store.cards.findIndex(c => c.id === activeFeaturedCardId);
+        const isRtl = document.documentElement.dir === 'rtl';
+        const advance = isRtl ? (deltaX > 0) : (deltaX < 0);
+        let nextIdx = curIdx;
+        if (advance) {
+          nextIdx = (curIdx + 1) % store.cards.length;
+        } else {
+          nextIdx = (curIdx - 1 + store.cards.length) % store.cards.length;
+        }
+        if (nextIdx !== curIdx && store.cards[nextIdx]) {
+          window.selectFeaturedCard(store.cards[nextIdx].id);
+        }
+      }
+    }, { passive: true });
+  }
+
+  window.toggleCardStraighten = (el) => {
+    const box = document.getElementById('hero-card-tilted-box');
+    if (box) {
+      box.classList.toggle('straightened');
     }
+  };
 
-    container.innerHTML = `
-      <div class="space-y-2">
-        ${alertCards.map(c => {
-          const cStat = store.getCardSpendingStats(c.id);
-          const isExceeded = cStat.isExceeded;
-
-          if (isExceeded) {
-            return `
-              <div onclick="window.scrollToCard('${c.id}')" class="bg-white p-3.5 rounded-2xl border border-rose-200 flex justify-between items-center shadow-2xs hover:border-rose-300 transition-all cursor-pointer active:scale-[0.99]">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold text-slate-900">${c.name} ••${c.last4}</span>
-                    <span class="text-[10px] bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full font-bold">Over Limit</span>
-                  </div>
-                  <p class="text-[11px] text-slate-400 mt-0.5">
-                    ${formatCurrency(cStat.spent)} / ${formatCurrency(cStat.target)} ${c.cycleStartDay ? `• Cycle ${c.cycleStartDay}th–${c.cycleEndDay}th` : ''}
-                  </p>
-                </div>
-                <span class="text-xs font-bold text-rose-600 font-mono">+${formatCurrency(cStat.overAmount)}</span>
-              </div>
-            `;
-          } else {
-            return `
-              <div onclick="window.scrollToCard('${c.id}')" class="bg-white p-3.5 rounded-2xl border border-amber-200 flex justify-between items-center shadow-2xs hover:border-amber-300 transition-all cursor-pointer active:scale-[0.99]">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold text-slate-900">${c.name} ••${c.last4}</span>
-                    <span class="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">80%+ Limit</span>
-                  </div>
-                  <p class="text-[11px] text-slate-400 mt-0.5">
-                    ${formatCurrency(cStat.spent)} / ${formatCurrency(cStat.target)} ${c.cycleStartDay ? `• Cycle ${c.cycleStartDay}th–${c.cycleEndDay}th` : ''}
-                  </p>
-                </div>
-                <span class="text-xs font-bold text-amber-600 font-mono">${Math.round(cStat.rawPercentage)}%</span>
-              </div>
-            `;
-          }
-        }).join('')}
-      </div>
-    `;
+  function renderSecondaryCards(activeCardId) {
+    // Secondary warning states rendered cleanly if needed
   }
 
   function renderCardActivity(cardId) {
@@ -1018,86 +1205,39 @@ function initApp() {
     const card = store.getCard(cardId);
     if (!card) return;
 
-    // Filter transactions: show ONLY activity for this active card
     const cardTxs = store.getFilteredTransactions().filter(t => t.cardId === cardId);
-    const cardStat = store.getCardSpendingStats(cardId);
 
-    container.innerHTML = `
-      <div class="flex justify-between items-center mb-1">
-        <div>
-          <p class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-            <span>Activity</span>
-            <span class="text-indigo-600 font-extrabold">• ${card.name}</span>
-          </p>
-          <p class="text-[10px] text-slate-400 font-medium">
-            ${cardTxs.length} ${cardTxs.length === 1 ? 'expense' : 'expenses'} • ${formatCurrency(cardStat.spent)} total
-          </p>
-        </div>
-        <button onclick="window.switchTab('history')" class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
-          All History &rarr;
-        </button>
-      </div>
-
-      ${cardTxs.length === 0 ? `
-        <div class="bg-white p-5 rounded-2xl text-center border border-slate-100 shadow-2xs">
-          <p class="text-xs text-slate-400 font-medium">No expenses recorded for ${card.name} yet</p>
-          <button onclick="window.openAddTxForCard('${card.id}')" class="mt-2.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full transition-all inline-flex items-center gap-1">
+    if (cardTxs.length === 0) {
+      container.innerHTML = `
+        <div class="bg-[#1F2024] p-5 rounded-2xl text-center border border-[#2F3136] shadow-2xs">
+          <p class="text-xs text-[#9A9CA3] font-medium">${t('no_activity')}</p>
+          <button onclick="window.openAddTxForCard('${card.id}')" class="mt-2.5 px-3.5 py-1.5 bg-[#26272B] hover:bg-[#3A3C42] text-[#F5B700] text-xs font-bold rounded-full transition-all inline-flex items-center gap-1 border border-[#3A3C42]">
             <span>+</span>
-            <span>Add Expense for this card</span>
+            <span>${t('create_new')}</span>
           </button>
         </div>
-      ` : `
-        <div class="space-y-2.5">
-          ${cardTxs.slice(0, 8).map(tx => {
-            const isCredit = card.cardType === 'credit';
-            const stmtName = (tx.statementInfo && tx.statementInfo.statementMonthName) ? tx.statementInfo.statementMonthName.substring(0, 3) : 'Dec';
-            const isCurrentCycle = tx.statementInfo && tx.statementInfo.statementMonth === 12;
-            const txType = tx.transactionType || (tx.category === 'transfer' ? 'transfer' : 'purchase');
-            let typeBadge = '';
-            if (tx.isBalanceAdjustment || tx.transactionType === 'balance_adjustment') {
-              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">تسوية رصيد</span>';
-            } else if (txType === 'withdrawal') {
-              if (tx.card && tx.card.cardType === 'credit') {
-                typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">سحب كاش كريدت</span>';
-              } else {
-                typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">سحب نقدي</span>';
-              }
-            } else if (txType === 'transfer') {
-              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-200">تحويل</span>';
-            } else {
-              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">شراء</span>';
-            }
+      `;
+      return;
+    }
 
-            return `
-              <div class="bg-white p-3.5 rounded-2xl flex justify-between items-center shadow-2xs border border-slate-100/80 hover:shadow-xs transition-all">
-                <div class="pr-2 min-w-0">
-                  <p class="text-xs font-bold text-slate-900 leading-tight truncate">${tx.merchant}</p>
-                  <div class="flex items-center gap-1.5 mt-0.5">
-                    ${isCredit ? `
-                      <span class="text-[10px] ${isCurrentCycle ? 'text-indigo-600 font-semibold' : 'text-slate-400 font-medium'}">
-                        Affects ${stmtName} Statement
-                      </span>
-                    ` : `
-                      <span class="text-[10px] text-slate-400 font-medium">
-                        Debit Card
-                      </span>
-                    `}
-                    <span class="text-[10px] text-slate-300">•</span>
-                    <span class="text-[10px] text-slate-400 font-medium">${tx.date}</span>
-                  </div>
-                </div>
-                <div class="flex items-center gap-1.5 shrink-0 ml-2">
-                  ${typeBadge}
-                  <span class="text-xs font-bold ${tx.direction === 'income' ? 'text-emerald-600' : 'text-slate-900'} font-mono tracking-tight">
-                    ${tx.direction === 'income' ? '+' : '-'}${formatCurrency(tx.amount)}
-                  </span>
-                </div>
-              </div>
-            `;
-          }).join('')}
+    container.innerHTML = cardTxs.slice(0, 5).map(tx => {
+      const isCashAdvance = tx.transactionType === 'withdrawal';
+      return `
+        <div class="py-3 px-2 flex justify-between items-center border-b border-[#2F3136]/60 last:border-b-0 hover:bg-[#1F2024]/40 rounded-xl transition-all">
+          <div class="pr-2 min-w-0">
+            <p class="text-xs font-bold text-[#F3F1EC] leading-tight truncate">${tx.merchant}</p>
+            <p class="text-[10px] text-[#9A9CA3] font-medium truncate mt-0.5">
+              ${card.name} ${card.last4 ? '•••• ' + card.last4 : ''} ${isCashAdvance ? '• ' + t('cash_advance_debt') : ''}
+            </p>
+          </div>
+          <div class="text-end shrink-0 ml-2">
+            <span class="text-xs font-extrabold ${tx.direction === 'income' ? 'text-[#F5B700]' : 'text-[#F3F1EC]'} font-mono tracking-tight" dir="ltr">
+              ${tx.direction === 'income' ? '+' : '-'}${formatCurrency(tx.amount)}
+            </span>
+          </div>
         </div>
-      `}
-    `;
+      `;
+    }).join('');
   }
 
   // Helper to pre-select card in Add Transaction modal
@@ -1116,66 +1256,47 @@ function initApp() {
   // --- Update Active Card UI (Smooth update without DOM recreation) ---
   function updateActiveCardUI(cardId, scrollCarousel = false) {
     activeFeaturedCardId = cardId;
-    const card = store.getCard(cardId);
-    if (!card) return;
+    renderOverviewView();
+  }
 
-    // 1. Update top selector tabs
-    const tabsContainer = document.getElementById('card-selector-tabs');
-    if (tabsContainer) {
-      tabsContainer.querySelectorAll('button[data-tab-card-id]').forEach(btn => {
-        const isSel = btn.dataset.tabCardId === cardId;
-        if (isSel) {
-          btn.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 bg-[#111827] text-white shadow-xs';
-          btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        } else {
-          btn.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 hover:border-slate-300';
-        }
-      });
-    }
+  window.selectFeaturedCard = (cardId) => {
+    activeFeaturedCardId = cardId;
+    renderOverviewView();
+  };
 
-    // 2. Update card highlight in carousel
-    const carousel = document.getElementById('cards-carousel');
-    if (carousel) {
-      carousel.querySelectorAll('[data-card-id]').forEach(item => {
-        const isSel = item.dataset.cardId === cardId;
-        if (isSel) {
-          item.classList.add('ring-2', 'ring-[#111827]/40', 'scale-100');
-          item.classList.remove('scale-[0.98]', 'opacity-95');
-        } else {
-          item.classList.remove('ring-2', 'ring-[#111827]/40', 'scale-100');
-          item.classList.add('scale-[0.98]', 'opacity-95');
-        }
-      });
-    }
+  // ==========================================
+  // VIEW: REVIEW (DEDICATED DOCK TAB)
+  // ==========================================
+  function renderReviewView() {
+    const container = document.getElementById('view-review');
+    if (!container) return;
 
-    // 3. Update pagination dots
-    const dotsContainer = document.getElementById('carousel-pagination-dots');
-    if (dotsContainer) {
-      dotsContainer.querySelectorAll('button[data-dot-card-id]').forEach(dot => {
-        const isSel = dot.dataset.dotCardId === cardId;
-        dot.className = `h-1.5 rounded-full transition-all duration-300 ${isSel ? 'w-6 bg-[#111827]' : 'w-2 bg-slate-300 hover:bg-slate-400'}`;
-      });
-    }
+    const candidates = (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates) ? window.BankSmsEngine.pendingCandidates : [];
 
-    // 4. Update index counter badge (e.g. 1/8)
-    const counterEl = document.getElementById('card-counter-badge');
-    if (counterEl) {
-      const idx = store.cards.findIndex(c => c.id === cardId);
-      counterEl.textContent = `${idx + 1}/${store.cards.length}`;
-    }
+    container.innerHTML = `
+      <div class="space-y-4 pb-20">
+        <div class="flex justify-between items-center px-1 pt-1">
+          <div>
+            <h2 class="text-base font-extrabold text-[#F3F1EC]">${t('review')}</h2>
+            <p class="text-[11px] text-[#9A9CA3]">${t('bank_messages_ready', { n: candidates.length })}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="window.openSmsDiagnostics()" class="w-8 h-8 rounded-full bg-[#1F2024] hover:bg-[#26272B] border border-[#2F3136] text-[#9A9CA3] hover:text-[#F3F1EC] flex items-center justify-center transition-colors" title="${t('check_reception_status')}">
+              <i data-lucide="activity" class="w-4 h-4 text-[#F5B700]"></i>
+            </button>
+            <button onclick="window.openHistoricalSmsImport()" class="w-8 h-8 rounded-full bg-[#1F2024] hover:bg-[#26272B] border border-[#2F3136] text-[#9A9CA3] hover:text-[#F3F1EC] flex items-center justify-center transition-colors" title="${t('import_past_sms')}">
+              <i data-lucide="history" class="w-4 h-4 text-[#9A9CA3]"></i>
+            </button>
+          </div>
+        </div>
 
-    // 5. Update secondary cards below
-    renderSecondaryCards(cardId);
+        <div id="view-review-candidates-container" class="space-y-3"></div>
+      </div>
+    `;
 
-    // 6. Update card activity below
-    renderCardActivity(cardId);
-
-    // 7. If requested, smooth scroll carousel to card
-    if (scrollCarousel && carousel) {
-      const el = document.getElementById('card-carousel-item-' + cardId);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      }
+    renderSmsCandidatesList();
+    if (window.lucide) {
+      try { lucide.createIcons({ root: container }); } catch (e) {}
     }
   }
 
@@ -1550,36 +1671,39 @@ function initApp() {
   // ==========================================
   // VIEW 2: BANKS (3 MAX PER BANK)
   // ==========================================
+  // ==========================================
+  // VIEW 2: BANKS (3 MAX PER BANK)
+  // ==========================================
   function renderBanksView() {
     const container = document.getElementById('view-cards');
     if (!container) return;
 
     container.innerHTML = `
-      <div class="space-y-4">
+      <div class="space-y-4 pb-20">
         <div class="flex justify-between items-center px-1">
           <div>
-            <h2 class="text-sm font-extrabold text-slate-900">Banks & Cards</h2>
-            <p class="text-[11px] text-slate-400">Enforcing maximum 3 cards per bank</p>
+            <h2 class="text-sm font-extrabold text-[#F3F1EC]">${t('banks')} & ${t('cards')}</h2>
+            <p class="text-[11px] text-[#9A9CA3]">${t('cards_under_bank', { n: '3' })}</p>
           </div>
-          <button onclick="window.openModal('bank')" class="px-3.5 py-1.5 bg-[#111827] text-white text-xs font-bold rounded-full shadow-xs active-press flex items-center gap-1">
+          <button onclick="window.openModal('bank')" class="px-3.5 py-1.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-xs font-bold rounded-full shadow-xs active-press flex items-center gap-1">
             <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-            <span>Add Bank</span>
+            <span>${t('add_bank')}</span>
           </button>
         </div>
 
         <div class="space-y-4">
           ${store.banks.length === 0 ? `
-            <div class="bg-white p-7 rounded-3xl border border-slate-200/90 text-center shadow-xs space-y-3 mt-2">
-              <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center shadow-2xs">
+            <div class="bg-[#1F2024] p-7 rounded-3xl border border-[#2F3136] text-center shadow-xs space-y-3 mt-2">
+              <div class="w-12 h-12 mx-auto rounded-2xl bg-[#26272B] text-[#F5B700] flex items-center justify-center border border-[#3A3C42]">
                 <i data-lucide="building-2" class="w-6 h-6"></i>
               </div>
               <div>
-                <h3 class="text-xs font-bold text-slate-800">No Banks Added Yet</h3>
-                <p class="text-[11px] text-slate-400 mt-0.5">Add your bank (CIB, HSBC, QNB, NBE, Banque Misr, etc.) to manage up to 3 cards per bank.</p>
+                <h3 class="text-xs font-bold text-[#F3F1EC]">${t('no_banks_yet')}</h3>
+                <p class="text-[11px] text-[#9A9CA3] mt-0.5">${getLang() === 'ar' ? 'أضف بنكك لإدارة ما يصل إلى 3 كروت لكل بنك.' : 'Add your bank to manage up to 3 cards per bank.'}</p>
               </div>
-              <button onclick="window.openModal('bank')" class="px-4 py-2 bg-[#111827] text-white text-xs font-bold rounded-full shadow-xs active-press inline-flex items-center gap-1.5 mt-1">
+              <button onclick="window.openModal('bank')" class="px-4 py-2 bg-[#F5B700] text-[#111111] text-xs font-bold rounded-full shadow-xs active-press inline-flex items-center gap-1.5 mt-1">
                 <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                <span>Add Bank</span>
+                <span>${t('add_bank')}</span>
               </button>
             </div>
           ` : store.banks.map(bank => {
@@ -1587,66 +1711,66 @@ function initApp() {
             const isCapReached = cards.length >= 3;
 
             return `
-              <div class="bg-white rounded-3xl p-4 shadow-2xs border border-slate-200/90 space-y-3">
+              <div class="bg-[#1F2024] rounded-3xl p-4.5 shadow-md border border-[#2F3136] space-y-3.5">
                 <!-- Bank Header -->
-                <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+                <div class="flex justify-between items-center pb-2 border-b border-[#2F3136]/70">
                   <div class="flex items-center gap-2.5">
-                    <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-[11px] shadow-xs" style="background-color: ${bank.accentColor}">
+                    <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-[11px] shadow-xs" style="background-color: ${bank.accentColor || '#F5B700'}">
                       ${(bank && bank.shortCode ? bank.shortCode : 'BNK').substring(0, 3)}
                     </div>
                     <div>
-                      <h3 class="text-xs font-bold text-slate-900">${bank.name}</h3>
-                      <span class="text-[10px] text-slate-400 font-mono">${bank.shortCode}</span>
+                      <h3 class="text-xs font-bold text-[#F3F1EC]">${bank.name}</h3>
+                      <span class="text-[10px] text-[#9A9CA3] font-mono">${bank.shortCode}</span>
                     </div>
                   </div>
 
                   <div class="flex items-center gap-2">
-                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      isCapReached ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#26272B] border border-[#3A3C42] ${
+                      isCapReached ? 'text-[#F5B700]' : 'text-[#9A9CA3]'
                     }">
-                      ${cards.length}/3 Cards
+                      ${cards.length}/3 ${t('cards')}
                     </span>
-                    <button onclick="window.confirmDeleteBank('${bank.id}')" class="text-slate-300 hover:text-rose-500 p-1 transition-colors">
+                    <button onclick="window.confirmDeleteBank('${bank.id}')" class="text-[#9A9CA3] hover:text-[#E6A8A8] p-1 transition-colors">
                       <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                     </button>
                   </div>
                 </div>
 
-                <!-- Bank Accounts Section (Item 2: Live Balance) -->
+                <!-- Bank Accounts Section -->
                 ${(() => {
                   const accounts = store.getAccountsForBank(bank.id);
                   return `
                     <div class="space-y-1.5 pt-0.5">
                       <div class="flex items-center justify-between px-0.5">
-                        <span class="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                          <i data-lucide="landmark" class="w-3.5 h-3.5 text-slate-500"></i>
-                          <span>الحسابات البنكية (${accounts.length})</span>
+                        <span class="text-[11px] font-bold text-[#F3F1EC] flex items-center gap-1">
+                          <i data-lucide="landmark" class="w-3.5 h-3.5 text-[#F5B700]"></i>
+                          <span>${t('bank_accounts_count', { n: accounts.length })}</span>
                         </span>
-                        <button onclick="window.openAddAccountForBank('${bank.id}')" class="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5">
+                        <button onclick="window.openAddAccountForBank('${bank.id}')" class="text-[10px] font-bold text-[#F5B700] hover:underline flex items-center gap-0.5">
                           <i data-lucide="plus" class="w-3 h-3"></i>
-                          <span>إضافة حساب</span>
+                          <span>${t('add_account')}</span>
                         </button>
                       </div>
                       ${accounts.length === 0 ? `
-                        <div class="p-2 rounded-2xl bg-slate-50/70 border border-dashed border-slate-200 text-center text-[10px] text-slate-400">
-                          لا توجد حسابات بنكية مسجلة لهذا البنك
+                        <div class="p-2.5 rounded-2xl bg-[#26272B] border border-dashed border-[#3A3C42] text-center text-[10px] text-[#9A9CA3]">
+                          ${t('no_accounts_for_bank')}
                         </div>
                       ` : accounts.map(acc => `
-                        <div class="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 flex justify-between items-center">
+                        <div class="p-2.5 rounded-2xl bg-[#26272B] border border-[#3A3C42] flex justify-between items-center">
                           <div>
                             <div class="flex items-center gap-1.5">
-                              <span class="text-xs font-bold text-slate-900">${acc.name}</span>
-                              <span class="text-[10px] text-slate-400 font-mono">${acc.accountNumberMasked || acc.identifierDigits}</span>
+                              <span class="text-xs font-bold text-[#F3F1EC]">${acc.name}</span>
+                              <span class="text-[10px] text-[#9A9CA3] font-mono">${acc.accountNumberMasked || acc.identifierDigits}</span>
                             </div>
                           </div>
                           <div class="flex items-center gap-2">
-                            <span class="text-xs font-black font-mono px-2 py-0.5 rounded-full ${acc.balance < 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">
-                              الرصيد: ${formatCurrency(acc.balance || 0, acc.currency || 'EGP')}
+                            <span class="text-xs font-black font-mono px-2 py-0.5 rounded-full ${acc.balance < 0 ? 'bg-[#3A2020] text-[#E6A8A8] border border-[#E6A8A8]/30' : 'bg-[#16171A] text-[#F3F1EC] border border-[#3A3C42]'}" dir="ltr">
+                              ${formatCurrency(acc.balance || 0, acc.currency || 'EGP')}
                             </span>
-                            <button onclick="window.openEditAccountModal('${acc.id}')" class="text-slate-400 hover:text-indigo-600 p-0.5 transition-colors" title="تعديل الحساب والرصيد">
+                            <button onclick="window.openEditAccountModal('${acc.id}')" class="text-[#9A9CA3] hover:text-[#F5B700] p-0.5 transition-colors" title="${t('correct_balance')}">
                               <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
                             </button>
-                            <button onclick="window.confirmDeleteAccount('${acc.id}')" class="text-slate-300 hover:text-rose-500 p-0.5 transition-colors" title="حذف الحساب">
+                            <button onclick="window.confirmDeleteAccount('${acc.id}')" class="text-[#9A9CA3] hover:text-[#E6A8A8] p-0.5 transition-colors" title="${t('delete')}">
                               <i data-lucide="x" class="w-3.5 h-3.5"></i>
                             </button>
                           </div>
@@ -1657,42 +1781,42 @@ function initApp() {
                 })()}
 
                 <!-- Cards List -->
-                <div class="space-y-2.5 pt-1 border-t border-slate-100">
-                  <div class="px-0.5 text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                    <i data-lucide="credit-card" class="w-3.5 h-3.5 text-slate-500"></i>
-                    <span>الكروت المسجلة</span>
+                <div class="space-y-2.5 pt-1 border-t border-[#2F3136]/70">
+                  <div class="px-0.5 text-[11px] font-bold text-[#F3F1EC] flex items-center gap-1">
+                    <i data-lucide="credit-card" class="w-3.5 h-3.5 text-[#F5B700]"></i>
+                    <span>${t('registered_cards')}</span>
                   </div>
                   ${cards.map(c => {
                     const cStat = store.getCardSpendingStats(c.id);
                     const linkedAcc = c.linkedAccountId ? store.getAccount(c.linkedAccountId) : null;
                     return `
-                      <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex justify-between items-center">
+                      <div class="p-3.5 rounded-2xl bg-[#26272B] border border-[#3A3C42] flex justify-between items-center">
                         <div class="min-w-0 flex-1">
                           <div class="flex items-center gap-2">
-                            <span class="text-xs font-bold text-slate-900 truncate">${c.name}</span>
-                            <span class="text-[9px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-bold uppercase">${c.cardType}</span>
+                            <span class="text-xs font-bold text-[#F3F1EC] truncate">${c.name}</span>
+                            <span class="text-[9px] bg-[#16171A] border border-[#3A3C42] text-[#9A9CA3] px-2 py-0.5 rounded-full font-bold uppercase">${c.cardType}</span>
                           </div>
-                          <p class="text-[10px] text-slate-400 font-mono mt-0.5">
-                            •••• ${c.last4} ${c.cycleStartDay ? `• Cycle ${c.cycleStartDay}th–${c.cycleEndDay}th` : ''} ${linkedAcc ? `• مرتبط بـ: ${linkedAcc.name}` : ''}
+                          <p class="text-[10px] text-[#9A9CA3] font-mono mt-0.5">
+                            •••• ${c.last4} ${c.cycleStartDay ? `• Cycle ${c.cycleStartDay}th–${c.cycleEndDay}th` : ''} ${linkedAcc ? `• ${linkedAcc.name}` : ''}
                           </p>
-                          <div class="w-full bg-slate-200 rounded-full h-1 mt-2 overflow-hidden">
-                            <div class="${cStat.isExceeded ? 'bg-rose-500' : 'bg-emerald-500'} h-full rounded-full" style="width: ${cStat.percentage}%;"></div>
+                          <div class="w-full bg-[#16171A] rounded-full h-1 mt-2 overflow-hidden">
+                            <div class="${cStat.isExceeded ? 'bg-[#E6A8A8]' : 'bg-[#F5B700]'} h-full rounded-full" style="width: ${cStat.percentage}%;"></div>
                           </div>
                         </div>
 
-                        <div class="text-right shrink-0 ml-3">
-                          <span class="text-xs font-bold ${cStat.isExceeded ? 'text-rose-600' : 'text-slate-800'} font-mono block">
+                        <div class="text-end shrink-0 ml-3">
+                          <span class="text-xs font-bold ${cStat.isExceeded ? 'text-[#E6A8A8]' : 'text-[#F3F1EC]'} font-mono block" dir="ltr">
                             ${formatCurrency(cStat.spent)}
                           </span>
-                          <span class="text-[10px] text-slate-400 font-mono">/ ${formatCurrency(cStat.target)}</span>
+                          <span class="text-[10px] text-[#9A9CA3] font-mono" dir="ltr">/ ${formatCurrency(cStat.target)}</span>
                           <div class="flex items-center justify-end gap-1.5 mt-1">
-                            <button onclick="window.openEditCardModal('${c.id}')" class="p-0.5 text-slate-400 hover:text-indigo-600 transition-colors" title="تعديل الكارت">
+                            <button onclick="window.openEditCardModal('${c.id}')" class="p-0.5 text-[#9A9CA3] hover:text-[#F5B700] transition-colors" title="${t('edit_card')}">
                               <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
                             </button>
-                            <button onclick="window.openCustomizeCardModal('${c.id}', event)" class="p-0.5 text-slate-400 hover:text-indigo-600 transition-colors" title="Customize Card Color">
+                            <button onclick="window.openCustomizeCardModal('${c.id}', event)" class="p-0.5 text-[#9A9CA3] hover:text-[#F5B700] transition-colors" title="Customize Card Color">
                               <span class="text-xs">🎨</span>
                             </button>
-                            <button onclick="window.confirmDeleteCard('${c.id}')" class="text-slate-300 hover:text-rose-500 transition-colors" title="Delete Card">
+                            <button onclick="window.confirmDeleteCard('${c.id}')" class="text-[#9A9CA3] hover:text-[#E6A8A8] transition-colors" title="${t('delete')}">
                               <i data-lucide="x" class="w-3.5 h-3.5"></i>
                             </button>
                           </div>
@@ -1704,13 +1828,13 @@ function initApp() {
 
                 <!-- 3 Card Cap Enforcement Button -->
                 ${isCapReached ? `
-                  <div class="w-full py-2 rounded-full bg-slate-100 text-slate-400 text-[11px] font-bold text-center cursor-not-allowed">
-                    🔒 Maximum 3 Cards Reached for ${bank.shortCode}
+                  <div class="w-full py-2.5 rounded-full bg-[#26272B] border border-[#3A3C42] text-[#9A9CA3] text-[11px] font-bold text-center cursor-not-allowed">
+                    🔒 ${t('max_3_reached')}
                   </div>
                 ` : `
-                  <button onclick="window.openAddCardForBank('${bank.id}')" class="w-full py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold text-center transition-all flex items-center justify-center gap-1.5 active-press">
-                    <i data-lucide="plus" class="w-3.5 h-3.5 text-emerald-600"></i>
-                    <span>Add Card (${cards.length}/3)</span>
+                  <button onclick="window.openAddCardForBank('${bank.id}')" class="w-full py-2.5 rounded-full bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-[#F3F1EC] text-[11px] font-bold text-center transition-all flex items-center justify-center gap-1.5 active-press">
+                    <i data-lucide="plus" class="w-3.5 h-3.5 text-[#F5B700]"></i>
+                    <span>${t('add_card')} (${cards.length}/3)</span>
                   </button>
                 `}
               </div>
@@ -1719,10 +1843,14 @@ function initApp() {
         </div>
       </div>
     `;
+
+    if (window.lucide) {
+      try { lucide.createIcons({ root: container }); } catch (e) {}
+    }
   }
 
   // ==========================================
-  // VIEW 3: HISTORY
+  // VIEW 3: HISTORY (ACTIVITY)
   // ==========================================
   function renderHistoryView() {
     const container = document.getElementById('view-history');
@@ -1731,33 +1859,33 @@ function initApp() {
     const filtered = store.getFilteredTransactions();
 
     container.innerHTML = `
-      <div class="space-y-3">
+      <div class="space-y-3 pb-20">
         <div class="flex justify-between items-center px-1">
           <div>
-            <h2 class="text-sm font-extrabold text-slate-900">Transaction History</h2>
-            <p class="text-[11px] text-slate-400">${filtered.length} transactions recorded</p>
+            <h2 class="text-sm font-extrabold text-[#F3F1EC]">${t('history')}</h2>
+            <p class="text-[11px] text-[#9A9CA3]">${filtered.length} ${t('activity')}</p>
           </div>
-          <button onclick="window.exportTransactionsCSV()" class="px-3 py-1 bg-white border border-slate-200 text-slate-700 text-[11px] font-bold rounded-full shadow-2xs hover:bg-slate-50">
-            Export CSV
+          <button onclick="window.exportTransactionsCSV()" class="px-3 py-1 bg-[#1F2024] border border-[#2F3136] text-[#F3F1EC] text-[11px] font-bold rounded-full shadow-2xs hover:bg-[#26272B] transition-colors">
+            ${t('export_csv')}
           </button>
         </div>
 
         <!-- Search Bar -->
         <div class="relative">
-          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-          <input type="text" id="history-search-input" value="${store.searchQuery}" placeholder="Search merchant, amount, category..." class="w-full bg-white border border-slate-200 rounded-full pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 shadow-2xs">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-[#9A9CA3] absolute left-3.5 top-1/2 -translate-y-1/2 rtl:left-auto rtl:right-3.5"></i>
+          <input type="text" id="history-search-input" value="${store.searchQuery}" placeholder="${t('search_placeholder')}" class="w-full bg-[#1F2024] border border-[#2F3136] rounded-full pl-9 pr-3 rtl:pr-9 rtl:pl-3 py-2 text-xs font-medium text-[#F3F1EC] placeholder-[#9A9CA3] focus:outline-none focus:ring-1 focus:ring-[#F5B700] shadow-2xs">
         </div>
 
         <!-- Filter Chips Carousel -->
         <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
           <button onclick="window.setFilterStatement('all')" class="px-3 py-1 rounded-full text-[10px] font-bold shrink-0 ${
-            store.selectedStatementFilter === 'all' ? 'bg-[#111827] text-white' : 'bg-white text-slate-500 border border-slate-200'
+            store.selectedStatementFilter === 'all' ? 'bg-[#F5B700] text-[#111111]' : 'bg-[#1F2024] text-[#9A9CA3] border border-[#2F3136]'
           }">
-            All Cycles
+            ${t('all_cycles')}
           </button>
           ${store.getAvailableStatementMonths().map(m => `
             <button onclick="window.setFilterStatement('${m.key}')" class="px-3 py-1 rounded-full text-[10px] font-bold shrink-0 ${
-              store.selectedStatementFilter === m.key ? 'bg-[#111827] text-white' : 'bg-white text-slate-500 border border-slate-200'
+              store.selectedStatementFilter === m.key ? 'bg-[#F5B700] text-[#111111]' : 'bg-[#1F2024] text-[#9A9CA3] border border-[#2F3136]'
             }">
               ${m.badge}
             </button>
@@ -1767,17 +1895,17 @@ function initApp() {
         <!-- Transaction Items -->
         <div class="space-y-2 pt-1">
           ${filtered.length === 0 ? `
-            <div class="bg-white p-7 rounded-3xl text-center border border-slate-200/90 shadow-2xs space-y-3 mt-2">
-              <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center shadow-2xs">
+            <div class="bg-[#1F2024] p-7 rounded-3xl text-center border border-[#2F3136] shadow-2xs space-y-3 mt-2">
+              <div class="w-12 h-12 mx-auto rounded-2xl bg-[#26272B] text-[#9A9CA3] flex items-center justify-center border border-[#3A3C42]">
                 <i data-lucide="receipt" class="w-6 h-6"></i>
               </div>
               <div>
-                <h3 class="text-xs font-bold text-slate-800">No Transactions Yet</h3>
-                <p class="text-[11px] text-slate-400 mt-0.5">When you log an expense, it will appear here with automatic statement tags.</p>
+                <h3 class="text-xs font-bold text-[#F3F1EC]">${t('no_transactions_yet')}</h3>
+                <p class="text-[11px] text-[#9A9CA3] mt-0.5">${getLang() === 'ar' ? 'عند تسجيل حركة جديدة ستظهر هنا تلقائياً.' : 'When you log an expense, it will appear here.'}</p>
               </div>
-              <button onclick="window.openModal('transaction')" class="px-4 py-2 bg-[#111827] text-white text-xs font-bold rounded-full shadow-xs active-press inline-flex items-center gap-1.5 mt-1">
+              <button onclick="window.openModal('transaction')" class="px-4 py-2 bg-[#F5B700] text-[#111111] text-xs font-bold rounded-full shadow-xs active-press inline-flex items-center gap-1.5 mt-1">
                 <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                <span>Log Expense</span>
+                <span>${t('log_first_expense')}</span>
               </button>
             </div>
           ` : filtered.map(tx => {
@@ -1787,43 +1915,43 @@ function initApp() {
             const txType = tx.transactionType || (tx.category === 'transfer' ? 'transfer' : 'purchase');
             let typeBadge = '';
             if (tx.isBalanceAdjustment || tx.transactionType === 'balance_adjustment') {
-              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">تسوية رصيد</span>';
+              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#26272B] text-[#9A9CA3] border border-[#3A3C42]">تسوية رصيد</span>';
             } else if (txType === 'withdrawal') {
               if (tx.card && tx.card.cardType === 'credit') {
-                typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">سحب كاش كريدت</span>';
+                typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#26272B] text-[#E6A8A8] border border-[#E6A8A8]/30">سحب كاش كريدت</span>';
               } else {
-                typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">سحب نقدي</span>';
+                typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#26272B] text-[#F5B700] border border-[#F5B700]/30">سحب نقدي</span>';
               }
             } else if (txType === 'transfer') {
-              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-200">تحويل</span>';
+              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#26272B] text-[#9A9CA3] border border-[#3A3C42]">تحويل</span>';
             } else {
-              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">شراء</span>';
+              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#26272B] text-[#F3F1EC] border border-[#3A3C42]">شراء</span>';
             }
 
             return `
-              <div class="bg-white p-3.5 rounded-2xl flex justify-between items-center shadow-2xs border border-slate-100/90 hover:shadow-xs transition-all">
+              <div class="bg-[#1F2024] p-3.5 rounded-2xl flex justify-between items-center shadow-2xs border border-[#2F3136] hover:border-[#3A3C42] transition-all">
                 <div>
                   <div class="flex items-center gap-2">
-                    <p class="text-xs font-bold text-slate-900">${tx.merchant}</p>
-                    <span class="text-[10px] text-slate-400 font-mono">• ${tx.date}</span>
+                    <p class="text-xs font-bold text-[#F3F1EC]">${tx.merchant}</p>
+                    <span class="text-[10px] text-[#9A9CA3] font-mono">• ${tx.date}</span>
                   </div>
                   <div class="flex items-center gap-2 mt-0.5">
                     ${isCredit ? `
-                      <span class="text-[10px] ${isCurrentCycle ? 'text-indigo-600' : 'text-slate-400'} font-semibold">
-                        Affects ${stmtName} Statement
+                      <span class="text-[10px] ${isCurrentCycle ? 'text-[#F5B700]' : 'text-[#9A9CA3]'} font-semibold">
+                        Affects ${stmtName}
                       </span>
                     ` : `
-                      <span class="text-[10px] text-slate-400 font-medium">${tx.card?.name || 'Debit'}</span>
+                      <span class="text-[10px] text-[#9A9CA3] font-medium">${tx.card?.name || 'Debit'}</span>
                     `}
-                    <span class="text-slate-300">•</span>
-                    <span class="text-[10px] text-slate-400 font-mono">•••• ${tx.card?.last4 || ''}</span>
+                    <span class="text-[#3A3C42]">•</span>
+                    <span class="text-[10px] text-[#9A9CA3] font-mono">•••• ${tx.card?.last4 || ''}</span>
                   </div>
                 </div>
 
                 <div class="flex items-center gap-1.5">
                   ${typeBadge}
-                  <span class="text-xs font-bold ${tx.direction === 'income' ? 'text-emerald-600' : 'text-slate-900'} font-mono">${tx.direction === 'income' ? '+' : '-'}${formatCurrency(tx.amount)}</span>
-                  <button onclick="window.confirmDeleteTx('${tx.id}')" class="text-slate-300 hover:text-rose-500 p-1">
+                  <span class="text-xs font-bold ${tx.direction === 'income' ? 'text-[#F5B700]' : 'text-[#F3F1EC]'} font-mono" dir="ltr">${tx.direction === 'income' ? '+' : '-'}${formatCurrency(tx.amount)}</span>
+                  <button onclick="window.confirmDeleteTx('${tx.id}')" class="text-[#9A9CA3] hover:text-[#E6A8A8] p-1 transition-colors">
                     <i data-lucide="trash" class="w-3 h-3"></i>
                   </button>
                 </div>
@@ -1840,14 +1968,13 @@ function initApp() {
       renderHistoryView();
       if (window.lucide) lucide.createIcons();
     });
+
+    if (window.lucide) {
+      try { lucide.createIcons({ root: container }); } catch (e) {}
+    }
   }
 
   // --- Global Helpers ---
-  window.selectFeaturedCard = (cardId) => {
-    activeFeaturedCardId = cardId;
-    renderCurrentView();
-  };
-
   window.switchTab = (tab) => {
     switchView(tab);
   };
@@ -1862,8 +1989,21 @@ function initApp() {
     openModal('card');
   };
 
+  window.toggleAppLanguage = () => {
+    const current = getLang();
+    const next = current === 'ar' ? 'en' : 'ar';
+    setLang(next);
+  };
+
+  window.toggleDevSimulator = () => {
+    const box = document.getElementById('settings-dev-tools-box');
+    if (box) {
+      box.classList.toggle('hidden');
+    }
+  };
+
   // ==========================================
-  // VIEW 4: SETTINGS & BIOMETRICS VIEW
+  // VIEW 4: SETTINGS (EXACT MATCH TO MOCKUPS)
   // ==========================================
   async function renderSettingsView() {
     const container = document.getElementById('view-settings');
@@ -1872,257 +2012,224 @@ function initApp() {
     const isBioSupported = window.WalletSecurity ? await window.WalletSecurity.isBiometricsAvailable() : false;
     const isBioEnabled = window.WalletSecurity ? window.WalletSecurity.isBiometricsEnabled() : false;
     const timeoutMs = window.WalletSecurity ? window.WalletSecurity.getAutoLockTimeout() : 180000;
+    const currentCurrency = (typeof store.currency !== 'undefined') ? store.currency : 'EGP';
+
+    let autoLockLabel = t('minutes_3');
+    if (timeoutMs === 0) autoLockLabel = t('immediately');
+    else if (timeoutMs === 60000) autoLockLabel = t('minutes_1');
+    else if (timeoutMs === 300000) autoLockLabel = t('minutes_5');
+    else if (timeoutMs === 900000) autoLockLabel = t('minutes_15');
 
     container.innerHTML = `
-      <div class="space-y-3.5 pb-24">
-        
-        <!-- SECTION 1: SECURITY & BIOMETRIC AUTH -->
-        <div class="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-4">
-          <div class="flex items-center gap-2.5 pb-2 border-b border-slate-100">
-            <div class="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-              <i data-lucide="shield-check" class="w-4 h-4"></i>
-            </div>
-            <div>
-              <h3 class="text-xs font-extrabold text-slate-900 tracking-tight">Security & Biometrics</h3>
-              <p class="text-[10px] text-slate-400">Vault encryption and device unlock</p>
-            </div>
-          </div>
+      <div class="space-y-4 pb-24">
 
-          <!-- Biometric Toggle Row -->
-          <div class="flex items-center justify-between py-1">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <i data-lucide="fingerprint" class="w-5 h-5"></i>
-              </div>
+        <!-- Hidden File Input for Vault Backup Restore -->
+        <input type="file" id="vault-backup-file-input" accept=".json" class="hidden" onchange="window.importEncryptedVaultBackup(event)">
+
+        <!-- SECTION 1: SECURITY (الأمان) -->
+        <div class="space-y-1.5">
+          <p class="text-xs font-bold text-[#9A9CA3] px-1">${t('security')}</p>
+          <div class="bg-[#1F2024] border border-[#2F3136] rounded-3xl divide-y divide-[#2F3136]/70 overflow-hidden shadow-md">
+            
+            <!-- Row: PIN Code -->
+            <div class="flex items-center justify-between p-4">
               <div>
-                <div class="text-xs font-bold text-slate-900">Biometric Unlock</div>
-                <div class="text-[10px] text-slate-400">
-                  ${isBioSupported ? (isBioEnabled ? 'Face ID / Fingerprint is Active' : 'Touch ID, Face ID or Fingerprint') : 'Hardware not detected in this browser'}
+                <div class="text-xs font-bold text-[#F3F1EC]">${t('pin_code')}</div>
+                <div class="text-[10px] text-[#9A9CA3] mt-0.5">${t('digits_4')}</div>
+              </div>
+              <button type="button" onclick="window.promptChangePin()" class="px-3.5 py-1.5 rounded-xl bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-xs font-bold text-[#F3F1EC] active-press transition-colors">
+                ${t('change')}
+              </button>
+            </div>
+
+            <!-- Row: Biometric Unlock -->
+            <div class="flex items-center justify-between p-4">
+              <div>
+                <div class="text-xs font-bold text-[#F3F1EC]">${t('biometric_unlock')}</div>
+                <div class="text-[10px] text-[#9A9CA3] mt-0.5">
+                  ${isBioSupported ? (isBioEnabled ? t('enabled') : t('not_enabled')) : (getLang() === 'ar' ? 'غير مدعوم في هذا المتصفح' : 'Not supported')}
                 </div>
               </div>
-            </div>
-            <div>
               <label class="relative inline-flex items-center ${isBioSupported ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'}">
                 <input type="checkbox" id="settings-biometric-toggle" ${isBioEnabled ? 'checked' : ''} ${!isBioSupported ? 'disabled' : ''} class="sr-only peer">
-                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                <div class="w-11 h-6 bg-[#26272B] border border-[#3A3C42] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] rtl:peer-checked:after:-translate-x-full after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700]"></div>
               </label>
             </div>
-          </div>
 
-          <!-- Change PIN Row -->
-          <div class="flex items-center justify-between py-1 border-t border-slate-100 pt-3">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <i data-lucide="key-round" class="w-5 h-5"></i>
-              </div>
+            <!-- Row: Auto-Lock -->
+            <div class="flex items-center justify-between p-4">
               <div>
-                <div class="text-xs font-bold text-slate-900">4-Digit Security PIN</div>
-                <div class="text-[10px] text-slate-400">Master code for AES-256 decryption</div>
+                <div class="text-xs font-bold text-[#F3F1EC]">${t('auto_lock')}</div>
               </div>
+              <select id="settings-autolock-select" onchange="window.updateAutoLockTimeout(this.value)" class="text-xs font-bold bg-[#26272B] border border-[#3A3C42] text-[#F3F1EC] rounded-xl px-3 py-1.5 outline-none cursor-pointer">
+                <option value="0" ${timeoutMs === 0 ? 'selected' : ''}>${t('immediately')}</option>
+                <option value="60000" ${timeoutMs === 60000 ? 'selected' : ''}>${t('minutes_1')}</option>
+                <option value="180000" ${timeoutMs === 180000 ? 'selected' : ''}>${t('minutes_3')}</option>
+                <option value="300000" ${timeoutMs === 300000 ? 'selected' : ''}>${t('minutes_5')}</option>
+                <option value="900000" ${timeoutMs === 900000 ? 'selected' : ''}>${t('minutes_15')}</option>
+              </select>
             </div>
-            <button onclick="window.promptChangePin()" class="px-3.5 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold active-press transition-colors">
-              Change PIN
-            </button>
-          </div>
 
-          <!-- Auto-Lock Duration Row -->
-          <div class="flex items-center justify-between py-1 border-t border-slate-100 pt-3">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
-                <i data-lucide="timer" class="w-5 h-5"></i>
-              </div>
-              <div>
-                <div class="text-xs font-bold text-slate-900">Auto-Lock Timer</div>
-                <div class="text-[10px] text-slate-400">Locks when in background</div>
-              </div>
+            <!-- Row: Lock Wallet Now -->
+            <div onclick="window.WalletSecurity && window.WalletSecurity.lock()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
+              <span class="text-xs font-bold text-[#F3F1EC]">${t('lock_wallet_now')}</span>
+              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
             </div>
-            <select id="settings-autolock-select" onchange="window.updateAutoLockTimeout(this.value)" class="text-xs font-bold bg-slate-50 border border-slate-200 text-slate-700 rounded-full px-2.5 py-1 outline-none cursor-pointer">
-              <option value="0" ${timeoutMs === 0 ? 'selected' : ''}>Immediately</option>
-              <option value="60000" ${timeoutMs === 60000 ? 'selected' : ''}>1 minute</option>
-              <option value="180000" ${timeoutMs === 180000 ? 'selected' : ''}>3 minutes</option>
-              <option value="300000" ${timeoutMs === 300000 ? 'selected' : ''}>5 minutes</option>
-              <option value="900000" ${timeoutMs === 900000 ? 'selected' : ''}>15 minutes</option>
-            </select>
-          </div>
 
-          <!-- Vault Security Architecture Note & Boundaries -->
-          <div class="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 space-y-2 text-[10px] leading-relaxed">
-            <div class="flex items-center gap-1.5 font-bold text-slate-800">
-              <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-indigo-600"></i>
-              <span>بنية الحماية وحدود الأنظمة (Threat Model & Security Boundaries)</span>
-            </div>
-            ${window.BankSmsEngine && window.BankSmsEngine.isPlatformSupported() ? `
-              <div class="space-y-1 text-slate-600">
-                <div class="flex items-center gap-1 font-bold text-emerald-800">
-                  <i data-lucide="cpu" class="w-3 h-3 text-emerald-600"></i>
-                  <span>أندرويد أصلي (Hardware Keystore TEE):</span>
-                </div>
-                <p>
-                  مفتاح البصمة مربوط بعتاد الجهاز الآمن (Keystore) عبر BiometricPrompt.CryptoObject ولا يُفك تشفير رمز الـ PIN بدون بصمة حقيقية. طابور رسائل الـ SMS مشفر بـ MasterKey AES-256. فتح المحفظة بالـ PIN اليدوي مستقل تماماً ويضمن عدم فقدان بياناتك في حال تعديل البصمات من إعدادات النظام.
-                </p>
-              </div>
-            ` : `
-              <div class="space-y-1 text-slate-600">
-                <div class="flex items-center gap-1 font-bold text-blue-800">
-                  <i data-lucide="globe" class="w-3 h-3 text-blue-600"></i>
-                  <span>نسخة المتصفح / PWA (Web Crypto & WebAuthn):</span>
-                </div>
-                <p>
-                  تشفير الخزنة محلياً بـ AES-256-GCM مع اشتقاق PBKDF2 (100,000 تكرار). مصادقة WebAuthn تتأكد من وجود المستخدم، ورمز الـ PIN اليدوي هو جذر التشفير الأساسي؛ نظراً لعدم إتاحة المتصفحات وصولاً مباشراً لعتاد Keystore بدون خادم مصادقة أو امتدادات PRF.
-                </p>
-              </div>
-            `}
           </div>
         </div>
 
-        <!-- SECTION: BANK SMS TRANSACTION IMPORT -->
-        <div class="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-4">
-          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-            <div class="flex items-center gap-2.5">
-              <div class="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                <i data-lucide="message-square" class="w-4 h-4"></i>
-              </div>
+        <!-- SECTION 2: SMS PROCESSING (استقبال الرسائل) -->
+        <div class="space-y-1.5">
+          <p class="text-xs font-bold text-[#9A9CA3] px-1">${t('sms_intake')}</p>
+          <div class="bg-[#1F2024] border border-[#2F3136] rounded-3xl divide-y divide-[#2F3136]/70 overflow-hidden shadow-md">
+            
+            <!-- Row: Read Bank SMS -->
+            <div class="flex items-center justify-between p-4">
               <div>
-                <h3 class="text-xs font-extrabold text-slate-900 tracking-tight">Bank SMS Transaction Import</h3>
-                <p class="text-[10px] text-slate-400">On-device parsing & Keystore queue</p>
+                <div class="text-xs font-bold text-[#F3F1EC]">${t('read_bank_sms')}</div>
+                <div class="text-[10px] text-[#9A9CA3] mt-0.5">
+                  ${(window.BankSmsEngine && window.BankSmsEngine.stats.permissionStatus === 'granted') ? t('active_perm_granted') : t('inactive_or_no_perm')}
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="settings-sms-import-toggle" ${window.BankSmsEngine && window.BankSmsEngine.stats.isSmsImportEnabled ? 'checked' : ''} onchange="window.toggleSmsImport(this.checked)" class="sr-only peer">
+                <div class="w-11 h-6 bg-[#26272B] border border-[#3A3C42] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] rtl:peer-checked:after:-translate-x-full after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700]"></div>
+              </label>
+            </div>
+
+            <!-- Row: Allowed Banks -->
+            <div onclick="window.toggleDevSimulator()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
+              <span class="text-xs font-bold text-[#F3F1EC]">${t('allowed_banks')}</span>
+              <div class="flex items-center gap-1.5">
+                <span class="text-[10px] text-[#9A9CA3] font-mono">CIB +${Math.max(store.banks.length - 1, 0)}</span>
+                <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
               </div>
             </div>
-            ${window.BankSmsEngine && window.BankSmsEngine.isPlatformSupported()
-              ? '<span class="text-[9px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Android Native</span>'
-              : '<span class="text-[9px] font-extrabold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">PWA / Web View</span>'}
-          </div>
 
-          <!-- Explanation Banner -->
-          <div class="bg-indigo-50/70 rounded-2xl p-3 border border-indigo-100/80 text-[10px] text-indigo-900 leading-relaxed space-y-1">
-            <div class="font-extrabold flex items-center gap-1.5 text-indigo-950">
-              <i data-lucide="shield-check" class="w-3.5 h-3.5 text-indigo-600"></i>
-              <span>Privacy & Security Guarantee</span>
+            <!-- Row: Check Reception Status -->
+            <div onclick="window.openSmsDiagnostics()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
+              <span class="text-xs font-bold text-[#F3F1EC]">${t('check_reception_status')}</span>
+              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
             </div>
-            <p class="text-indigo-800/90">
-              Only incoming SMS from enabled banks are processed on-device. Raw SMS text is discarded immediately in memory. OTPs, passwords, and verification codes are strictly rejected.
-            </p>
-          </div>
 
-          <!-- Toggle: Opt-In Switch -->
-          <div class="flex items-center justify-between py-1">
-            <div>
-              <div class="text-xs font-bold text-slate-900">Enable Bank SMS Import</div>
-              <div class="text-[10px] text-slate-400">Off by default • Explicit opt-in</div>
+            <!-- Row: Import Past SMS -->
+            <div onclick="window.openHistoricalSmsImport()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
+              <span class="text-xs font-bold text-[#F3F1EC]">${t('import_past_sms')}</span>
+              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
             </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" id="settings-sms-import-toggle" ${window.BankSmsEngine && window.BankSmsEngine.stats.isSmsImportEnabled ? 'checked' : ''} onchange="window.toggleSmsImport(this.checked)" class="sr-only peer">
-              <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-            </label>
-          </div>
 
-          <!-- Permission Status Row -->
-          <div class="flex items-center justify-between py-1 border-t border-slate-100 pt-3">
-            <div>
-              <div class="text-xs font-bold text-slate-900">RECEIVE_SMS Permission</div>
-              <div class="text-[10px] text-slate-400">Android runtime permission state</div>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                (window.BankSmsEngine && window.BankSmsEngine.stats.permissionStatus === 'granted')
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : (window.BankSmsEngine && window.BankSmsEngine.stats.permissionStatus === 'denied')
-                  ? 'bg-rose-100 text-rose-800'
-                  : 'bg-amber-100 text-amber-800'
-              }">
-                ${((window.BankSmsEngine && window.BankSmsEngine.stats.permissionStatus) || 'UNAVAILABLE').toUpperCase()}
-              </span>
-              ${window.BankSmsEngine && window.BankSmsEngine.isPlatformSupported() && window.BankSmsEngine.stats.permissionStatus !== 'granted'
-                ? `<button onclick="window.requestSmsPermission()" class="text-[10px] font-bold px-2 py-1 bg-slate-900 text-white rounded-lg active-press">Request</button>`
-                : ''}
-            </div>
           </div>
+        </div>
 
-          <!-- Keystore Protection Row -->
-          <div class="flex items-center justify-between py-1 border-t border-slate-100 pt-3">
-            <div>
-              <div class="text-xs font-bold text-slate-900">Hardware Keystore Vault</div>
-              <div class="text-[10px] text-slate-400">MasterKey AES-256-GCM queue</div>
-            </div>
-            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-              window.BankSmsEngine && window.BankSmsEngine.stats.isKeystoreProtected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
-            }">
-              ${window.BankSmsEngine && window.BankSmsEngine.stats.isKeystoreProtected ? 'ACTIVE' : 'READY / MEMORY'}
-            </span>
-          </div>
-
-          <!-- Pending Queue & Review Inbox Trigger -->
-          <div class="flex items-center justify-between py-1 border-t border-slate-100 pt-3">
-            <div>
-              <div class="text-xs font-bold text-slate-900">Pending Transactions</div>
-              <div class="text-[10px] text-slate-400">${(window.BankSmsEngine && window.BankSmsEngine.pendingCandidates.length) || 0} awaiting review</div>
-            </div>
-            <button onclick="window.openSmsReviewInbox()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-full active-press transition-all flex items-center gap-1 shadow-xs">
-              <i data-lucide="inbox" class="w-3.5 h-3.5"></i>
-              <span>Review (${(window.BankSmsEngine && window.BankSmsEngine.pendingCandidates.length) || 0})</span>
-            </button>
-          </div>
-
-          <!-- Real-Time Diagnostics & Historical SMS Import Actions -->
-          <div class="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
-            <button onclick="window.openSmsDiagnostics()" class="p-2.5 rounded-2xl bg-indigo-50/70 hover:bg-indigo-100/80 border border-indigo-200/60 text-indigo-900 text-left transition-all active-press flex flex-col gap-1">
-              <div class="flex items-center justify-between">
-                <i data-lucide="activity" class="w-4 h-4 text-indigo-600"></i>
-                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-200/70 text-indigo-800">تشخيص</span>
+        <!-- SECTION 3: BACKUP & GENERAL (النسخ الاحتياطي والعام) -->
+        <div class="space-y-1.5">
+          <p class="text-xs font-bold text-[#9A9CA3] px-1">${t('backup_general')}</p>
+          <div class="bg-[#1F2024] border border-[#2F3136] rounded-3xl divide-y divide-[#2F3136]/70 overflow-hidden shadow-md">
+            
+            <!-- Row: Export Encrypted Backup -->
+            <div onclick="window.exportEncryptedVaultBackup()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
+              <div>
+                <div class="text-xs font-bold text-[#F3F1EC]">${t('export_encrypted_backup')}</div>
+                <div class="text-[10px] text-[#9A9CA3] mt-0.5">${t('passphrase_8_chars')}</div>
               </div>
-              <div class="text-xs font-extrabold">حالة الاستقبال لحظياً</div>
-              <div class="text-[10px] text-slate-500">فحص الصلاحيات وآخر بث</div>
-            </button>
+              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
+            </div>
 
-            <button onclick="window.openHistoricalSmsImport()" class="p-2.5 rounded-2xl bg-blue-50/70 hover:bg-blue-100/80 border border-blue-200/60 text-blue-900 text-left transition-all active-press flex flex-col gap-1">
-              <div class="flex items-center justify-between">
-                <i data-lucide="history" class="w-4 h-4 text-blue-600"></i>
-                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-blue-200/70 text-blue-800">استيراد</span>
+            <!-- Row: Import Backup -->
+            <div onclick="document.getElementById('vault-backup-file-input').click()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
+              <div>
+                <div class="text-xs font-bold text-[#F3F1EC]">${t('import_backup')}</div>
+                <div class="text-[10px] text-[#9A9CA3] mt-0.5">${t('replaces_data_after_confirm')}</div>
               </div>
-              <div class="text-xs font-extrabold">الرسائل القديمة</div>
-              <div class="text-[10px] text-slate-500">فحص آمن على دفعات</div>
-            </button>
+              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
+            </div>
+
+            <!-- Row: Language -->
+            <div class="flex items-center justify-between p-4">
+              <div>
+                <div class="text-xs font-bold text-[#F3F1EC]">${t('language')}</div>
+                <div class="text-[10px] text-[#9A9CA3] mt-0.5">${t('all_screen_one_lang')}</div>
+              </div>
+              <button type="button" onclick="window.toggleAppLanguage()" class="px-3.5 py-1.5 rounded-xl bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-xs font-bold text-[#F3F1EC] active-press transition-colors">
+                ${getLang() === 'ar' ? 'العربية' : 'English'}
+              </button>
+            </div>
+
+            <!-- Row: Currency -->
+            <div class="flex items-center justify-between p-4">
+              <span class="text-xs font-bold text-[#F3F1EC]">${t('currency')}</span>
+              <select onchange="window.switchCurrency(this.value)" class="text-xs font-bold bg-[#26272B] border border-[#3A3C42] text-[#F3F1EC] rounded-xl px-3 py-1.5 outline-none cursor-pointer">
+                <option value="EGP" ${currentCurrency === 'EGP' ? 'selected' : ''}>EGP</option>
+                <option value="USD" ${currentCurrency === 'USD' ? 'selected' : ''}>USD ($)</option>
+                <option value="EUR" ${currentCurrency === 'EUR' ? 'selected' : ''}>EUR (€)</option>
+                <option value="SAR" ${currentCurrency === 'SAR' ? 'selected' : ''}>SAR</option>
+                <option value="AED" ${currentCurrency === 'AED' ? 'selected' : ''}>AED</option>
+                <option value="GBP" ${currentCurrency === 'GBP' ? 'selected' : ''}>GBP (£)</option>
+              </select>
+            </div>
+
+            <!-- Row: Export CSV -->
+            <div onclick="window.exportTransactionsCSV()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
+              <span class="text-xs font-bold text-[#F3F1EC]">${t('export_csv')}</span>
+              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
+            </div>
+
+            <!-- Row: Developer Tools & Simulation -->
+            <div onclick="window.toggleDevSimulator()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
+              <span class="text-xs font-bold text-[#F3F1EC]">${t('developer_tools')}</span>
+              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
+            </div>
+
+            <!-- Row: Clear All Data -->
+            <div onclick="window.clearAllData()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#3A2020]/40 transition-colors active-press">
+              <span class="text-xs font-bold text-[#E6A8A8]">${t('clear_all_data')}</span>
+              <span class="text-[#E6A8A8] text-xs">&rsaquo;</span>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- DEVELOPER TOOLS EXPANDABLE DRAWER -->
+        <div id="settings-dev-tools-box" class="hidden bg-[#1F2024] rounded-3xl p-5 border border-[#2F3136] space-y-4">
+          <div class="flex items-center justify-between pb-2 border-b border-[#2F3136]">
+            <h3 class="text-xs font-extrabold text-[#F3F1EC]">${t('developer_tools')}</h3>
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#26272B] text-[#F5B700] border border-[#F5B700]/30">DEV / DEMO</span>
           </div>
 
           <!-- Bank Allowlist Manager -->
-          <div class="border-t border-slate-100 pt-3 space-y-2">
+          <div class="space-y-2">
             <div class="flex items-center justify-between">
-              <label class="text-xs font-bold text-slate-900">Allowed Bank Senders</label>
-              <span class="text-[10px] text-slate-400">${(window.BankSmsEngine && window.BankSmsEngine.allowlist.length) || 0} enabled</span>
+              <label class="text-xs font-bold text-[#F3F1EC]">Allowed Bank Senders</label>
+              <span class="text-[10px] text-[#9A9CA3]">{(window.BankSmsEngine && window.BankSmsEngine.allowlist.length) || 0} enabled</span>
             </div>
-            <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded-2xl border border-slate-100">
+            <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 bg-[#26272B] rounded-2xl border border-[#3A3C42]">
               ${(window.BankSmsEngine && window.BankSmsEngine.allowlist || []).map(b => `
-                <span class="inline-flex items-center gap-1 text-[10px] font-bold bg-white text-slate-800 px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs">
+                <span class="inline-flex items-center gap-1 text-[10px] font-bold bg-[#1F2024] text-[#F3F1EC] px-2 py-0.5 rounded-full border border-[#3A3C42]">
                   <span>${b}</span>
-                  <button type="button" onclick="window.removeBankSender('${b}')" class="text-slate-400 hover:text-rose-600 font-black ml-0.5">&times;</button>
+                  <button type="button" onclick="window.removeAllowedBank('${b}')" class="text-[#9A9CA3] hover:text-[#E6A8A8]">×</button>
                 </span>
               `).join('')}
             </div>
-            <div class="flex gap-1.5 pt-1">
-              <input type="text" id="new-bank-sender-input" placeholder="Add bank (e.g. ALEXBANK)" class="flex-1 text-[11px] font-bold px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 uppercase">
-              <button type="button" onclick="window.addBankSender()" class="px-3 py-1.5 bg-[#111827] text-white text-[11px] font-bold rounded-xl active-press">Add</button>
+            <div class="flex gap-2">
+              <input type="text" id="settings-add-bank-input" placeholder="e.g. CIB, ALEXBANK" class="flex-1 text-xs bg-[#26272B] border border-[#3A3C42] rounded-xl px-2.5 py-1.5 text-[#F3F1EC] outline-none">
+              <button type="button" onclick="window.addAllowedBank()" class="px-3 py-1.5 bg-[#F5B700] text-[#111111] text-[11px] font-bold rounded-xl active-press">Add</button>
             </div>
           </div>
 
           <!-- In-App Synthetic SMS Test Simulator -->
-          <div class="border-t border-slate-100 pt-3 space-y-2">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-1.5">
-                <i data-lucide="flask-conical" class="w-3.5 h-3.5 text-indigo-600"></i>
-                <span class="text-xs font-bold text-slate-900">SMS Parser Test Simulator</span>
-              </div>
-              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">Dev & Demo</span>
-            </div>
-            <p class="text-[10px] text-slate-400">Test fabricated English & Arabic messages through the parser pipeline:</p>
+          <div class="border-t border-[#2F3136] pt-3 space-y-2">
+            <label class="text-xs font-bold text-[#F3F1EC]">SMS Parser Test Simulator</label>
             <div class="flex gap-2">
-              <select id="sms-simulator-select" class="flex-1 text-[11px] font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 outline-none cursor-pointer">
+              <select id="sms-simulator-select" class="flex-1 text-[11px] font-bold bg-[#26272B] border border-[#3A3C42] text-[#F3F1EC] rounded-xl px-2.5 py-1.5 outline-none cursor-pointer">
                 <option value="0">CIB Purchase (EGP 1,250.50 at Amazon Egypt)</option>
                 <option value="1">HSBC POS Debit (EGP 450.00 at Starbucks Arkan)</option>
-                <option value="2">NBE Arabic + Eastern Numerals (١,٤٥٠.٠٠ ج.م لدى فودافون)</option>
+                <option value="2">NBE Arabic (١,٤٥٠.٠٠ ج.م لدى فودافون)</option>
                 <option value="3">Banque Misr Arabic (850.00 جنيه لدى كارفور)</option>
                 <option value="4">Amazon Refund (EGP 600.00 Income Credit)</option>
                 <option value="5">Security OTP (Must be REJECTED)</option>
               </select>
-              <button type="button" onclick="window.simulatePresetSms()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-xl active-press transition-all shrink-0">
+              <button type="button" onclick="window.simulatePresetSms()" class="px-3 py-1.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-[11px] font-bold rounded-xl active-press shrink-0">
                 Simulate
               </button>
             </div>
@@ -2130,136 +2237,32 @@ function initApp() {
 
         </div>
 
-        <!-- SECTION 2: PREFERENCES -->
-        <div class="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-3">
-          <div class="flex items-center gap-2.5 pb-2 border-b border-slate-100">
-            <div class="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
-              <i data-lucide="sliders" class="w-4 h-4"></i>
-            </div>
-            <div>
-              <h3 class="text-xs font-extrabold text-slate-900 tracking-tight">Preferences</h3>
-              <p class="text-[10px] text-slate-400">Display and currency format</p>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between py-1">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
-                <i data-lucide="coins" class="w-5 h-5"></i>
-              </div>
-              <div>
-                <div class="text-xs font-bold text-slate-900">Wallet Currency</div>
-                <div class="text-[10px] text-slate-400">Used for balances and expenses</div>
-              </div>
-            </div>
-            <select onchange="window.switchCurrency(this.value)" class="text-xs font-bold bg-slate-50 border border-slate-200 text-slate-700 rounded-full px-3 py-1 outline-none cursor-pointer">
-              <option value="EGP" ${currentCurrency === 'EGP' ? 'selected' : ''}>EGP</option>
-              <option value="USD" ${currentCurrency === 'USD' ? 'selected' : ''}>USD ($)</option>
-              <option value="EUR" ${currentCurrency === 'EUR' ? 'selected' : ''}>EUR (€)</option>
-              <option value="SAR" ${currentCurrency === 'SAR' ? 'selected' : ''}>SAR</option>
-              <option value="AED" ${currentCurrency === 'AED' ? 'selected' : ''}>AED</option>
-              <option value="GBP" ${currentCurrency === 'GBP' ? 'selected' : ''}>GBP (£)</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- SECTION 3: DATA & ACTIONS -->
-        <div class="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-2.5">
-          <div class="flex items-center gap-2.5 pb-2 border-b border-slate-100">
-            <div class="w-7 h-7 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
-              <i data-lucide="database" class="w-4 h-4"></i>
-            </div>
-            <div>
-              <h3 class="text-xs font-extrabold text-slate-900 tracking-tight">Data Management</h3>
-              <p class="text-[10px] text-slate-400">Export and session actions</p>
-            </div>
-          </div>
-
-          <button onclick="window.WalletSecurity && window.WalletSecurity.lock()" class="w-full p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-800 flex items-center justify-between text-xs font-bold border border-slate-200/70 transition-all active-press">
-            <div class="flex items-center gap-2.5">
-              <i data-lucide="lock" class="w-4 h-4 text-slate-600"></i>
-              <span>Lock Wallet Session</span>
-            </div>
-            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
-          </button>
-
-          <button onclick="window.exportTransactionsCSV()" class="w-full p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-800 flex items-center justify-between text-xs font-bold border border-slate-200/70 transition-all active-press">
-            <div class="flex items-center gap-2.5">
-              <i data-lucide="download" class="w-4 h-4 text-emerald-600"></i>
-              <span>Export Transactions (CSV)</span>
-            </div>
-            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
-          </button>
-
-          <!-- Vault Backup & Restore Migration -->
-          <div class="pt-2 border-t border-slate-100 space-y-2">
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vault Backup & Migration (Browser &harr; Android)</p>
-            
-            <button onclick="window.exportEncryptedVaultBackup()" class="w-full p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-800 flex items-center justify-between text-xs font-bold border border-slate-200/70 transition-all active-press">
-              <div class="flex items-center gap-2.5">
-                <i data-lucide="hard-drive-download" class="w-4 h-4 text-indigo-600"></i>
-                <span>Export Encrypted Vault Backup (JSON)</span>
-              </div>
-              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
-            </button>
-
-            <label class="w-full p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-800 flex items-center justify-between text-xs font-bold border border-slate-200/70 transition-all active-press cursor-pointer">
-              <div class="flex items-center gap-2.5">
-                <i data-lucide="hard-drive-upload" class="w-4 h-4 text-emerald-600"></i>
-                <span>Import Vault Backup (Restore)</span>
-              </div>
-              <input type="file" accept=".json" onchange="window.importEncryptedVaultBackup(event)" class="hidden">
-              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
-            </label>
-          </div>
-
-          <button onclick="window.clearAllData()" class="w-full p-3 rounded-2xl bg-rose-50 hover:bg-rose-100/80 text-rose-700 border border-rose-100 flex items-center justify-between text-xs font-bold transition-all active-press">
-            <div class="flex items-center gap-2.5">
-              <i data-lucide="trash-2" class="w-4 h-4 text-rose-600"></i>
-              <span>Clear All Wallet Data</span>
-            </div>
-            <i data-lucide="chevron-right" class="w-4 h-4 text-rose-400"></i>
-          </button>
-        </div>
-
-        <div class="text-center pt-2 text-[10px] text-slate-400 space-y-0.5">
-          <p class="font-bold text-slate-500">ApexWallet — Visual Card-First Tracker</p>
-          <p>Version 1.4.8 • Keystore Protected</p>
-        </div>
-
       </div>
     `;
 
-    // Hook up Biometric toggle
+    // Biometric Toggle Handler
     const bioToggle = document.getElementById('settings-biometric-toggle');
-    if (bioToggle) {
+    if (bioToggle && isBioSupported) {
       bioToggle.addEventListener('change', async (e) => {
-        if (bioToggle.checked) {
-          const pin = prompt('Enter your 4-digit PIN to enable Biometrics (Face ID / Fingerprint):');
-          if (!pin || pin.length !== 4) {
-            bioToggle.checked = false;
-            showToast('Biometric setup cancelled', 'info');
-            return;
-          }
-          showToast('Scan your fingerprint or Face ID...', 'info');
-          const res = await window.WalletSecurity.enableBiometrics(pin);
-          if (res && res.success) {
-            showToast('Biometric unlock enabled successfully!', 'success');
-            renderSettingsView();
+        if (!window.WalletSecurity) return;
+        const enabled = e.target.checked;
+        if (enabled) {
+          const ok = await window.WalletSecurity.enableBiometrics();
+          if (!ok) {
+            e.target.checked = false;
+            showToast('Failed to activate biometrics', 'error');
           } else {
-            bioToggle.checked = false;
-            showToast((res && res.error) || 'Failed to enable Biometrics', 'error');
+            showToast('Biometric unlock activated', 'success');
           }
         } else {
           window.WalletSecurity.disableBiometrics();
           showToast('Biometrics disabled', 'info');
-          renderSettingsView();
         }
       });
     }
 
     if (window.lucide) {
-      try { lucide.createIcons(); } catch (e) {}
+      try { lucide.createIcons({ root: container }); } catch (e) {}
     }
   }
 
@@ -2365,73 +2368,80 @@ function initApp() {
   // BANK SMS IMPORT & REVIEW INBOX CONTROLLER
   // ==========================================
   function renderSmsCandidatesList() {
-    const listEl = document.getElementById('sms-candidates-container');
+    const listEls = [
+      document.getElementById('sms-candidates-container'),
+      document.getElementById('view-review-candidates-container')
+    ].filter(Boolean);
     const counterEl = document.getElementById('sms-inbox-counter');
-    if (!listEl) return;
 
     const candidates = (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates) ? window.BankSmsEngine.pendingCandidates : [];
     if (counterEl) {
-      counterEl.textContent = `${candidates.length} New`;
+      counterEl.textContent = `${candidates.length} ${t('review_btn')}`;
     }
 
+    if (listEls.length === 0) return;
+
     if (candidates.length === 0) {
-      listEl.innerHTML = `
-        <div class="py-10 text-center space-y-2">
-          <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+      const emptyHtml = `
+        <div class="py-12 text-center space-y-3 bg-[#1F2024] border border-[#2F3136] rounded-3xl p-6">
+          <div class="w-12 h-12 mx-auto rounded-full bg-[#26272B] text-[#9A9CA3] flex items-center justify-center border border-[#3A3C42]">
             <i data-lucide="inbox" class="w-6 h-6"></i>
           </div>
-          <p class="text-xs font-bold text-slate-700">Inbox is empty</p>
-          <p class="text-[10px] text-slate-400 max-w-[220px] mx-auto">New incoming bank transactions will automatically appear here when received via SMS.</p>
+          <p class="text-xs font-bold text-[#F3F1EC]">${t('inbox_empty')}</p>
+          <p class="text-[10px] text-[#9A9CA3] max-w-[240px] mx-auto">${t('inbox_empty_desc')}</p>
         </div>
       `;
-      if (window.lucide) {
-        try { lucide.createIcons({ root: listEl }); } catch (e) {}
-      }
+      listEls.forEach(el => {
+        el.innerHTML = emptyHtml;
+        if (window.lucide) {
+          try { lucide.createIcons({ root: el }); } catch (e) {}
+        }
+      });
       return;
     }
 
     const cards = store.cards || [];
 
-    listEl.innerHTML = candidates.map(c => {
+    const candidatesHtml = candidates.map(c => {
       const isCredit = c.type === 'income' || c.direction === 'income';
       let opTypeBadge = '';
       if (c.transactionType === 'withdrawal') {
-        opTypeBadge = '<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">🏧 سحب نقدي (ATM)</span>';
+        opTypeBadge = `<span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#26272B] text-[#F5B700] border border-[#F5B700]/30">🏧 ${t('withdrawal')}</span>`;
       } else if (c.transactionType === 'transfer') {
-        opTypeBadge = '<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-300">🔁 تحويل (Transfer)</span>';
+        opTypeBadge = `<span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#26272B] text-[#9A9CA3] border border-[#3A3C42]">🔁 ${t('transfer')}</span>`;
       } else {
         opTypeBadge = isCredit
-          ? '<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">📥 وارد / استرداد</span>'
-          : '<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-300">🛍️ شراء (Purchase)</span>';
+          ? '<span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#26272B] text-[#F5B700] border border-[#F5B700]/40">📥 وارد</span>'
+          : `<span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#26272B] text-[#F3F1EC] border border-[#3A3C42]">🛍️ ${t('purchase')}</span>`;
       }
 
       const needsCardSelection = c.requiresCardSelection || !c.matchedCardId;
 
       return `
-        <div id="candidate-card-${c.id}" class="bg-slate-50 border ${needsCardSelection ? 'border-amber-300 ring-1 ring-amber-300/40' : 'border-slate-200'} rounded-2xl p-3.5 space-y-2.5 transition-all">
+        <div id="candidate-card-${c.id}" class="bg-[#1F2024] border ${needsCardSelection ? 'border-[#F5B700] ring-1 ring-[#F5B700]/30' : 'border-[#2F3136]'} rounded-2xl p-4 space-y-3 transition-all shadow-md">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="text-[11px] font-black tracking-tight text-slate-900 bg-white px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">${c.bank}</span>
+              <span class="text-[11px] font-black tracking-tight text-[#F3F1EC] bg-[#26272B] px-2 py-0.5 rounded-lg border border-[#3A3C42]">${c.bank}</span>
               ${opTypeBadge}
-              ${c.isHistorical ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800">استيراد قديم</span>' : ''}
-              ${c.cardSuffix ? `<span class="text-[10px] font-mono text-slate-500 font-bold">•••• ${c.cardSuffix}</span>` : '<span class="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">اختر الكارت</span>'}
+              ${c.isHistorical ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#26272B] text-[#9A9CA3] border border-[#3A3C42]">استيراد قديم</span>' : ''}
+              ${c.cardSuffix ? `<span class="text-[10px] font-mono text-[#9A9CA3] font-bold">•••• ${c.cardSuffix}</span>` : '<span class="text-[9px] font-bold text-[#F5B700] bg-[#26272B] border border-[#F5B700]/30 px-1.5 py-0.5 rounded">اختر الكارت</span>'}
             </div>
-            <span class="text-xs font-black font-mono ${isCredit ? 'text-emerald-600' : 'text-slate-900'} shrink-0 ml-2">
+            <span class="text-xs font-black font-mono ${isCredit ? 'text-[#F5B700]' : 'text-[#F3F1EC]'} shrink-0 ml-2" dir="ltr">
               ${isCredit ? '+' : '-'}${c.amount.toFixed(2)} ${c.currency}
             </span>
           </div>
 
           ${needsCardSelection ? `
-            <div class="bg-amber-50/90 border border-amber-200 rounded-xl p-2.5 space-y-1.5 text-xs text-amber-900">
-              <div class="flex items-start gap-1.5 font-bold text-[11px] text-amber-900">
-                <i data-lucide="help-circle" class="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5"></i>
+            <div class="bg-[#26272B] border border-[#F5B700]/40 rounded-xl p-2.5 space-y-1.5 text-xs text-[#F5B700]">
+              <div class="flex items-start gap-1.5 font-bold text-[11px] text-[#F5B700]">
+                <i data-lucide="help-circle" class="w-3.5 h-3.5 text-[#F5B700] shrink-0 mt-0.5"></i>
                 <span>سبب عدم المطابقة: ${c.nonMatchReason || 'لا يوجد كارت أو حساب مسجل بهذه الأرقام لدى هذا البنك'}</span>
               </div>
               ${c.matchSuggestion ? `
-                <div class="text-[10px] text-amber-800 flex items-center justify-between gap-2 pt-0.5 border-t border-amber-200/60">
+                <div class="text-[10px] text-[#F3F1EC] flex items-center justify-between gap-2 pt-0.5 border-t border-[#3A3C42]">
                   <span>💡 ${c.matchSuggestion}</span>
                   ${c.suggestAddAccount ? `
-                    <button type="button" onclick="window.openAddAccountPrompt('${c.suggestAddAccount.bankId || ''}', '${c.suggestAddAccount.digits || ''}', '${c.suggestAddAccount.position || 'last'}')" class="shrink-0 px-2.5 py-1 bg-amber-200 hover:bg-amber-300 text-amber-950 rounded-lg text-[10px] font-bold active-press shadow-2xs">
+                    <button type="button" onclick="window.openAddAccountPrompt('${c.suggestAddAccount.bankId || ''}', '${c.suggestAddAccount.digits || ''}', '${c.suggestAddAccount.position || 'last'}')" class="shrink-0 px-2.5 py-1 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] rounded-lg text-[10px] font-bold active-press shadow-2xs">
                       + إضافة الحساب
                     </button>
                   ` : ''}
@@ -2441,28 +2451,28 @@ function initApp() {
           ` : ''}
 
           ${c.isPotentialDuplicate ? `
-            <div class="bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-xs text-amber-900 space-y-1">
-              <div class="flex items-center gap-1.5 font-bold text-amber-900">
-                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600"></i>
+            <div class="bg-[#26272B] border border-[#F5B700]/40 rounded-xl p-2.5 text-xs text-[#F5B700] space-y-1">
+              <div class="flex items-center gap-1.5 font-bold text-[#F5B700]">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-[#F5B700]"></i>
                 <span>⚠️ تكرار محتمل (Possible Duplicate)</span>
               </div>
-              <p class="text-[10px] text-amber-800 leading-tight">${c.potentialDuplicateReason || 'توجد عملية سابقة مسجلة بنفس المبلغ في المحفظة.'}</p>
-              <div class="text-[9px] text-amber-700 bg-amber-100/60 p-1 rounded font-mono">
+              <p class="text-[10px] text-[#F3F1EC] leading-tight">${c.potentialDuplicateReason || 'توجد عملية سابقة مسجلة بنفس المبلغ في المحفظة.'}</p>
+              <div class="text-[9px] text-[#9A9CA3] bg-[#1F2024] p-1 rounded font-mono border border-[#3A3C42]">
                 المسجل سابقاً: ${c.potentialDuplicateMatch ? `${c.potentialDuplicateMatch.amount} EGP بتاريخ ${c.potentialDuplicateMatch.date} (${c.potentialDuplicateMatch.merchant})` : 'عملية بنفس القيمة'}
               </div>
             </div>
           ` : ''}
 
-          <div class="space-y-1.5">
+          <div class="space-y-2">
             <div>
-              <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Merchant / Reference</label>
-              <input type="text" id="candidate-merchant-${c.id}" value="${c.merchant ? c.merchant.replace(/"/g, '&quot;') : (c.bank + ' Transaction')}" class="w-full text-xs font-bold text-slate-900 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 outline-none focus:border-indigo-500">
+              <label class="block text-[9px] font-bold uppercase tracking-wider text-[#9A9CA3] mb-1">Merchant / Reference</label>
+              <input type="text" id="candidate-merchant-${c.id}" value="${c.merchant ? c.merchant.replace(/"/g, '&quot;') : (c.bank + ' Transaction')}" class="w-full text-xs font-bold text-[#F3F1EC] bg-[#26272B] border border-[#3A3C42] rounded-xl px-2.5 py-2 outline-none focus:border-[#F5B700]">
             </div>
 
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Assign Card</label>
-                <select id="candidate-card-select-${c.id}" onchange="window.onCandidateTypeChanged('${c.id}')" class="w-full text-[11px] font-bold text-slate-800 bg-white border ${needsCardSelection ? 'border-amber-400 ring-2 ring-amber-400/20' : 'border-slate-200'} rounded-xl px-2 py-1.5 outline-none cursor-pointer">
+                <label class="block text-[9px] font-bold uppercase tracking-wider text-[#9A9CA3] mb-1">Assign Card</label>
+                <select id="candidate-card-select-${c.id}" onchange="window.onCandidateTypeChanged('${c.id}')" class="w-full text-[11px] font-bold text-[#F3F1EC] bg-[#26272B] border ${needsCardSelection ? 'border-[#F5B700] ring-1 ring-[#F5B700]/20' : 'border-[#3A3C42]'} rounded-xl px-2 py-2 outline-none cursor-pointer">
                   <option value="" ${!c.matchedCardId && !c.matchedAccountId ? 'selected disabled' : ''}>-- اختر الكارت / الحساب --</option>
                   <optgroup label="💳 الكروت (Cards)">
                     ${cards.map(card => {
@@ -2482,8 +2492,8 @@ function initApp() {
               </div>
 
               <div>
-                <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Category</label>
-                <select id="candidate-category-select-${c.id}" class="w-full text-[11px] font-bold text-slate-800 bg-white border border-slate-200 rounded-xl px-2 py-1.5 outline-none cursor-pointer">
+                <label class="block text-[9px] font-bold uppercase tracking-wider text-[#9A9CA3] mb-1">Category</label>
+                <select id="candidate-category-select-${c.id}" class="w-full text-[11px] font-bold text-[#F3F1EC] bg-[#26272B] border border-[#3A3C42] rounded-xl px-2 py-2 outline-none cursor-pointer">
                   <option value="shopping" ${c.suggestedCategory === 'shopping' ? 'selected' : ''}>Shopping</option>
                   <option value="food" ${c.suggestedCategory === 'food' ? 'selected' : ''}>Food & Dining</option>
                   <option value="groceries" ${c.suggestedCategory === 'groceries' ? 'selected' : ''}>Groceries</option>
@@ -2497,34 +2507,34 @@ function initApp() {
               </div>
             </div>
 
-            <!-- Transaction Type Selector (Item 6) -->
+            <!-- Transaction Type Selector -->
             <div class="space-y-1">
-              <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-500">نوع العملية (Transaction Type)</label>
-              <div class="grid grid-cols-3 gap-1.5 p-1 bg-white rounded-xl border border-slate-200 text-center">
-                <label class="flex items-center justify-center gap-1 cursor-pointer py-1 px-1.5 rounded-lg hover:bg-slate-50 text-[10px] font-bold text-slate-700">
-                  <input type="radio" name="candidate-type-${c.id}" value="purchase" class="hidden peer" ${(!c.transactionType || c.transactionType === 'purchase') ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
-                  <span class="w-full py-0.5 rounded-md peer-checked:bg-indigo-600 peer-checked:text-white transition-all">🛍️ شراء</span>
+              <label class="block text-[9px] font-bold uppercase tracking-wider text-[#9A9CA3]">نوع العملية (Transaction Type)</label>
+              <div class="grid grid-cols-3 gap-1.5 p-1 bg-[#16171A] rounded-xl border border-[#3A3C42] text-center">
+                <label class="flex items-center justify-center gap-1 cursor-pointer py-1 px-1.5 rounded-lg text-[10px] font-bold text-[#9A9CA3] hover:text-[#F3F1EC]">
+                  <input type="radio" name="candidate-type-${c.id}" value="purchase" class="hidden peer" ${c.transactionType === 'purchase' || !c.transactionType ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
+                  <span class="w-full py-1 rounded-md peer-checked:bg-[#F5B700] peer-checked:text-[#111111] transition-all">🛍️ شراء</span>
                 </label>
-                <label class="flex items-center justify-center gap-1 cursor-pointer py-1 px-1.5 rounded-lg hover:bg-slate-50 text-[10px] font-bold text-slate-700">
+                <label class="flex items-center justify-center gap-1 cursor-pointer py-1 px-1.5 rounded-lg text-[10px] font-bold text-[#9A9CA3] hover:text-[#F3F1EC]">
                   <input type="radio" name="candidate-type-${c.id}" value="transfer" class="hidden peer" ${c.transactionType === 'transfer' ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
-                  <span class="w-full py-0.5 rounded-md peer-checked:bg-sky-600 peer-checked:text-white transition-all">🔁 تحويل</span>
+                  <span class="w-full py-1 rounded-md peer-checked:bg-[#F5B700] peer-checked:text-[#111111] transition-all">🔁 تحويل</span>
                 </label>
-                <label class="flex items-center justify-center gap-1 cursor-pointer py-1 px-1.5 rounded-lg hover:bg-slate-50 text-[10px] font-bold text-slate-700">
+                <label class="flex items-center justify-center gap-1 cursor-pointer py-1 px-1.5 rounded-lg text-[10px] font-bold text-[#9A9CA3] hover:text-[#F3F1EC]">
                   <input type="radio" name="candidate-type-${c.id}" value="withdrawal" class="hidden peer" ${c.transactionType === 'withdrawal' ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
-                  <span class="w-full py-0.5 rounded-md peer-checked:bg-amber-600 peer-checked:text-white transition-all">🏧 سحب نقدي</span>
+                  <span class="w-full py-1 rounded-md peer-checked:bg-[#F5B700] peer-checked:text-[#111111] transition-all">🏧 سحب نقدي</span>
                 </label>
               </div>
             </div>
 
-            <!-- Warning for unlinked debit withdrawal (Item 4) -->
-            <div id="candidate-debit-warn-${c.id}" class="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2 ${(() => {
+            <!-- Warning for unlinked debit withdrawal -->
+            <div id="candidate-debit-warn-${c.id}" class="text-[10px] font-bold text-[#E6A8A8] bg-[#3A2020] border border-[#E6A8A8]/30 rounded-lg p-2 ${(() => {
               const matchedCard = c.matchedCardId ? store.getCard(c.matchedCardId) : null;
               return (c.transactionType === 'withdrawal' && matchedCard && matchedCard.cardType === 'debit' && !matchedCard.linkedAccountId && !c.matchedAccountId) ? '' : 'hidden';
             })()}">
               ⚠️ تنبيه: كارت الديبت المختار غير مرتبط بحساب بنكي. سحب الكاش يتطلب اختيار حساب بنكي أو ربط الكارت بحساب أولاً لمنع ضياع الأثر المالي.
             </div>
 
-            <!-- Dynamic Balance Preview & Negative Warning (Item 3) -->
+            <!-- Dynamic Balance Preview -->
             ${(() => {
               let candAcc = null;
               if (c.matchedAccountId) {
@@ -2541,13 +2551,13 @@ function initApp() {
               const expAfter = isInc ? curBal + c.amount : curBal - c.amount;
               const isNeg = expAfter < 0;
               return `
-                <div id="candidate-balance-box-${c.id}" class="p-2 rounded-xl ${isNeg ? 'bg-rose-50 border border-rose-200 text-rose-900' : 'bg-slate-100/70 text-slate-700'} space-y-0.5">
+                <div id="candidate-balance-box-${c.id}" class="p-2 rounded-xl bg-[#26272B] border ${isNeg ? 'border-[#E6A8A8]/40 text-[#E6A8A8]' : 'border-[#3A3C42] text-[#F3F1EC]'} space-y-0.5">
                   <div class="flex items-center justify-between text-[10px] font-bold">
                     <span>الرصيد قبل (${candAcc.name}): ${formatCurrency(curBal)}</span>
-                    <span class="font-mono ${isNeg ? 'text-rose-700 font-black' : ''}">بعد العملية: ${formatCurrency(expAfter)}</span>
+                    <span class="font-mono ${isNeg ? 'text-[#E6A8A8] font-black' : ''}">بعد العملية: ${formatCurrency(expAfter)}</span>
                   </div>
                   ${isNeg ? `
-                    <div class="text-[10px] font-bold text-rose-700 flex items-center gap-1">
+                    <div class="text-[10px] font-bold text-[#E6A8A8] flex items-center gap-1">
                       <span>⚠️ تحذير: اعتماد هذه العملية سيجعل رصيد الحساب بالسالب!</span>
                     </div>
                   ` : ''}
@@ -2555,29 +2565,32 @@ function initApp() {
               `;
             })()}
 
-            <div class="text-[9px] text-slate-400 flex items-center justify-between px-0.5 pt-0.5">
+            <div class="text-[9px] text-[#9A9CA3] flex items-center justify-between px-0.5 pt-0.5">
               <span>Date: ${c.transactionTime || new Date(c.receiptTime).toLocaleString()}</span>
               <span>Ref: ${(c.fingerprint || '').slice(0, 10)}</span>
             </div>
           </div>
 
-          <div class="flex items-center gap-2 pt-1 border-t border-slate-200/60">
-            <button type="button" onclick="window.approveSmsCandidate('${c.id}')" class="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl active-press transition-all flex items-center justify-center gap-1 shadow-xs">
+          <div class="flex items-center gap-2 pt-2 border-t border-[#2F3136]">
+            <button type="button" onclick="window.approveSmsCandidate('${c.id}')" class="flex-1 py-2 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-xs font-bold rounded-xl active-press transition-all flex items-center justify-center gap-1 shadow-md">
               <i data-lucide="check" class="w-3.5 h-3.5"></i>
-              <span>Approve (Import)</span>
+              <span>${t('approve')}</span>
             </button>
-            <button type="button" onclick="window.rejectSmsCandidate('${c.id}')" class="py-1.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold rounded-xl active-press transition-all flex items-center justify-center gap-1">
+            <button type="button" onclick="window.rejectSmsCandidate('${c.id}')" class="py-2 px-3 bg-[#26272B] hover:bg-[#3A3C42] text-[#9A9CA3] hover:text-[#E6A8A8] text-xs font-bold rounded-xl active-press transition-all flex items-center justify-center gap-1">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-              <span>Reject</span>
+              <span>${t('reject')}</span>
             </button>
           </div>
         </div>
       `;
     }).join('');
 
-    if (window.lucide) {
-      try { lucide.createIcons({ root: listEl }); } catch (e) {}
-    }
+    listEls.forEach(el => {
+      el.innerHTML = candidatesHtml;
+      if (window.lucide) {
+        try { lucide.createIcons({ root: el }); } catch (e) {}
+      }
+    });
   }
 
   window.openSmsReviewInbox = () => {
