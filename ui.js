@@ -2244,7 +2244,6 @@ function initApp() {
   // ==========================================
   let historicalState = {
     days: 30,
-    offset: 0,
     isScanning: false,
     scanResult: null
   };
@@ -2259,7 +2258,6 @@ function initApp() {
 
   window.selectHistoricalDays = (days) => {
     historicalState.days = days;
-    historicalState.offset = 0;
     historicalState.scanResult = null;
     renderSmsHistoricalContent(historicalState);
   };
@@ -2269,7 +2267,6 @@ function initApp() {
     const res = await window.BankSmsEngine.requestReadSmsPermission();
     if (res.granted) {
       showToast('تم منح صلاحية قراءة الرسائل بنجاح!', 'success');
-      historicalState.offset = 0;
       historicalState.scanResult = null;
       renderSmsHistoricalContent(historicalState);
     } else {
@@ -2280,19 +2277,17 @@ function initApp() {
   window.startHistoricalScan = async () => {
     if (!window.BankSmsEngine || historicalState.isScanning) return;
     historicalState.isScanning = true;
-    historicalState.offset = 0;
+    historicalState.scanResult = null;
     renderSmsHistoricalContent(historicalState);
 
     const res = await window.BankSmsEngine.queryHistoricalSmsBatch({
       days: historicalState.days,
-      offset: 0,
       limit: 20
     });
 
     historicalState.isScanning = false;
     if (res.success) {
       historicalState.scanResult = res;
-      historicalState.offset = res.nextOffset;
       showToast(`تم فحص الدفعة: عُثر على ${res.addedCount} عملية جديدة!`, 'success');
     } else {
       showToast(res.error || 'فشل فحص الرسائل القديمة', 'error');
@@ -2307,20 +2302,121 @@ function initApp() {
 
     const res = await window.BankSmsEngine.queryHistoricalSmsBatch({
       days: historicalState.days,
-      offset: historicalState.offset,
       limit: 20
     });
 
     historicalState.isScanning = false;
     if (res.success) {
       historicalState.scanResult = res;
-      historicalState.offset = res.nextOffset;
-      showToast(`تم جلب دفعة جديدة: ${res.addedCount} عملية!`, 'success');
+      showToast(res.addedCount > 0 ? `تم جلب دفعة جديدة: ${res.addedCount} عملية!` : 'لا توجد رسائل إضافية غير مراجعة.', 'info');
     } else {
       showToast(res.error || 'فشل فحص الدفعة التالية', 'error');
     }
     renderSmsHistoricalContent(historicalState);
   };
+
+  async function renderSmsHistoricalContent(state = {}) {
+    const container = document.getElementById('sms-historical-content');
+    if (!container) return;
+
+    const readGranted = window.BankSmsEngine && window.BankSmsEngine.stats.readSmsGranted;
+
+    if (!readGranted) {
+      container.innerHTML = `
+        <div class="py-4 space-y-3 text-center">
+          <div class="w-12 h-12 mx-auto rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <i data-lucide="lock" class="w-6 h-6"></i>
+          </div>
+          <div class="space-y-1">
+            <h4 class="font-extrabold text-sm text-slate-900">مطلوب صلاحية قراءة الرسائل (READ_SMS)</h4>
+            <p class="text-[11px] text-slate-500 max-w-[260px] mx-auto leading-relaxed">
+              لاستيراد العمليات البنكية السابقة من صندوق الرسائل، يحتاج التطبيق لموافقتك الصريحة لقراءة الرسائل البنكية فقط محلياً على جهازك.
+            </p>
+          </div>
+
+          <div class="pt-2 space-y-2">
+            <button type="button" onclick="window.requestReadSmsAndStart()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs active-press shadow-xs">
+              الموافقة ومنح الصلاحية
+            </button>
+            <p class="text-[9px] text-slate-400">يمكنك إلغاء الصلاحية في أي وقت من إعدادات الهاتف.</p>
+          </div>
+        </div>
+      `;
+      if (window.lucide) try { lucide.createIcons({ root: container }); } catch (e) {}
+      return;
+    }
+
+    const days = state.days || 30;
+    const isScanning = state.isScanning || false;
+    const scanResult = state.scanResult || null;
+
+    container.innerHTML = `
+      <div class="space-y-3.5">
+        <!-- Date Range Selection -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-bold text-slate-800">اختر الفترة الزمنية للاستيراد:</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" onclick="window.selectHistoricalDays(30)" class="py-2 rounded-xl text-xs font-bold border transition-all ${days === 30 ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs' : 'bg-slate-50 text-slate-700 border-slate-200'}">آخر شهر</button>
+            <button type="button" onclick="window.selectHistoricalDays(90)" class="py-2 rounded-xl text-xs font-bold border transition-all ${days === 90 ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs' : 'bg-slate-50 text-slate-700 border-slate-200'}">آخر ٣ شهور</button>
+            <button type="button" onclick="window.selectHistoricalDays(365)" class="py-2 rounded-xl text-xs font-bold border transition-all ${days === 365 ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs' : 'bg-slate-50 text-slate-700 border-slate-200'}">آخر سنة</button>
+          </div>
+        </div>
+
+        <!-- Safety Notice -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[10px] text-slate-600 space-y-1">
+          <div class="font-bold text-slate-900 flex items-center gap-1">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>حماية الخصوصية ومنع فقد البيانات:</span>
+          </div>
+          <ul class="list-disc list-inside space-y-0.5 text-slate-500">
+            <li>يتم فحص المرسلين الموجودين في قائمة البنوك المعتمدة فقط.</li>
+            <li>استبعاد أي رسائل OTP أو أكواد تفعيل أو إعلانات فوراً.</li>
+            <li>جلب دفعات آمنة (٢٠ عملية لكل دفعة) مع حفظها ضد قفل التطبيق.</li>
+            <li>المراجعة اليدوية إلزامية قبل احتساب أي عملية في الأرصدة.</li>
+          </ul>
+        </div>
+
+        ${scanResult ? `
+          <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-extrabold text-emerald-900 text-xs">نتائج فحص الدفعة:</span>
+              <span class="px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded-full font-bold text-[10px]">
+                عُثر على ${scanResult.addedCount} عملية جديدة
+              </span>
+            </div>
+            <div class="text-[10px] text-emerald-800 space-y-0.5 font-mono">
+              <div>المستبعد (OTP / إعلانات): ${scanResult.rejectedCount}</div>
+              <div>المكرر المرفوض تلقائياً: ${scanResult.duplicateCount}</div>
+              <div>حالة الفحص: ${scanResult.hasMore ? 'توجد رسائل إضافية في هذه الفترة' : 'اكتمل فحص كافة الرسائل'}</div>
+            </div>
+            <div class="pt-1 flex gap-2">
+              <button type="button" onclick="window.openSmsReviewInbox()" class="flex-1 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-xs active-press">
+                فتح صندوق المراجعة (${(window.BankSmsEngine && window.BankSmsEngine.pendingCandidates.length) || 0})
+              </button>
+              ${scanResult.hasMore ? `
+                <button type="button" onclick="window.fetchNextHistoricalBatch()" class="py-1.5 px-3 bg-white border border-emerald-300 text-emerald-900 rounded-lg font-bold text-xs active-press">
+                  فحص الدفعة التالية (الـ 20 التالية)
+                </button>
+              ` : `
+                <span class="px-2.5 py-1.5 bg-emerald-100 text-emerald-800 rounded-lg font-bold text-[10px] flex items-center">
+                  اكتمل الاستيراد ✅
+                </span>
+              `}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Start Import Action Button -->
+        <button type="button" id="btn-start-historical-scan" onclick="window.startHistoricalScan()" ${isScanning ? 'disabled' : ''} class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 active-press transition-all shadow-xs">
+          ${isScanning ? '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>جاري الفحص الدقيق...</span>' : '<i data-lucide="scan" class="w-4 h-4"></i><span>بدء فحص واستيراد الدفعة الأولى</span>'}
+        </button>
+      </div>
+    `;
+
+    if (window.lucide) {
+      try { lucide.createIcons({ root: container }); } catch (e) {}
+    }
+  }
 
   // --- Vault Backup & Restore Migration ---
   window.exportEncryptedVaultBackup = () => {

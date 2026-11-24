@@ -240,19 +240,67 @@
       this.notifyChange();
     }
 
+    savePendingStagedCandidates() {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('apexwallet_sms_pending_staged_v1', JSON.stringify(this.pendingCandidates));
+        }
+      } catch (e) {
+        console.warn('Failed to persist staged SMS candidates to localStorage:', e);
+      }
+    }
+
+    loadPendingStagedCandidates() {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const raw = localStorage.getItem('apexwallet_sms_pending_staged_v1');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              return parsed;
+            }
+          }
+        }
+      } catch (e) {}
+      return [];
+    }
+
     async fetchPendingTransactions() {
       const plugin = getNativePlugin();
+      let nativePending = [];
       if (plugin) {
         try {
           const res = await plugin.getPendingTransactions();
-          this.pendingCandidates = (res && res.pending) ? res.pending : [];
-          this.enrichCandidates();
+          nativePending = (res && res.pending) ? res.pending : [];
         } catch (e) {
-          console.error('Error fetching pending transactions:', e);
+          console.error('Error fetching pending transactions from native plugin:', e);
         }
       } else {
-        this.loadWebQueue();
+        nativePending = this.loadWebQueue();
       }
+
+      // Merge native pending with locally staged candidates so nothing is lost across restarts
+      const staged = this.loadPendingStagedCandidates();
+      const mergedMap = new Map();
+
+      // Native queue candidates
+      for (const item of nativePending) {
+        if (item && (item.fingerprint || item.id)) {
+          mergedMap.set(item.fingerprint || item.id, item);
+        }
+      }
+
+      // Staged candidates from local storage
+      for (const item of staged) {
+        const key = item.fingerprint || item.id;
+        if (key && !mergedMap.has(key)) {
+          mergedMap.set(key, item);
+        }
+      }
+
+      this.pendingCandidates = Array.from(mergedMap.values());
+      this.enrichCandidates();
+      this.savePendingStagedCandidates();
       this.notifyChange();
       return this.pendingCandidates;
     }
@@ -266,6 +314,7 @@
         this.enrichCandidates();
         this.stats.pendingCount = this.pendingCandidates.length;
         this.stats.lastReceivedAt = Date.now();
+        this.savePendingStagedCandidates();
         this.notifyChange();
       }
     }
@@ -365,10 +414,10 @@
     /**
      * Scans past bank SMS in bounded batches (max 20 per batch).
      * Does NOT silently overflow or drop items.
+     * Eliminates numerical offset skipping by passing excludeFingerprints of unreviewed items.
      */
     async queryHistoricalSmsBatch(options = {}) {
       const days = options.days || 30;
-      const offset = options.offset || 0;
       const limit = options.limit || 20;
 
       const plugin = getNativePlugin();
@@ -376,8 +425,13 @@
         return { success: false, error: 'Historical import is only available on native Android.' };
       }
 
+      // Collect fingerprints of all candidates currently waiting in review inbox
+      const excludeFingerprints = this.pendingCandidates
+        .map(c => c.fingerprint)
+        .filter(Boolean);
+
       try {
-        const res = await plugin.queryHistoricalSms({ days, offset, limit });
+        const res = await plugin.queryHistoricalSms({ days, limit, excludeFingerprints });
         if (res && res.success) {
           const batch = res.candidates || [];
           let addedCount = 0;
@@ -391,17 +445,16 @@
           }
           this.enrichCandidates();
           this.stats.pendingCount = this.pendingCandidates.length;
+          this.savePendingStagedCandidates();
           this.notifyChange();
 
           return {
             success: true,
             addedCount,
             batchCount: batch.length,
-            totalMatched: res.totalMatched,
-            hasMore: res.hasMore,
-            nextOffset: res.nextOffset,
-            rejectedCount: res.rejectedCount,
-            duplicateCount: res.duplicateCount
+            hasMore: !!res.hasMore,
+            rejectedCount: res.rejectedCount || 0,
+            duplicateCount: res.duplicateCount || 0
           };
         } else {
           return { success: false, error: (res && res.error) || 'Failed to query historical SMS' };
@@ -455,9 +508,10 @@
         // Acknowledge from native queue
         await this.acknowledgeIds([c.id, c.fingerprint]);
 
-        // Remove from memory
+        // Remove from memory and update persistent stage
         this.pendingCandidates.splice(idx, 1);
         this.stats.pendingCount = this.pendingCandidates.length;
+        this.savePendingStagedCandidates();
         this.notifyChange();
 
         return { success: true, transaction: newTx };
@@ -478,6 +532,7 @@
       await this.acknowledgeIds([c.id, c.fingerprint]);
       this.pendingCandidates.splice(idx, 1);
       this.stats.pendingCount = this.pendingCandidates.length;
+      this.savePendingStagedCandidates();
       this.notifyChange();
       return true;
     }
@@ -510,6 +565,7 @@
       }
       this.pendingCandidates = [];
       this.stats.pendingCount = 0;
+      this.savePendingStagedCandidates();
       this.saveWebQueue();
       this.notifyChange();
     }

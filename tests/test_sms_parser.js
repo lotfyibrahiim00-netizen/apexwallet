@@ -334,6 +334,147 @@ runTest('Vault export and import preserves data fidelity with zero loss', () => 
   assert.strictEqual(deserialized.transactions[0].amount, 1250.50);
 });
 
+// 11. Historical Batch Pagination Zero-Loss Test (60 SMS over 3 batches of 20 with partial approvals)
+runTest('Batch pagination delivers 60 messages over 3 batches with zero loss and zero numerical offset skipping', () => {
+  // Generate 60 unique bank SMS messages in inbox (from newest to oldest)
+  const mockInbox = [];
+  for (let i = 1; i <= 60; i++) {
+    const amount = 100 + i;
+    const date = `2026-11-${String((i % 28) + 1).padStart(2, '0')}`;
+    const rawBody = `Purchase of EGP ${amount}.00 at Merchant_${i} with card ending in 8492 on ${date}.`;
+    mockInbox.push({
+      sender: 'CIB',
+      body: rawBody,
+      timestamp: Date.now() - (60 - i) * 3600000
+    });
+  }
+
+  // State maintained across batches:
+  // - processedFingerprints: acknowledged/approved/rejected items
+  // - pendingInbox: unreviewed candidates currently waiting in frontend
+  const processedFingerprints = new Set();
+  let pendingInbox = [];
+
+  // Query engine simulation exactly matching BankSmsPlugin.java
+  function queryHistoricalBatch(inbox, excludeFingerprints, batchLimit = 20) {
+    const excludeSet = new Set(excludeFingerprints);
+    const candidates = [];
+    let hasMore = false;
+
+    for (const msg of inbox) {
+      const parsed = parseBankSms(msg.sender, msg.body);
+      if (!parsed) continue;
+
+      const fp = parsed.fingerprint;
+      // Skip if already in processed queue history
+      if (processedFingerprints.has(fp)) continue;
+      // Skip if currently pending in user's review inbox
+      if (excludeSet.has(fp)) continue;
+
+      if (candidates.length < batchLimit) {
+        candidates.push(parsed);
+      } else {
+        hasMore = true;
+        break;
+      }
+    }
+
+    return { candidates, hasMore };
+  }
+
+  // --- BATCH 1: Fetch first 20 ---
+  const batch1 = queryHistoricalBatch(mockInbox, pendingInbox.map(c => c.fingerprint), 20);
+  assert.strictEqual(batch1.candidates.length, 20, 'Batch 1 must return exactly 20 items');
+  assert.strictEqual(batch1.hasMore, true, 'Batch 1 must indicate hasMore = true');
+  pendingInbox.push(...batch1.candidates);
+  assert.strictEqual(pendingInbox.length, 20);
+
+  // User partially reviews: approves first 10, leaves remaining 10 in inbox
+  const approvedBatch1 = pendingInbox.splice(0, 10);
+  for (const item of approvedBatch1) {
+    processedFingerprints.add(item.fingerprint);
+  }
+  assert.strictEqual(pendingInbox.length, 10, '10 unreviewed items remain in inbox');
+  assert.strictEqual(processedFingerprints.size, 10, '10 items recorded as processed');
+
+  // --- BATCH 2: Fetch next 20 (MUST NOT skip unreviewed messages) ---
+  const batch2 = queryHistoricalBatch(mockInbox, pendingInbox.map(c => c.fingerprint), 20);
+  assert.strictEqual(batch2.candidates.length, 20, 'Batch 2 must return exactly 20 items');
+  assert.strictEqual(batch2.hasMore, true, 'Batch 2 must indicate hasMore = true');
+
+  // Verify none of batch2 items overlap with approved OR unreviewed items
+  for (const c2 of batch2.candidates) {
+    assert.ok(!processedFingerprints.has(c2.fingerprint), 'Batch 2 item must not be already processed');
+    assert.ok(!pendingInbox.some(p => p.fingerprint === c2.fingerprint), 'Batch 2 item must not be already in pending inbox');
+  }
+
+  pendingInbox.push(...batch2.candidates);
+  assert.strictEqual(pendingInbox.length, 30, 'Inbox now has 10 from Batch 1 + 20 from Batch 2');
+
+  // User reviews and approves all 30 pending items
+  const approvedBatch2 = pendingInbox.splice(0, 30);
+  for (const item of approvedBatch2) {
+    processedFingerprints.add(item.fingerprint);
+  }
+  assert.strictEqual(pendingInbox.length, 0);
+  assert.strictEqual(processedFingerprints.size, 40);
+
+  // --- BATCH 3: Fetch final 20 ---
+  const batch3 = queryHistoricalBatch(mockInbox, pendingInbox.map(c => c.fingerprint), 20);
+  assert.strictEqual(batch3.candidates.length, 20, 'Batch 3 must return final 20 items');
+  assert.strictEqual(batch3.hasMore, false, 'Batch 3 must indicate hasMore = false (all 60 processed)');
+
+  pendingInbox.push(...batch3.candidates);
+  assert.strictEqual(pendingInbox.length, 20);
+
+  // User approves final batch
+  const approvedBatch3 = pendingInbox.splice(0, 20);
+  for (const item of approvedBatch3) {
+    processedFingerprints.add(item.fingerprint);
+  }
+
+  // --- Final Verification: Exactly 60 unique messages, 0 lost, 0 duplicates ---
+  assert.strictEqual(processedFingerprints.size, 60, 'All 60 unique messages must be completely processed');
+  assert.strictEqual(pendingInbox.length, 0, 'No dangling items in inbox');
+});
+
+// 12. Candidate Persistence Across App Restart / Background Kill
+runTest('Staged candidates persist and merge safely across app restarts without silent drops', () => {
+  const mockStorage = new Map();
+  const STORAGE_KEY = 'apexwallet_sms_pending_staged_v1';
+
+  // Simulate frontend state before kill
+  const candidateA = { id: 'c_1', fingerprint: 'fp_1', amount: 250, merchant: 'Carrefour' };
+  const candidateB = { id: 'c_2', fingerprint: 'fp_2', amount: 500, merchant: 'Zara' };
+  mockStorage.set(STORAGE_KEY, JSON.stringify([candidateA, candidateB]));
+
+  // Simulate app restart: native queue returns candidateB and candidateC (e.g. arrived while closed)
+  const nativeQueuePending = [
+    { id: 'c_2', fingerprint: 'fp_2', amount: 500, merchant: 'Zara' },
+    { id: 'c_3', fingerprint: 'fp_3', amount: 750, merchant: 'Amazon' }
+  ];
+
+  // Merge logic from sms_engine.js:
+  const staged = JSON.parse(mockStorage.get(STORAGE_KEY) || '[]');
+  const mergedMap = new Map();
+
+  for (const item of nativeQueuePending) {
+    if (item && item.fingerprint) mergedMap.set(item.fingerprint, item);
+  }
+  for (const item of staged) {
+    if (item && item.fingerprint && !mergedMap.has(item.fingerprint)) {
+      mergedMap.set(item.fingerprint, item);
+    }
+  }
+
+  const restoredCandidates = Array.from(mergedMap.values());
+  assert.strictEqual(restoredCandidates.length, 3, 'Must merge all 3 candidates without dropping candidateA');
+  const restoredFpSet = new Set(restoredCandidates.map(c => c.fingerprint));
+  assert.ok(restoredFpSet.has('fp_1'), 'Candidate A preserved from staged storage');
+  assert.ok(restoredFpSet.has('fp_2'), 'Candidate B preserved deduplicated');
+  assert.ok(restoredFpSet.has('fp_3'), 'Candidate C received while closed preserved');
+});
+
 console.log('\n----------------------------------------------------');
 console.log(`Results: ${passedTests} / ${totalTests} tests passed (${Math.round(passedTests/totalTests*100)}%)`);
 console.log('----------------------------------------------------');

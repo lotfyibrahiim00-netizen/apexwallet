@@ -169,7 +169,7 @@ public class BankSmsPlugin extends Plugin {
 
     /**
      * Queries past SMS from device inbox with strict bank allowlist filtering,
-     * in-memory OTP/promo rejection, SHA-256 deduplication, and safe batching.
+     * in-memory OTP/promo rejection, SHA-256 deduplication, and safe non-skipping batching.
      * Raw message text is NEVER retained or logged.
      */
     @PluginMethod
@@ -189,17 +189,26 @@ public class BankSmsPlugin extends Plugin {
         }
 
         int days = call.getInt("days", 30);
-        int batchOffset = call.getInt("offset", 0);
         int batchLimit = call.getInt("limit", 20);
+
+        JSArray excludeArray = call.getArray("excludeFingerprints");
+        Set<String> excludeSet = new HashSet<>();
+        if (excludeArray != null) {
+            for (int i = 0; i < excludeArray.length(); i++) {
+                try {
+                    excludeSet.add(excludeArray.getString(i));
+                } catch (JSONException ignored) {}
+            }
+        }
 
         long cutoffTimestamp = System.currentTimeMillis() - (days * 24L * 60L * 60L * 1000L);
         Set<String> allowlist = mQueue.getBankAllowlist();
 
         List<JSObject> candidates = new ArrayList<>();
-        int totalMatchedInWindow = 0;
+        List<CandidateTransaction> candidatesToEnqueue = new ArrayList<>();
         int rejectedOtpOrPromo = 0;
         int duplicateCount = 0;
-        int matchIndex = 0;
+        boolean hasMore = false;
 
         android.content.ContentResolver cr = getContext().getContentResolver();
         android.net.Uri inboxUri = android.net.Uri.parse("content://sms/inbox");
@@ -227,30 +236,45 @@ public class BankSmsPlugin extends Plugin {
                     String body = cursor.getString(bodyIdx);
                     if (body == null || body.trim().isEmpty()) continue;
 
-                    // 2. Parse strictly in memory
+                    // 2. Parse strictly in memory (rejects OTP, promo, balance-only)
                     CandidateTransaction candidate = BankSmsParser.parse(sender, body);
                     if (candidate == null) {
                         rejectedOtpOrPromo++;
                         continue;
                     }
 
-                    // 3. Level A Deduplication: check against processed fingerprints
-                    if (mQueue.isDuplicate(candidate.getFingerprint())) {
+                    String fp = candidate.getFingerprint();
+
+                    // 3. Skip if already processed in queue history
+                    if (mQueue.isDuplicate(fp)) {
                         duplicateCount++;
                         continue;
                     }
 
-                    totalMatchedInWindow++;
+                    // 4. Skip if currently pending in user's review inbox
+                    if (excludeSet.contains(fp)) {
+                        continue;
+                    }
 
-                    // 4. Bounded batch window
-                    if (matchIndex >= batchOffset && matchIndex < (batchOffset + batchLimit)) {
+                    // Collect up to batchLimit
+                    if (candidates.size() < batchLimit) {
                         try {
                             candidates.add(JSObject.fromJSONObject(candidate.toJsonObject()));
+                            candidatesToEnqueue.add(candidate);
                         } catch (JSONException ignored) {}
+                    } else {
+                        // Found at least one more un-reviewed transaction in window
+                        hasMore = true;
+                        break;
                     }
-                    matchIndex++;
 
                 } while (cursor.moveToNext());
+            }
+
+            // Persist the newly imported batch into the native Keystore-backed queue
+            // so they survive app restarts without silent drops
+            if (!candidatesToEnqueue.isEmpty()) {
+                mQueue.enqueueBatch(candidatesToEnqueue);
             }
 
             JSObject ret = new JSObject();
@@ -261,10 +285,7 @@ public class BankSmsPlugin extends Plugin {
             }
             ret.put("candidates", arr);
             ret.put("batchCount", arr.length());
-            ret.put("totalMatched", totalMatchedInWindow);
-            ret.put("offset", batchOffset);
-            ret.put("hasMore", (batchOffset + batchLimit) < matchIndex);
-            ret.put("nextOffset", batchOffset + batchLimit);
+            ret.put("hasMore", hasMore);
             ret.put("rejectedCount", rejectedOtpOrPromo);
             ret.put("duplicateCount", duplicateCount);
             call.resolve(ret);

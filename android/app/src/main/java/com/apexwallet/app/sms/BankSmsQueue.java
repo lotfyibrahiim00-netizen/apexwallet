@@ -36,9 +36,9 @@ public class BankSmsQueue {
     private static final String KEY_STATS_LAST_BROADCAST = "stats_last_broadcast";
     private static final String KEY_STATS_LAST_BROADCAST_SENDER = "stats_last_broadcast_sender";
 
-    private static final int MAX_QUEUE_SIZE = 50;
-    private static final int MAX_PROCESSED_HISTORY = 100;
-    private static final long DEDUPLICATION_WINDOW_MS = 48 * 60 * 60 * 1000L; // 48 hours
+    private static final int MAX_QUEUE_SIZE = 100;
+    private static final int MAX_PROCESSED_HISTORY = 300;
+    private static final long DEDUPLICATION_WINDOW_MS = 90 * 24 * 60 * 60 * 1000L; // 90 days
 
     private static BankSmsQueue sInstance;
 
@@ -161,9 +161,10 @@ public class BankSmsQueue {
             }
         }
 
-        // Enforce maximum queue bounds (FIFO drop of oldest if over capacity)
-        while (pending.size() >= MAX_QUEUE_SIZE) {
-            pending.remove(0);
+        // Enforce maximum queue bounds without silent FIFO drop
+        if (pending.size() >= MAX_QUEUE_SIZE) {
+            Log.w(TAG, "Queue reached capacity (" + MAX_QUEUE_SIZE + "). Rejecting new enqueue without silent drop.");
+            return false;
         }
 
         pending.add(candidate);
@@ -184,6 +185,37 @@ public class BankSmsQueue {
         }
 
         return true;
+    }
+
+    /**
+     * Enqueues a batch of candidates into the encrypted queue up to MAX_QUEUE_SIZE.
+     * Rejects duplicates based on fingerprint. Never silently drops existing items.
+     */
+    public synchronized int enqueueBatch(List<CandidateTransaction> candidates) {
+        if (candidates == null || candidates.isEmpty()) return 0;
+        List<CandidateTransaction> pending = getPendingList();
+        int added = 0;
+        for (CandidateTransaction c : candidates) {
+            if (c == null || c.getFingerprint() == null || isDuplicate(c.getFingerprint())) {
+                continue;
+            }
+            boolean exists = false;
+            for (CandidateTransaction existing : pending) {
+                if (c.getFingerprint().equals(existing.getFingerprint())) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists && pending.size() < MAX_QUEUE_SIZE) {
+                pending.add(c);
+                recordFingerprint(c.getFingerprint());
+                added++;
+            }
+        }
+        if (added > 0) {
+            savePendingList(pending);
+        }
+        return added;
     }
 
     /**
