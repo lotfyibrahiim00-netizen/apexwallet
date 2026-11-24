@@ -93,6 +93,7 @@
           // If record has stored bioKey or is not backed by Keystore or WebAuthn PRF:
           if (bioData && (bioData.bioKey || (!bioData.isKeystoreBound && !bioData.isWebAuthnPrf))) {
             localStorage.removeItem(BIOMETRIC_KEY);
+            localStorage.setItem('apexwallet_bio_migrated_notice', 'true');
             console.warn('Security migration: Purged legacy insecure biometric record from localStorage.');
           }
         }
@@ -416,10 +417,16 @@
       if (!raw) return false;
       try {
         const parsed = JSON.parse(raw);
-        if (parsed && (parsed.credId === 'native_android_keystore' || parsed.isKeystoreBound)) {
+        if (!parsed) return false;
+        // Native Android Keystore bound
+        if (parsed.credId === 'native_android_keystore' || parsed.isKeystoreBound) {
           return true;
         }
-        return !!(parsed && parsed.credId && parsed.encryptedPin && parsed.bioKey);
+        // WebAuthn PRF hardware-derived key bound
+        if (parsed.isWebAuthnPrf && parsed.credId && parsed.prfSalt && parsed.encryptedPin) {
+          return true;
+        }
+        return false;
       } catch (e) {
         return false;
       }
@@ -753,7 +760,7 @@
       if (!passphrase || !passphrase.trim()) {
         return {
           app: 'ApexWallet',
-          version: '1.4.7',
+          version: '1.4.8',
           encrypted: false,
           format: 'apexwallet_plaintext_backup_v2',
           exportedAt: new Date().toISOString(),
@@ -795,7 +802,7 @@
 
       return {
         app: 'ApexWallet',
-        version: '1.4.7',
+        version: '1.4.8',
         encrypted: true,
         format: 'apexwallet_encrypted_backup_v2',
         exportedAt: new Date().toISOString(),
@@ -914,4 +921,9 @@
   }
 
   window.WalletSecurity = new WalletSecurityEngine();
-})(window);
+  window.walletSecurity = window.WalletSecurity; // Parity alias for lowercase references
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { WalletSecurity: window.WalletSecurity, WalletSecurityEngine };
+  }
+})(typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : this));

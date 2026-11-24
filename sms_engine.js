@@ -237,6 +237,10 @@
       this.notifyChange();
     }
 
+    isSenderAllowed(sender) {
+      return WebFallbackParser.isSenderAllowed(sender, this.allowlist);
+    }
+
     async updateAllowlist(newAllowlist) {
       this.allowlist = [...newAllowlist];
       const plugin = getNativePlugin();
@@ -869,6 +873,18 @@
 
   // --- Web Fallback Parser (Identical Logic to BankSmsParser.java for browser parity) ---
   const WebFallbackParser = {
+    DEFAULT_ALLOWLIST: [...DEFAULT_ALLOWLIST],
+
+    isSenderAllowed: function (sender, customAllowlist = null) {
+      if (!sender) return false;
+      const list = customAllowlist || this.DEFAULT_ALLOWLIST || DEFAULT_ALLOWLIST;
+      const clean = sender.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      return list.some(allowed => {
+        const cleanAllowed = allowed.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        return clean.includes(cleanAllowed) || cleanAllowed.includes(clean);
+      });
+    },
+
     normalizeNumerals: function (str) {
       if (!str) return '';
       return str.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))

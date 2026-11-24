@@ -17,162 +17,36 @@
 const crypto = require('crypto');
 const assert = require('assert');
 
-// --- In-line Parser Implementation under test (matching Java & JS engines) ---
-const ALLOWLIST = [
-  'CIB', 'HSBC', 'QNB', 'NBE', 'BM', 'BANQUEMISR', 'EMIRATESNBD',
-  'ENBD', 'FABMISR', 'FAB', 'ALEXBANK', 'ADIB', 'AAIB', 'FAISAL'
-];
+// DIRECT TESTING OF THE ACTUAL SHIPPED PRODUCTION FILE (sms_engine.js)
+const { WebFallbackParser, BankSmsEngine } = require('../sms_engine.js');
 
-function isSenderAllowed(sender, allowlist = ALLOWLIST) {
-  if (!sender) return false;
-  const clean = sender.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-  return allowlist.some(allowed => {
-    const cleanAllowed = allowed.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    return clean.includes(cleanAllowed) || cleanAllowed.includes(clean);
-  });
+function isSenderAllowed(sender, customAllowlist = null) {
+  return WebFallbackParser.isSenderAllowed(sender, customAllowlist);
 }
 
 function normalizeNumerals(input) {
-  if (!input) return '';
-  return input
-    .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
-    .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
-    .replace(/[\u066b]/g, '.')
-    .replace(/[\u066c]/g, ',');
+  return WebFallbackParser.normalizeNumerals(input);
 }
 
 function normalizeCurrency(curr) {
-  if (!curr) return 'EGP';
-  const c = curr.trim().toUpperCase();
-  if (['LE', 'L.E', 'ج.م', 'جم', 'جنيه', 'EGP'].includes(c)) return 'EGP';
-  if (['USD', '$'].includes(c)) return 'USD';
-  if (['EUR', '€'].includes(c)) return 'EUR';
-  if (['GBP', '£'].includes(c)) return 'GBP';
-  if (['AED', 'د.إ'].includes(c)) return 'AED';
-  if (['SAR', 'ر.س'].includes(c)) return 'SAR';
-  return c;
-}
-
-function resolveBankName(sender) {
-  if (!sender) return 'Bank';
-  const s = sender.toUpperCase();
-  if (s.includes('CIB')) return 'CIB';
-  if (s.includes('HSBC')) return 'HSBC';
-  if (s.includes('QNB')) return 'QNB';
-  if (s.includes('NBE') || s.includes('AHLI')) return 'NBE';
-  if (s.includes('MISR') || s.includes('BM')) return 'Banque Misr';
-  if (s.includes('ENBD') || s.includes('EMIRATES')) return 'Emirates NBD';
-  if (s.includes('FAB')) return 'FABMISR';
-  if (s.includes('ALEX')) return 'AlexBank';
-  return sender.trim();
+  return WebFallbackParser.normalizeCurrency(curr);
 }
 
 function normalizeDate(d) {
-  if (!d) return null;
-  const clean = d.replace(/\//g, '-');
-  const parts = clean.split('-');
-  if (parts.length !== 3) return null;
-  let year, month, day;
-  if (parts[0].length === 4) {
-    year = parts[0];
-    month = parts[1].padStart(2, '0');
-    day = parts[2].padStart(2, '0');
-  } else {
-    day = parts[0].padStart(2, '0');
-    month = parts[1].padStart(2, '0');
-    year = parts[2];
-    if (year.length === 2) {
-      year = '20' + year;
-    }
-  }
-  return `${year}-${month}-${day}`;
+  return WebFallbackParser.normalizeDate(d);
 }
 
 function extractDateTime(text) {
-  const pDateTime = /(?:on|بتاريخ|في)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})(?:\s+(?:at|الساعة|في)?\s*(\d{1,2}:\d{2}(?::\d{2})?))?/i;
-  const m = text.match(pDateTime);
-  if (m && m[1] && m[1].length >= 6) {
-    const normDate = normalizeDate(m[1]);
-    if (normDate) {
-      if (m[2]) {
-        return normDate + ' ' + m[2].substring(0, 5);
-      }
-      return normDate;
-    }
-  }
-  return null;
+  return WebFallbackParser.extractDateTime(text);
 }
 
 function extractTypedIdentifier(text) {
-  const lower = text.toLowerCase();
-  let entityType = 'card';
-  if (text.includes('حساب') || lower.includes('account')) {
-    entityType = 'account';
-  } else if (text.includes('بطاق') || text.includes('كارت') || lower.includes('card')) {
-    entityType = 'card';
-  } else {
-    entityType = 'unknown';
-  }
-
-  // First digits
-  const pFirst = /(?:starting\s+with|تبدأ\s+بـ?)\s*(\d{4})|(\d{4})(?:\*+|x{2,}|\.{2,})/i;
-  const mFirst = text.match(pFirst);
-  if (mFirst) {
-    const d = mFirst[1] || mFirst[2];
-    if (d && d.length === 4) {
-      return { entityType, digits: d, position: 'first' };
-    }
-  }
-
-  // Last digits
-  const pLast = /(?:ending\s+with(?:\s*#)?|ending\s+in|تنتهي\s+بـ?|المنتهي(?:ة)?\s+بـ?(?:رقم)?)\s*[:#*.]*\s*(\d{4})|(?:\*+|x{2,}|\.{2,})\s*(\d{4})\b|(?:card|account|بطاقة|حساب)[^\d]{0,25}?(\d{4})\b/i;
-  const mLast = text.match(pLast);
-  if (mLast) {
-    const d = mLast[1] || mLast[2] || mLast[3];
-    if (d && d.length === 4) {
-      return { entityType, digits: d, position: 'last' };
-    }
-  }
-
-  return { entityType, digits: '', position: 'last' };
+  return WebFallbackParser.extractTypedIdentifier(text);
 }
 
 function extractTransactionAmount(text) {
-  const pCurr = /(?:(?:was\s*charged\s*for|charged\s*for|purchase\s*of|paid|بمبلغ|مبلغ)\s+)?(?:(EGP|LE|L\.E|USD|EUR|GBP|AED|SAR|ج\.م|جم|جنيه|\$|€|£|د\.إ|ر\.س)\s*)?([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s*(EGP|LE|L\.E|USD|EUR|GBP|AED|SAR|ج\.م|جم|جنيه|\$|€|£|د\.إ|ر\.س)?/gi;
-  let m;
-  while ((m = pCurr.exec(text)) !== null) {
-    const matchStart = m.index;
-    const prefixCurr = m[1];
-    const numStr = m[2];
-    const suffixCurr = m[3];
-
-    if (!prefixCurr && !suffixCurr) continue;
-
-    const textBefore = text.substring(Math.max(0, matchStart - 35), matchStart).toLowerCase();
-    if (textBefore.includes('limit') || textBefore.includes('balance') ||
-        textBefore.includes('الحد المتاح') || textBefore.includes('رصيد متاح') || textBefore.includes('رصيدك')) {
-      continue;
-    }
-
-    const trimmedBefore = textBefore.trim();
-    if (trimmedBefore.endsWith('ending with#') || trimmedBefore.endsWith('ending with') ||
-        trimmedBefore.endsWith('ending in') || trimmedBefore.endsWith('منتهي بـ') ||
-        trimmedBefore.endsWith('بطاقة رقم') || trimmedBefore.endsWith('حساب رقم')) {
-      continue;
-    }
-
-    if (numStr) {
-      const val = parseFloat(numStr.replace(/,/g, ''));
-      if (val > 0 && val < 10000000) {
-        const curr = prefixCurr ? normalizeCurrency(prefixCurr) : normalizeCurrency(suffixCurr);
-        return { amount: val, currency: curr };
-      }
-    }
-  }
-  return null;
+  return WebFallbackParser.extractTransactionAmount(text);
 }
-
-const { WebFallbackParser } = require('../sms_engine.js');
 
 function parseBankSms(sender, rawBody) {
   return WebFallbackParser.parse(sender, rawBody);

@@ -2224,7 +2224,7 @@ function initApp() {
 
         <div class="text-center pt-2 text-[10px] text-slate-400 space-y-0.5">
           <p class="font-bold text-slate-500">ApexWallet — Visual Card-First Tracker</p>
-          <p>Version 1.4.7 • Keystore Protected</p>
+          <p>Version 1.4.8 • Keystore Protected</p>
         </div>
 
       </div>
@@ -3313,14 +3313,14 @@ function initApp() {
 
     const rawData = {
       app: 'ApexWallet',
-      version: '1.4.7',
+      version: '1.4.8',
       securityVault: rawVault ? JSON.parse(rawVault) : null,
       userStore: userStore ? JSON.parse(userStore) : null,
       currency: currency
     };
 
     const passphrase = prompt(
-      'أدخل عبارة مرور قوية (Passphrase) مخصصة لتشفير النسخة الاحتياطية (AES-256-GCM مع 100,000 دورة PBKDF2).\n\nلحماية بياناتك، لا تستخدم رمز الـ PIN. إذا تركت الحقل فارغاً وضغطت حسناً، سيتم تصدير النسخة كنص غير مشفر:'
+      'أدخل عبارة مرور قوية (Passphrase) مخصصة لتشفير النسخة الاحتياطية (AES-256-GCM مع 100,000 دورة PBKDF2).\n\n• يجب ألا تقل عبارة المرور عن 8 أحرف.\n• يجب أن تكون مختلفة تماماً عن رمز PIN المكون من 4 أرقام.\n• اترك الحقل فارغاً واضغط حسناً فقط إذا كنت ترغب في تصدير نسخة غير مشفرة:'
     );
 
     if (passphrase === null) {
@@ -3328,27 +3328,47 @@ function initApp() {
       return;
     }
 
+    const trimmedPass = passphrase.trim();
+    let isEncrypted = false;
+
+    if (trimmedPass.length > 0) {
+      // Enforce strength requirements: min 8 characters, not a 4-digit PIN
+      if (trimmedPass.length < 8 || /^\d{4}$/.test(trimmedPass)) {
+        alert('عبارة المرور ضعيفة جداً! لحماية بياناتك المالية، يجب أن تكون 8 أحرف على الأقل ولا يمكن استخدام رمز PIN المكون من 4 أرقام.');
+        return;
+      }
+      isEncrypted = true;
+    } else {
+      // Explicit confirmation for plaintext export
+      const confirmPlaintext = confirm(
+        '⚠️ تحذير أمني هام:\n\nلم تدخل عبارة مرور. هل ترغب بالتأكيد في تصدير نسخة احتياطية غير مشفرة (نص صريح)؟\n\nتنبيه: النسخة غير المشفرة تحتوي على بياناتك المالية مكشوفة لأي شخص يصل للملف.'
+      );
+      if (!confirmPlaintext) {
+        return;
+      }
+      isEncrypted = false;
+    }
+
     try {
       let backupPayload;
-      let filename;
-      let isEncrypted = false;
+      const secEngine = window.WalletSecurity || window.walletSecurity;
 
-      if (window.walletSecurity && typeof window.walletSecurity.encryptBackup === 'function') {
-        backupPayload = await window.walletSecurity.encryptBackup(rawData, passphrase);
-        isEncrypted = backupPayload.encrypted !== false;
+      if (secEngine && typeof secEngine.encryptBackup === 'function') {
+        backupPayload = await secEngine.encryptBackup(rawData, isEncrypted ? trimmedPass : '');
       } else {
         backupPayload = {
           app: 'ApexWallet',
-          version: '1.4.7',
+          version: '1.4.8',
+          encrypted: false,
           exportedAt: new Date().toISOString(),
-          ...rawData
+          data: rawData
         };
       }
 
       const dateStr = new Date().toISOString().split('T')[0];
-      filename = isEncrypted
+      const filename = isEncrypted
         ? `apexwallet_backup_encrypted_${dateStr}.json`
-        : `apexwallet_backup_plaintext_${dateStr}.json`;
+        : `apexwallet_backup_UNENCRYPTED_PLAINTEXT_${dateStr}.json`;
 
       const blob = new Blob([JSON.stringify(backupPayload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -3363,7 +3383,7 @@ function initApp() {
       if (isEncrypted) {
         showToast('تم تصدير النسخة الاحتياطية بنجاح مشفرة بعبارة المرور الخاصة بك (AES-256).', 'success');
       } else {
-        showToast('تنبيه: تم تصدير النسخة الاحتياطية كنص غير مشفر بعبارة مرور.', 'warning');
+        showToast('تنبيه أمني: تم تصدير النسخة الاحتياطية كنص صريح غير مشفر.', 'warning');
       }
     } catch (err) {
       showToast('فشل تصدير النسخة الاحتياطية: ' + err.message, 'error');
@@ -3382,29 +3402,42 @@ function initApp() {
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const envelope = JSON.parse(e.target.result);
+        let envelope;
+        try {
+          envelope = JSON.parse(e.target.result);
+        } catch (jsonErr) {
+          showToast('ملف النسخة الاحتياطية تالف أو ليس بتنسيق JSON صحيح.', 'error');
+          return;
+        }
+
         if (!envelope || envelope.app !== 'ApexWallet') {
           showToast('ملف النسخة الاحتياطية غير صالح أو ليس خاصاً بتطبيق ApexWallet.', 'error');
           return;
         }
 
         let restoredData = null;
+        const secEngine = window.WalletSecurity || window.walletSecurity;
 
         // Check if file is encrypted v2
         if (envelope.format === 'apexwallet_encrypted_backup_v2' || (envelope.encrypted === true && envelope.cipher)) {
           const passphrase = prompt('هذه النسخة الاحتياطية مشفرة بعبارة مرور (AES-256).\nيرجى إدخال عبارة المرور لفك تشفيرها:');
           if (passphrase === null) {
-            event.target.value = '';
+            // Cancelled
             return;
           }
-          if (!window.walletSecurity || typeof window.walletSecurity.decryptBackup !== 'function') {
+          if (!secEngine || typeof secEngine.decryptBackup !== 'function') {
             throw new Error('وحدة فك التشفير غير متاحة.');
           }
-          restoredData = await window.walletSecurity.decryptBackup(envelope, passphrase);
+          try {
+            restoredData = await secEngine.decryptBackup(envelope, passphrase);
+          } catch (decErr) {
+            showToast('خطأ: عبارة المرور غير صحيحة أو تم التلاعب بملف النسخة الاحتياطية.', 'error');
+            return;
+          }
         } else if (envelope.format === 'apexwallet_plaintext_backup_v2' || envelope.encrypted === false) {
           // Plaintext v2
-          if (window.walletSecurity && typeof window.walletSecurity.decryptBackup === 'function') {
-            restoredData = await window.walletSecurity.decryptBackup(envelope, '');
+          if (secEngine && typeof secEngine.decryptBackup === 'function') {
+            restoredData = await secEngine.decryptBackup(envelope, '');
           } else {
             restoredData = envelope.data || envelope;
           }
@@ -3625,6 +3658,12 @@ function initApp() {
               hidePinLock();
               isPinBusy = false;
               renderCurrentView();
+              if (localStorage.getItem('apexwallet_bio_migrated_notice') === 'true') {
+                localStorage.removeItem('apexwallet_bio_migrated_notice');
+                setTimeout(() => {
+                  showToast('تم تحديث أمان البصمة إلى WebAuthn PRF. تم إيقاف البصمة السابقة، يرجى إعادة تفعيلها من الإعدادات.', 'info');
+                }, 500);
+              }
             }, 250);
           } else {
             triggerPinError('Incorrect PIN. Please try again.');
@@ -3799,7 +3838,7 @@ function initApp() {
   }
 
   // Initial tab & modal
-  const hash = window.location.hash.replace('#', '');
+  const hash = (window.location && window.location.hash) ? window.location.hash.replace('#', '') : '';
   const initialTab = hash === 'cards' || hash === 'history' || hash === 'settings' ? hash : 'dashboard';
   const initialModal = hash.startsWith('modal-') ? hash.replace('modal-', '') : null;
 

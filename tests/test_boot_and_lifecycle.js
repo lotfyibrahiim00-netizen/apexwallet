@@ -84,7 +84,7 @@ async function testRuntimeLifecycle() {
     TextDecoder: TextDecoder,
     btoa: (str) => Buffer.from(str, 'binary').toString('base64'),
     atob: (b64) => Buffer.from(b64, 'base64').toString('binary'),
-    location: { hostname: 'localhost' },
+    location: { hostname: 'localhost', hash: '' },
     addEventListener: () => {},
     removeEventListener: () => {}
   };
@@ -181,7 +181,7 @@ function createHeadlessSandbox() {
     TextDecoder: TextDecoder,
     btoa: (str) => Buffer.from(str, 'binary').toString('base64'),
     atob: (b64) => Buffer.from(b64, 'base64').toString('binary'),
-    location: { hostname: 'localhost' },
+    location: { hostname: 'localhost', hash: '' },
     addEventListener: () => {},
     removeEventListener: () => {}
   };
@@ -190,7 +190,18 @@ function createHeadlessSandbox() {
     readyState: 'complete',
     addEventListener: () => {},
     removeEventListener: () => {},
-    hidden: false
+    hidden: false,
+    getElementById: (id) => ({
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      classList: { add: () => {}, remove: () => {}, contains: () => false },
+      style: {},
+      innerHTML: '',
+      textContent: '',
+      value: ''
+    }),
+    querySelector: () => null,
+    querySelectorAll: () => []
   };
 
   const sandbox = {
@@ -835,6 +846,150 @@ async function testV147AcceptanceCriteria() {
   assert.ok(!indexHtml.includes('https://unpkg.com/lucide@latest'), 'index.html must not reference CDN lucide');
 }
 
+/**
+ * Reviewer Verification Test Suite for v1.4.8 (Build 14)
+ * Directly tests the shipped production files without mocks or reimplementation.
+ */
+async function testV148ReviewerFixes() {
+  const sandbox = createHeadlessSandbox();
+  
+  // Also load ui.js into the sandbox
+  const uiCode = fs.readFileSync(path.join(__dirname, '..', 'ui.js'), 'utf8');
+  vm.runInContext(uiCode, sandbox, { filename: 'ui.js' });
+
+  // 1. Regression test: window.WalletSecurity casing parity
+  assert.ok(sandbox.window.WalletSecurity, 'window.WalletSecurity must be defined on window');
+  assert.ok(sandbox.window.walletSecurity, 'window.walletSecurity alias must be defined on window for backward-compatibility');
+  assert.strictEqual(sandbox.window.walletSecurity, sandbox.window.WalletSecurity, 'Both casing variants must reference identical instance');
+
+  // 2. Direct addTransaction: Credit card + accountId must NEVER deduct from account balance (Reviewer Item 3)
+  const store = sandbox.window.walletStore;
+  store.clearAllData();
+  const bank = store.addBank({ name: 'Commercial International Bank', shortCode: 'CIB' });
+  const acc = store.addAccount({ bankId: bank.id, name: 'Current Account', identifierDigits: '9988', balance: 900 });
+  const creditCard = store.addCard({
+    bankId: bank.id,
+    name: 'CIB Platinum Credit',
+    last4: '7766',
+    cardType: 'credit',
+    cycleStartDay: 1,
+    cycleEndDay: 30,
+    monthlyTarget: 10000
+  });
+
+  assert.strictEqual(acc.balance, 900, 'Initial account balance must be 900');
+
+  // Attempt direct addTransaction with creditCard AND explicit accountId
+  const directTx = store.addTransaction({
+    amount: 100,
+    merchant: 'Zara Cairo',
+    cardId: creditCard.id,
+    accountId: acc.id,
+    transactionType: 'purchase'
+  });
+
+  // Verification against reviewer finding: balance must remain 900, NOT 800!
+  assert.strictEqual(acc.balance, 900, 'Reviewer Item 3 Fix: Credit card transaction with accountId must NEVER deduct from account balance');
+  assert.strictEqual(directTx.accountId, null, 'Credit card transaction accountId must be null');
+
+  // Deleting credit transaction must also not mutate account balance
+  store.deleteTransaction(directTx.id);
+  assert.strictEqual(acc.balance, 900, 'Deleting credit transaction must not mutate account balance');
+
+  // Debit card verification: Debit card linked to account DOES deduct exactly once (no double deduction)
+  const debitCard = store.addCard({
+    bankId: bank.id,
+    name: 'CIB Titanium Debit',
+    last4: '5544',
+    cardType: 'debit',
+    linkedAccountId: acc.id,
+    monthlyTarget: 5000
+  });
+  const debitTx = store.addTransaction({
+    amount: 200,
+    merchant: 'Spinneys',
+    cardId: debitCard.id,
+    transactionType: 'purchase'
+  });
+  assert.strictEqual(acc.balance, 700, 'Linked debit card must deduct exactly once from account balance');
+  store.deleteTransaction(debitTx.id);
+  assert.strictEqual(acc.balance, 900, 'Deleting debit transaction reverses deduction to 900');
+
+  // 3. WebAuthn PRF Biometrics Detection (Reviewer Item 2)
+  const security = sandbox.window.WalletSecurity;
+  const localStorage = sandbox.window.localStorage;
+  
+  // Set PRF biometric record (no bioKey, as intended for hardware-derived key)
+  localStorage.setItem('apexwallet_biometrics_v1', JSON.stringify({
+    credId: 'base64CredId123',
+    prfSalt: 'base64PrfSalt456',
+    encryptedPin: 'base64EncPin789',
+    isWebAuthnPrf: true,
+    enrolledAt: new Date().toISOString()
+  }));
+
+  assert.strictEqual(security.isBiometricsEnabled(), true, 'Reviewer Item 2 Fix: isBiometricsEnabled() must return true for WebAuthn PRF records');
+
+  // Set legacy insecure bioKey record -> must be considered disabled and purged on migration
+  localStorage.setItem('apexwallet_biometrics_v1', JSON.stringify({
+    bioKey: 'insecure_legacy_raw_key',
+    encryptedPin: 'xyz'
+  }));
+  assert.strictEqual(security.isBiometricsEnabled(), false, 'Legacy bioKey record must be considered disabled');
+  security._migrateLegacyInsecureBiometrics();
+  assert.strictEqual(localStorage.getItem('apexwallet_biometrics_v1'), null, 'Legacy record must be purged from localStorage');
+  assert.strictEqual(localStorage.getItem('apexwallet_bio_migrated_notice'), 'true', 'Migration notice flag must be set for user alert');
+
+  // 4. Passphrase Backup Encryption & Decryption (Reviewer Item 1)
+  const sensitiveVault = {
+    test: 'secret_bank_data',
+    userStore: {
+      accounts: [{ name: 'Salary Account', balance: 50000 }],
+      transactions: [{ merchant: 'Luxury Watches', amount: 45000 }]
+    }
+  };
+
+  const strongPassphrase = 'MyUltraSecurePassphrase#2026';
+  const encryptedBackup = await security.encryptBackup(sensitiveVault, strongPassphrase);
+
+  // Assert encryption envelope structure
+  assert.strictEqual(encryptedBackup.encrypted, true, 'Backup envelope must have encrypted=true');
+  assert.strictEqual(encryptedBackup.version, '1.4.8');
+  assert.ok(encryptedBackup.kdf, 'Backup must contain KDF metadata');
+  assert.strictEqual(encryptedBackup.kdf.algorithm, 'PBKDF2');
+  assert.strictEqual(encryptedBackup.kdf.iterations, 100000);
+  assert.strictEqual(encryptedBackup.cipher.algorithm, 'AES-GCM');
+  assert.ok(encryptedBackup.cipher.ciphertext, 'Ciphertext must be present');
+
+  // Verify that sensitive merchant or amount does NOT appear in plaintext JSON
+  const serialized = JSON.stringify(encryptedBackup);
+  assert.ok(!serialized.includes('Luxury Watches'), 'Merchant name must NOT appear in encrypted backup file');
+  assert.ok(!serialized.includes('45000'), 'Amount must NOT appear in encrypted backup file');
+  assert.ok(!serialized.includes('Salary Account'), 'Account name must NOT appear in encrypted backup file');
+
+  // Decrypt with correct passphrase -> Must restore 100% of data faithfully
+  const decrypted = await security.decryptBackup(encryptedBackup, strongPassphrase);
+  assert.strictEqual(decrypted.test, 'secret_bank_data');
+  assert.strictEqual(decrypted.userStore.accounts[0].balance, 50000);
+  assert.strictEqual(decrypted.userStore.transactions[0].merchant, 'Luxury Watches');
+
+  // Decrypt with wrong passphrase -> Must throw error and NOT corrupt existing state
+  const preRestoreVault = localStorage.getItem('apexwallet_security_vault_v1');
+  let threwWrongPass = false;
+  try {
+    await security.decryptBackup(encryptedBackup, 'WrongPassword123!');
+  } catch (err) {
+    threwWrongPass = true;
+    assert.ok(err.message.includes('عبارة المرور غير صحيحة') || err.message.includes('تالف'));
+  }
+  assert.strictEqual(threwWrongPass, true, 'Decryption with wrong passphrase must be rejected');
+  assert.strictEqual(localStorage.getItem('apexwallet_security_vault_v1'), preRestoreVault, 'Existing localStorage vault must remain untouched on decryption failure');
+
+  // 5. Offline cold start: styles.css must not contain @import of Google Fonts (Reviewer Item 6)
+  const stylesCss = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
+  assert.ok(!stylesCss.includes('@import url'), 'styles.css must not import external Google Fonts for 100% offline cold start');
+}
+
 (async function main() {
   await runStepAsync('New user boot: Setup PIN and configure master vault', async () => {
     await testRuntimeLifecycle();
@@ -862,6 +1017,10 @@ async function testV147AcceptanceCriteria() {
 
   await runStepAsync('v1.4.7 Acceptance Criteria (أ through ك): Strict Linking, Passphrase KDF, Web Biometrics Migration, Clean Ref, Local Assets', async () => {
     await testV147AcceptanceCriteria();
+  });
+
+  await runStepAsync('v1.4.8 Reviewer Items (1 through 6): WalletSecurity casing, WebAuthn PRF detection, Credit account balance protection, Offline styles', async () => {
+    await testV148ReviewerFixes();
   });
 
   console.log('\n----------------------------------------------------');

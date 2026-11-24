@@ -8,9 +8,8 @@
   - Amber Warning: #F59E0B
   - Border Radius: rounded-3xl for primary cards, rounded-2xl for secondary pills, rounded-full for buttons & badges
   - Floating Nav: bottom floating pill with backdrop-blur-md
+  - 100% Offline: system UI font stack without external network calls
 */
-
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
 
 :root {
   --bg-slate: #F9FAFB;

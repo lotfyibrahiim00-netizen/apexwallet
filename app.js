@@ -1006,10 +1006,14 @@ class WalletAppStore {
     const txAmount = parseFloat(amount);
     const txOpType = transactionType || (category === 'transfer' ? 'transfer' : 'purchase');
 
-    // Engine-Level Account Linking & Contradiction Enforcement (Item 1 & Item 2)
+    // Engine-Level Account Linking & Contradiction Enforcement (Item 1 & Item 2 & Reviewer v1.4.7)
     const incomingAccountId = accountId || expectedAccountId || null;
 
-    if (card && card.cardType === 'debit') {
+    if (card && card.cardType === 'credit') {
+      // Credit cards represent bank credit lines/obligations and NEVER deduct from a bank deposit account balance.
+      // Any accountId passed alongside a credit card is strictly ignored (targetAccount = null) to protect account balances.
+      targetAccount = null;
+    } else if (card && card.cardType === 'debit') {
       const cardLinkedAccId = card.linkedAccountId || null;
 
       if (incomingAccountId) {
@@ -1370,5 +1374,10 @@ class WalletAppStore {
 }
 
 // Export global instance (dual-export to guarantee compatibility across all modules)
-window.walletStore = new WalletAppStore();
-window.store = window.walletStore;
+if (typeof window !== 'undefined') {
+  window.walletStore = new WalletAppStore();
+  window.store = window.walletStore;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { WalletAppStore };
+}
