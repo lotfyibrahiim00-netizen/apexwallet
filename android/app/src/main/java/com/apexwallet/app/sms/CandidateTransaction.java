@@ -12,29 +12,41 @@ import java.util.UUID;
 public class CandidateTransaction {
     private String id;
     private String bank;
-    private String cardSuffix;       // e.g. "1234" or "" if unknown
-    private String type;             // "expense" | "income"
+    private String cardSuffix;           // Legacy last 4 digits
+    private String entityType;           // "card" | "account" | "unknown"
+    private String identifierDigits;     // 4 digits (e.g. "0000")
+    private String digitsPosition;       // "last" | "first"
+    private String referenceNumber;      // e.g. "REF123456" or ""
+    private String type;                 // "expense" | "income"
     private double amount;
-    private String currency;         // e.g. "EGP", "USD"
-    private String merchant;         // merchant, ATM or reference; empty string if none
-    private String transactionTime;  // extracted from text, or null if absent
-    private long receiptTime;        // timestamp when message was received on device
-    private String fingerprint;      // SHA-256 hash for deduplication
-    private String status;           // "pending", "approved", "rejected"
+    private String currency;             // e.g. "EGP", "USD"
+    private String merchant;             // merchant, ATM or reference; empty string if none
+    private String transactionTime;      // extracted normalized date/time (e.g. "2026-11-23 11:44")
+    private long receiptTime;            // timestamp when message was received on device
+    private String fingerprint;          // SHA-256 hash for deduplication
+    private String status;               // "pending", "approved", "rejected"
     private boolean requiresCardSelection;
 
     public CandidateTransaction() {
         this.id = UUID.randomUUID().toString();
         this.status = "pending";
         this.receiptTime = System.currentTimeMillis();
+        this.entityType = "card";
+        this.digitsPosition = "last";
+        this.referenceNumber = "";
     }
 
-    public CandidateTransaction(String bank, String cardSuffix, String type, double amount,
-                                String currency, String merchant, String transactionTime,
-                                String fingerprint, boolean requiresCardSelection) {
+    public CandidateTransaction(String bank, String cardSuffix, String entityType,
+                                String identifierDigits, String digitsPosition, String referenceNumber,
+                                String type, double amount, String currency, String merchant,
+                                String transactionTime, String fingerprint, boolean requiresCardSelection) {
         this.id = UUID.randomUUID().toString();
-        this.bank = bank;
+        this.bank = bank != null ? bank : "Bank";
         this.cardSuffix = cardSuffix != null ? cardSuffix : "";
+        this.entityType = entityType != null ? entityType : "card";
+        this.identifierDigits = identifierDigits != null ? identifierDigits : (cardSuffix != null ? cardSuffix : "");
+        this.digitsPosition = digitsPosition != null ? digitsPosition : "last";
+        this.referenceNumber = referenceNumber != null ? referenceNumber : "";
         this.type = type != null ? type : "expense";
         this.amount = amount;
         this.currency = currency != null ? currency : "EGP";
@@ -52,7 +64,12 @@ public class CandidateTransaction {
             obj.put("id", id);
             obj.put("bank", bank);
             obj.put("cardSuffix", cardSuffix);
+            obj.put("entityType", entityType);
+            obj.put("identifierDigits", identifierDigits);
+            obj.put("digitsPosition", digitsPosition);
+            obj.put("referenceNumber", referenceNumber);
             obj.put("type", type);
+            obj.put("direction", type); // alias for consistency
             obj.put("amount", amount);
             obj.put("currency", currency);
             obj.put("merchant", merchant);
@@ -71,7 +88,11 @@ public class CandidateTransaction {
         candidate.id = obj.optString("id", UUID.randomUUID().toString());
         candidate.bank = obj.optString("bank", "Unknown Bank");
         candidate.cardSuffix = obj.optString("cardSuffix", "");
-        candidate.type = obj.optString("type", "expense");
+        candidate.entityType = obj.optString("entityType", "card");
+        candidate.identifierDigits = obj.optString("identifierDigits", candidate.cardSuffix);
+        candidate.digitsPosition = obj.optString("digitsPosition", "last");
+        candidate.referenceNumber = obj.optString("referenceNumber", "");
+        candidate.type = obj.optString("direction", obj.optString("type", "expense"));
         candidate.amount = obj.optDouble("amount", 0.0);
         candidate.currency = obj.optString("currency", "EGP");
         candidate.merchant = obj.optString("merchant", "");
@@ -90,6 +111,10 @@ public class CandidateTransaction {
     public String getId() { return id; }
     public String getBank() { return bank; }
     public String getCardSuffix() { return cardSuffix; }
+    public String getEntityType() { return entityType; }
+    public String getIdentifierDigits() { return identifierDigits; }
+    public String getDigitsPosition() { return digitsPosition; }
+    public String getReferenceNumber() { return referenceNumber; }
     public String getType() { return type; }
     public double getAmount() { return amount; }
     public String getCurrency() { return currency; }
@@ -99,8 +124,4 @@ public class CandidateTransaction {
     public String getFingerprint() { return fingerprint; }
     public String getStatus() { return status; }
     public boolean isRequiresCardSelection() { return requiresCardSelection; }
-
-    public void setStatus(String status) { this.status = status; }
-    public void setCardSuffix(String cardSuffix) { this.cardSuffix = cardSuffix; }
-    public void setRequiresCardSelection(boolean requires) { this.requiresCardSelection = requires; }
 }

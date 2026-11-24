@@ -709,49 +709,6 @@
         return { success: false, error: err.message || 'Biometric authentication failed' };
       }
     }
-            allowCredentials: [{
-              id: credIdBytes,
-              type: 'public-key'
-            }],
-            userVerification: 'required',
-            timeout: 60000
-          }
-        });
-
-        if (!assertion) {
-          return { success: false, error: 'Biometric verification cancelled' };
-        }
-
-        // Decrypt PIN
-        const bioKeyBytes = b64ToBuf(bioData.bioKey);
-        const bioCryptoKey = await crypto.subtle.importKey(
-          'raw',
-          bioKeyBytes,
-          { name: 'AES-GCM' },
-          false,
-          ['decrypt']
-        );
-
-        const packed = b64ToBuf(bioData.encryptedPin);
-        const iv = packed.slice(0, 12);
-        const ciphertext = packed.slice(12);
-
-        const decryptedBuffer = await crypto.subtle.decrypt(
-          { name: 'AES-GCM', iv: iv },
-          bioCryptoKey,
-          ciphertext
-        );
-
-        const dec = new TextDecoder();
-        const pin = dec.decode(decryptedBuffer);
-
-        // Unlock vault with decrypted PIN
-        return await this.unlock(pin);
-      } catch (err) {
-        console.error('Biometric assertion error:', err);
-        return { success: false, error: err.message || 'Biometric authentication cancelled' };
-      }
-    }
 
     /**
      * Setup auto-lock listeners

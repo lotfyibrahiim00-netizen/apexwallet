@@ -296,22 +296,58 @@ function initApp() {
     });
   });
 
-  // Dynamic Card Modal Cycle Inputs
+  // Dynamic Card Modal Cycle & Linked Account Inputs
   function updateCardCycleInputs() {
     const cardType = document.querySelector('input[name="card-type"]:checked')?.value || 'credit';
     const cycleContainer = document.getElementById('card-cycle-section');
-    if (!cycleContainer) return;
+    const linkedAccContainer = document.getElementById('card-linked-account-section');
+    const targetInput = document.getElementById('card-target');
+    const targetLabel = document.getElementById('card-target-label');
+    const submitBtnText = document.getElementById('card-submit-button-text');
 
-    if (cardType === 'credit') {
-      cycleContainer.classList.remove('hidden');
-    } else {
-      cycleContainer.classList.add('hidden');
+    if (cycleContainer) {
+      if (cardType === 'credit') {
+        cycleContainer.classList.remove('hidden');
+      } else {
+        cycleContainer.classList.add('hidden');
+      }
+    }
+
+    if (linkedAccContainer) {
+      if (cardType === 'debit') {
+        linkedAccContainer.classList.remove('hidden');
+        // Populate linked accounts
+        const bankId = document.getElementById('card-bank-select')?.value;
+        const linkedSelect = document.getElementById('card-linked-account');
+        if (linkedSelect && store.accounts) {
+          const accs = bankId ? store.getAccountsForBank(bankId) : store.accounts;
+          linkedSelect.innerHTML = '<option value="">None (Independent Debit)</option>' +
+            accs.map(a => `<option value="${a.id}">${a.name} (${a.accountNumberMasked || a.identifierDigits})</option>`).join('');
+        }
+      } else {
+        linkedAccContainer.classList.add('hidden');
+      }
+    }
+
+    if (targetLabel && targetInput) {
+      if (cardType === 'credit') {
+        targetLabel.textContent = 'Spending Target / Limit (Required)';
+        targetInput.required = true;
+      } else {
+        targetLabel.textContent = 'Spending Target / Limit (Optional)';
+        targetInput.required = false;
+      }
+    }
+
+    if (submitBtnText) {
+      submitBtnText.textContent = cardType === 'account' ? 'Save Bank Account' : 'Save Card';
     }
   }
 
   document.querySelectorAll('input[name="card-type"]').forEach(radio => {
     radio.addEventListener('change', updateCardCycleInputs);
   });
+  document.getElementById('card-bank-select')?.addEventListener('change', updateCardCycleInputs);
 
   // Color Swatch Selection for Bank Modal
   document.querySelectorAll('.bank-color-swatch').forEach(swatch => {
@@ -412,18 +448,46 @@ function initApp() {
     const name = document.getElementById('card-name').value;
     const last4 = document.getElementById('card-last4').value;
     const cardType = document.querySelector('input[name="card-type"]:checked')?.value || 'credit';
+    const digitsPosition = document.querySelector('input[name="card-digits-position"]:checked')?.value || 'last';
     const monthlyTarget = document.getElementById('card-target').value;
+    const linkedAccountId = document.getElementById('card-linked-account')?.value || null;
     const cycleStartDay = document.getElementById('card-cycle-start')?.value || 1;
     const cycleEndDay = document.getElementById('card-cycle-end')?.value || 30;
     const network = document.getElementById('card-network')?.value || 'Visa';
 
     try {
-      const newCard = store.addCard({ bankId, name, last4, cardType, monthlyTarget, cycleStartDay, cycleEndDay, network });
-      activeFeaturedCardId = newCard.id;
-      closeModal('card');
-      e.target.reset();
-      showToast(`Card "${name}" added!`, 'success');
-      renderCurrentView();
+      if (cardType === 'account') {
+        store.addAccount({
+          bankId,
+          name,
+          identifierDigits: last4,
+          digitsPosition,
+          balance: 0,
+          currency: currentCurrency
+        });
+        closeModal('card');
+        e.target.reset();
+        showToast(`Bank account "${name}" added!`, 'success');
+        renderCurrentView();
+      } else {
+        const newCard = store.addCard({
+          bankId,
+          name,
+          last4,
+          cardType,
+          digitsPosition,
+          linkedAccountId: cardType === 'debit' ? linkedAccountId : null,
+          monthlyTarget,
+          cycleStartDay,
+          cycleEndDay,
+          network
+        });
+        activeFeaturedCardId = newCard.id;
+        closeModal('card');
+        e.target.reset();
+        showToast(`Card "${name}" added!`, 'success');
+        renderCurrentView();
+      }
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -777,8 +841,8 @@ function initApp() {
                     <span class="text-[10px] text-slate-400 font-medium">${tx.date}</span>
                   </div>
                 </div>
-                <span class="text-xs font-bold text-slate-900 font-mono tracking-tight shrink-0 ml-2">
-                  -${formatCurrency(tx.amount)}
+                <span class="text-xs font-bold ${tx.direction === 'income' ? 'text-emerald-600' : 'text-slate-900'} font-mono tracking-tight shrink-0 ml-2">
+                  ${tx.direction === 'income' ? '+' : '-'}${formatCurrency(tx.amount)}
                 </span>
               </div>
             `;
@@ -1315,7 +1379,7 @@ function initApp() {
                 </div>
 
                 <div class="flex items-center gap-2">
-                  <span class="text-xs font-bold text-slate-900 font-mono">-${formatCurrency(tx.amount)}</span>
+                  <span class="text-xs font-bold ${tx.direction === 'income' ? 'text-emerald-600' : 'text-slate-900'} font-mono">${tx.direction === 'income' ? '+' : '-'}${formatCurrency(tx.amount)}</span>
                   <button onclick="window.confirmDeleteTx('${tx.id}')" class="text-slate-300 hover:text-rose-500 p-1">
                     <i data-lucide="trash" class="w-3 h-3"></i>
                   </button>
@@ -1717,7 +1781,7 @@ function initApp() {
 
         <div class="text-center pt-2 text-[10px] text-slate-400 space-y-0.5">
           <p class="font-bold text-slate-500">ApexWallet — Visual Card-First Tracker</p>
-          <p>Version 1.2 • Hardware Encrypted PWA</p>
+          <p>Version 1.4.0 • Keystore Protected</p>
         </div>
 
       </div>
@@ -1776,7 +1840,12 @@ function initApp() {
   window.confirmDeleteCard = (cardId) => {
     const card = store.getCard(cardId);
     if (!card) return;
-    if (confirm(`Delete card "${card.name}" (•••• ${card.last4})?`)) {
+    const affectedTxs = store.transactions.filter(t => t.cardId === cardId);
+    const count = affectedTxs.length;
+    const msg = count > 0 
+      ? `Delete card "${card.name}" (•••• ${card.last4})?\n\nWarning: There are ${count} recorded transactions linked to this card.`
+      : `Delete card "${card.name}" (•••• ${card.last4})?`;
+    if (confirm(msg)) {
       store.deleteCard(cardId);
       showToast(`Card deleted`, 'info');
       renderCurrentView();
@@ -2498,8 +2567,9 @@ function initApp() {
 
     const backupPayload = {
       app: 'ApexWallet',
-      version: '1.2.0',
+      version: '1.4.0',
       exportedAt: new Date().toISOString(),
+      encryptionNote: 'Master AES-GCM vault encrypted via PBKDF2 from 4-digit PIN.',
       securityVault: rawVault ? JSON.parse(rawVault) : null,
       userStore: userStore ? JSON.parse(userStore) : null,
       currency: currency
@@ -2509,24 +2579,29 @@ function initApp() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `apexwallet_vault_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `apexwallet_vault_backup_v1.4_${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('Vault backup exported successfully!', 'success');
+    showToast('Vault backup exported successfully! (Protected by your PIN)', 'success');
   };
 
   window.importEncryptedVaultBackup = (event) => {
     const file = event.target.files && event.target.files[0];
     if (!file) return;
 
+    if (!confirm('استيراد النسخة الاحتياطية سيستبدل كافة البيانات الحالية في التطبيق. هل ترغب في المتابعة؟ (يُنصح بتصدير نسخة احتياطية أولاً)')) {
+      event.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target.result);
-        if (!data || data.app !== 'ApexWallet') {
-          showToast('Invalid ApexWallet backup file.', 'error');
+        if (!data || data.app !== 'ApexWallet' || (!data.securityVault && !data.userStore)) {
+          showToast('ملف النسخة الاحتياطية غير صالح أو تالف.', 'error');
           return;
         }
 
@@ -2540,12 +2615,12 @@ function initApp() {
           localStorage.setItem('wallet_currency', data.currency);
         }
 
-        showToast('Vault imported! Please enter your PIN to unlock.', 'success');
+        showToast('تم استيراد البيانات بنجاح! جاري إعادة التحميل...', 'success');
         setTimeout(() => {
           window.location.reload();
         }, 1200);
       } catch (err) {
-        showToast('Error reading backup file: ' + err.message, 'error');
+        showToast('خطأ أثناء قراءة ملف النسخة الاحتياطية: ' + err.message, 'error');
       }
     };
     reader.readAsText(file);

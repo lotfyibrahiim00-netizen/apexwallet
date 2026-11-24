@@ -553,6 +553,7 @@ class WalletAppStore {
     this.storageKey = 'apexwallet_user_vault_v1';
     this.banks = [];
     this.cards = [];
+    this.accounts = [];
     this.transactions = [];
     this.activeTab = 'dashboard';
     this.selectedAccountFilter = 'all'; // 'all' | 'bank:{id}' | 'card:{id}'
@@ -566,6 +567,7 @@ class WalletAppStore {
     if (!data) return;
     this.banks = data.banks || [];
     this.cards = data.cards || [];
+    this.accounts = data.accounts || [];
     this.transactions = data.transactions || [];
   }
 
@@ -579,6 +581,7 @@ class WalletAppStore {
     if (window.WalletSecurity && window.WalletSecurity.isConfigured() && window.WalletSecurity.isLocked) {
       this.banks = [];
       this.cards = [];
+      this.accounts = [];
       this.transactions = [];
       return;
     }
@@ -589,6 +592,7 @@ class WalletAppStore {
         const parsed = JSON.parse(raw);
         this.banks = parsed.banks || [];
         this.cards = parsed.cards || [];
+        this.accounts = parsed.accounts || [];
         this.transactions = parsed.transactions || [];
         return;
       } catch (e) {
@@ -598,12 +602,14 @@ class WalletAppStore {
     // Clean initial state: ZERO mock / rush / test data
     this.banks = [];
     this.cards = [];
+    this.accounts = [];
     this.transactions = [];
   }
 
   clearAllData() {
     this.banks = [];
     this.cards = [];
+    this.accounts = [];
     this.transactions = [];
     this.saveState();
   }
@@ -612,6 +618,7 @@ class WalletAppStore {
     const payload = {
       banks: this.banks,
       cards: this.cards,
+      accounts: this.accounts,
       transactions: this.transactions
     };
     if (window.WalletSecurity && window.WalletSecurity.isConfigured() && !window.WalletSecurity.isLocked) {
@@ -679,19 +686,61 @@ class WalletAppStore {
     return true;
   }
 
+  // --- Account Entity Methods (Item 6b) ---
+  getAccount(accId) {
+    return this.accounts.find(a => a.id === accId);
+  }
+
+  getAccountsForBank(bankId) {
+    return this.accounts.filter(a => a.bankId === bankId);
+  }
+
+  addAccount({ bankId, name, identifierDigits, digitsPosition, balance, currency }) {
+    if (!identifierDigits || !/^\d{4}$/.test(identifierDigits)) {
+      throw new Error('Please enter exactly 4 digits identifying the account.');
+    }
+    const id = 'acc_' + Date.now();
+    const pos = digitsPosition === 'first' ? 'first' : 'last';
+    const digits = identifierDigits.trim();
+    const newAcc = {
+      id,
+      bankId,
+      name: (name || 'Bank Account').trim(),
+      identifierDigits: digits,
+      digitsPosition: pos,
+      accountNumberMasked: pos === 'first' ? `${digits} ••••` : `•••• ${digits}`,
+      balance: parseFloat(balance) || 0,
+      currency: currency || 'EGP',
+      createdAt: new Date().toISOString()
+    };
+    this.accounts.push(newAcc);
+    this.saveState();
+    return newAcc;
+  }
+
+  deleteAccount(accId) {
+    this.accounts = this.accounts.filter(a => a.id !== accId);
+    // Unlink any debit cards pointing to this account
+    this.cards.forEach(c => {
+      if (c.linkedAccountId === accId) c.linkedAccountId = null;
+    });
+    this.saveState();
+    return true;
+  }
+
   // --- Card Methods ---
   getCard(cardId) {
     return this.cards.find(c => c.id === cardId);
   }
 
-  addCard({ bankId, name, last4, cardType, monthlyTarget, cycleStartDay, cycleEndDay, network, colorPreset, customColor }) {
+  addCard({ bankId, name, last4, cardType, monthlyTarget, cycleStartDay, cycleEndDay, network, colorPreset, customColor, digitsPosition, linkedAccountId }) {
     // Strict 3-card cap enforcement
     if (!this.canAddCardToBank(bankId)) {
       throw new Error('This bank already has the maximum of 3 cards allowed.');
     }
 
     if (!last4 || !/^\d{4}$/.test(last4)) {
-      throw new Error('Please enter exactly 4 digits for the card number.');
+      throw new Error('Please enter exactly 4 digits for the card identifier.');
     }
 
     if (cardType === 'credit') {
@@ -703,13 +752,18 @@ class WalletAppStore {
     }
 
     const id = 'card_' + Date.now();
+    const pos = digitsPosition === 'first' ? 'first' : 'last';
+    const digits = last4.trim();
     const newCard = {
       id,
       bankId,
       name: name.trim(),
-      last4: last4.trim(),
+      last4: digits,
+      identifierDigits: digits,
+      digitsPosition: pos,
+      linkedAccountId: linkedAccountId || null,
       cardType, // 'credit' | 'debit' | 'prepaid'
-      monthlyTarget: parseFloat(monthlyTarget) || 0,
+      monthlyTarget: parseFloat(monthlyTarget) || 0, // optional for debit
       cycleStartDay: cardType === 'credit' ? parseInt(cycleStartDay, 10) : null,
       cycleEndDay: cardType === 'credit' ? parseInt(cycleEndDay, 10) : null,
       network: network || (cardType === 'prepaid' ? 'Meeza' : 'Visa'),
@@ -728,7 +782,12 @@ class WalletAppStore {
     if (!card) return false;
 
     if (data.name) card.name = data.name.trim();
-    if (data.last4 && /^\d{4}$/.test(data.last4)) card.last4 = data.last4.trim();
+    if (data.last4 && /^\d{4}$/.test(data.last4)) {
+      card.last4 = data.last4.trim();
+      card.identifierDigits = data.last4.trim();
+    }
+    if (data.digitsPosition) card.digitsPosition = data.digitsPosition;
+    if (data.linkedAccountId !== undefined) card.linkedAccountId = data.linkedAccountId;
     if (data.cardType) card.cardType = data.cardType;
     if (data.monthlyTarget !== undefined) card.monthlyTarget = parseFloat(data.monthlyTarget) || 0;
 
@@ -753,9 +812,15 @@ class WalletAppStore {
     return true;
   }
 
-  deleteCard(cardId) {
+  deleteCard(cardId, keepTransactions = false) {
     this.cards = this.cards.filter(c => c.id !== cardId);
-    this.transactions = this.transactions.filter(t => t.cardId !== cardId);
+    if (keepTransactions) {
+      this.transactions.forEach(t => {
+        if (t.cardId === cardId) t.cardId = null;
+      });
+    } else {
+      this.transactions = this.transactions.filter(t => t.cardId !== cardId);
+    }
     this.saveState();
     return true;
   }
@@ -765,31 +830,31 @@ class WalletAppStore {
     return this.transactions.find(t => t.id === txId);
   }
 
-  addTransaction({ amount, merchant, category, date, bankId, cardId, notes }) {
+  addTransaction({ amount, merchant, category, date, bankId, cardId, accountId, direction, type, notes }) {
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
       throw new Error('Please enter a valid positive amount.');
     }
     if (!merchant || !merchant.trim()) {
       throw new Error('Please enter a merchant or description.');
     }
-    if (!cardId) {
-      throw new Error('Please select a card.');
-    }
 
-    const card = this.getCard(cardId);
-    if (!card) throw new Error('Selected card was not found.');
+    const card = cardId ? this.getCard(cardId) : null;
+    const account = accountId ? this.getAccount(accountId) : null;
+    const bId = bankId || (card ? card.bankId : (account ? account.bankId : null));
 
-    const bId = bankId || card.bankId;
-
+    const txDirection = (direction === 'income' || type === 'income') ? 'income' : 'expense';
     const id = 'tx_' + Date.now();
     const newTx = {
       id,
       amount: parseFloat(amount),
+      direction: txDirection,
+      type: txDirection,
       merchant: merchant.trim(),
       category: category || 'other',
       date: date || new Date().toISOString().split('T')[0],
       bankId: bId,
-      cardId: card.id,
+      cardId: card ? card.id : null,
+      accountId: account ? account.id : (card && card.linkedAccountId ? card.linkedAccountId : null),
       notes: (notes || '').trim(),
       createdAt: new Date().toISOString()
     };
@@ -930,7 +995,9 @@ class WalletAppStore {
       }
     }
 
-    const spent = cardTxs.reduce((sum, t) => sum + t.amount, 0);
+    const cardExpenses = cardTxs.filter(t => t.direction !== 'income' && t.type !== 'income').reduce((sum, t) => sum + t.amount, 0);
+    const cardIncome = cardTxs.filter(t => t.direction === 'income' || t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const spent = Math.max(0, cardExpenses - cardIncome);
     const target = card.monthlyTarget || 0;
     const percentage = target > 0 ? (spent / target) * 100 : 0;
     const isExceeded = target > 0 && spent > target;
@@ -945,6 +1012,7 @@ class WalletAppStore {
     return {
       card,
       spent,
+      income: cardIncome,
       target,
       percentage: Math.min(percentage, 100),
       rawPercentage: percentage,
@@ -960,7 +1028,9 @@ class WalletAppStore {
   // --- Overall Dashboard Target Stats ---
   getOverallStats() {
     const filteredTxs = this.getFilteredTransactions();
-    const totalSpent = filteredTxs.reduce((sum, t) => sum + t.amount, 0);
+    const totalExpenses = filteredTxs.filter(t => t.direction !== 'income' && t.type !== 'income').reduce((sum, t) => sum + t.amount, 0);
+    const totalIncome = filteredTxs.filter(t => t.direction === 'income' || t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const totalSpent = Math.max(0, totalExpenses - totalIncome);
     const totalCount = filteredTxs.length;
 
     // Calculate total targets based on current account filter

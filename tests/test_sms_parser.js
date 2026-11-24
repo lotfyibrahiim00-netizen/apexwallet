@@ -44,7 +44,7 @@ function normalizeNumerals(input) {
 function normalizeCurrency(curr) {
   if (!curr) return 'EGP';
   const c = curr.trim().toUpperCase();
-  if (['LE', 'L.E', 'ج.م', 'جنيه', 'EGP'].includes(c)) return 'EGP';
+  if (['LE', 'L.E', 'ج.م', 'جم', 'جنيه', 'EGP'].includes(c)) return 'EGP';
   if (['USD', '$'].includes(c)) return 'USD';
   if (['EUR', '€'].includes(c)) return 'EUR';
   if (['GBP', '£'].includes(c)) return 'GBP';
@@ -67,6 +67,111 @@ function resolveBankName(sender) {
   return sender.trim();
 }
 
+function normalizeDate(d) {
+  if (!d) return null;
+  const clean = d.replace(/\//g, '-');
+  const parts = clean.split('-');
+  if (parts.length !== 3) return null;
+  let year, month, day;
+  if (parts[0].length === 4) {
+    year = parts[0];
+    month = parts[1].padStart(2, '0');
+    day = parts[2].padStart(2, '0');
+  } else {
+    day = parts[0].padStart(2, '0');
+    month = parts[1].padStart(2, '0');
+    year = parts[2];
+    if (year.length === 2) {
+      year = '20' + year;
+    }
+  }
+  return `${year}-${month}-${day}`;
+}
+
+function extractDateTime(text) {
+  const pDateTime = /(?:on|بتاريخ|في)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})(?:\s+(?:at|الساعة|في)?\s*(\d{1,2}:\d{2}(?::\d{2})?))?/i;
+  const m = text.match(pDateTime);
+  if (m && m[1] && m[1].length >= 6) {
+    const normDate = normalizeDate(m[1]);
+    if (normDate) {
+      if (m[2]) {
+        return normDate + ' ' + m[2].substring(0, 5);
+      }
+      return normDate;
+    }
+  }
+  return null;
+}
+
+function extractTypedIdentifier(text) {
+  const lower = text.toLowerCase();
+  let entityType = 'card';
+  if (text.includes('حساب') || lower.includes('account')) {
+    entityType = 'account';
+  } else if (text.includes('بطاق') || text.includes('كارت') || lower.includes('card')) {
+    entityType = 'card';
+  } else {
+    entityType = 'unknown';
+  }
+
+  // First digits
+  const pFirst = /(?:starting\s+with|تبدأ\s+بـ?)\s*(\d{4})|(\d{4})(?:\*+|x{2,}|\.{2,})/i;
+  const mFirst = text.match(pFirst);
+  if (mFirst) {
+    const d = mFirst[1] || mFirst[2];
+    if (d && d.length === 4) {
+      return { entityType, digits: d, position: 'first' };
+    }
+  }
+
+  // Last digits
+  const pLast = /(?:ending\s+with(?:\s*#)?|ending\s+in|تنتهي\s+بـ?|المنتهي(?:ة)?\s+بـ?(?:رقم)?)\s*[:#*.]*\s*(\d{4})|(?:\*+|x{2,}|\.{2,})\s*(\d{4})\b|(?:card|account|بطاقة|حساب)[^\d]{0,25}?(\d{4})\b/i;
+  const mLast = text.match(pLast);
+  if (mLast) {
+    const d = mLast[1] || mLast[2] || mLast[3];
+    if (d && d.length === 4) {
+      return { entityType, digits: d, position: 'last' };
+    }
+  }
+
+  return { entityType, digits: '', position: 'last' };
+}
+
+function extractTransactionAmount(text) {
+  const pCurr = /(?:(?:was\s*charged\s*for|charged\s*for|purchase\s*of|paid|بمبلغ|مبلغ)\s+)?(?:(EGP|LE|L\.E|USD|EUR|GBP|AED|SAR|ج\.م|جم|جنيه|\$|€|£|د\.إ|ر\.س)\s*)?([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s*(EGP|LE|L\.E|USD|EUR|GBP|AED|SAR|ج\.م|جم|جنيه|\$|€|£|د\.إ|ر\.س)?/gi;
+  let m;
+  while ((m = pCurr.exec(text)) !== null) {
+    const matchStart = m.index;
+    const prefixCurr = m[1];
+    const numStr = m[2];
+    const suffixCurr = m[3];
+
+    if (!prefixCurr && !suffixCurr) continue;
+
+    const textBefore = text.substring(Math.max(0, matchStart - 35), matchStart).toLowerCase();
+    if (textBefore.includes('limit') || textBefore.includes('balance') ||
+        textBefore.includes('الحد المتاح') || textBefore.includes('رصيد متاح') || textBefore.includes('رصيدك')) {
+      continue;
+    }
+
+    const trimmedBefore = textBefore.trim();
+    if (trimmedBefore.endsWith('ending with#') || trimmedBefore.endsWith('ending with') ||
+        trimmedBefore.endsWith('ending in') || trimmedBefore.endsWith('منتهي بـ') ||
+        trimmedBefore.endsWith('بطاقة رقم') || trimmedBefore.endsWith('حساب رقم')) {
+      continue;
+    }
+
+    if (numStr) {
+      const val = parseFloat(numStr.replace(/,/g, ''));
+      if (val > 0 && val < 10000000) {
+        const curr = prefixCurr ? normalizeCurrency(prefixCurr) : normalizeCurrency(suffixCurr);
+        return { amount: val, currency: curr };
+      }
+    }
+  }
+  return null;
+}
+
 function parseBankSms(sender, rawBody) {
   if (!rawBody || !rawBody.trim()) return null;
   const normalized = normalizeNumerals(rawBody);
@@ -83,29 +188,29 @@ function parseBankSms(sender, rawBody) {
   if (isBalanceOnly) return null;
 
   // 3. Type
-  const isCredit = /\b(refund|refunded|deposited|credited|reversed|cash\s*in|transfer\s*received)\b|استرداد|إيداع|ايداع|دائن|اضافة|إضافة|تحويل\s*وارد/i.test(normalized);
-  const isDebit = /\b(purchase|paid|debited|spent|withdrawn|charge|pos|online|atm|cash\s*out)\b|شراء|خصم|مدين|سحب|دفع|عملية\s*خصم|تسوق|شحن/i.test(normalized);
+  const isCredit = /\b(refund|refunded|deposited|deposit|credited|credit|reversed|reversal|cash\s*in|transfer\s*received|received)\b|استرداد|إيداع|ايداع|دائن|اضافة|إضافة|تحويل\s*وارد|تم\s*استلام\s*تحويل|استلام\s*مبلغ/i.test(normalized);
+  const isDebit = /\b(purchase|purchased|paid|debit|debited|spent|withdrawn|withdraw|charge|charged|was\s*charged|transferred|transfer|pos|online|atm|cash\s*out)\b|شراء|خصم|مدين|سحب|دفع|تمت?\s*عملية|عملية\s*خصم|تسوق|شحن|تحويل\s*صادر|تم\s*تنفيذ\s*تحويل|تحويل\s*لحظي/i.test(normalized);
   if (!isCredit && !isDebit) return null;
   const type = (isCredit && !isDebit) ? 'income' : 'expense';
 
   // 4. Amount & Currency
-  const amtMatch = normalized.match(/(?:(EGP|LE|L\.E|USD|EUR|GBP|AED|SAR|ج\.م|جنيه|\$|€|£|د\.إ|ر\.س)\s*)?([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s*(EGP|LE|L\.E|USD|EUR|GBP|AED|SAR|ج\.م|جنيه|\$|€|£|د\.إ|ر\.س)?/i);
-  if (!amtMatch || !amtMatch[2]) return null;
-  const rawNum = amtMatch[2].replace(/,/g, '');
-  const amount = parseFloat(rawNum);
-  if (isNaN(amount) || amount <= 0 || amount > 10000000) return null;
+  const amtResult = extractTransactionAmount(normalized);
+  if (!amtResult || amtResult.amount <= 0) return null;
+  const amount = amtResult.amount;
+  const currency = amtResult.currency;
 
-  let currency = 'EGP';
-  const rawCurr = amtMatch[1] || amtMatch[3];
-  if (rawCurr) {
-    currency = normalizeCurrency(rawCurr);
-  }
+  // 5. Typed Identifier
+  const ident = extractTypedIdentifier(normalized);
+  const entityType = ident.entityType;
+  const identifierDigits = ident.digits;
+  const digitsPosition = ident.position;
+  const cardSuffix = identifierDigits;
 
-  // 5. Card Suffix
-  let cardSuffix = '';
-  const cardMatch = normalized.match(/(?:card|account|بطاقة|بطاقتكم|بطاقتك|كارت)[^\d]{0,35}?(?:\*+|\.{2,}|ending\s+in|تنتهي\s+بـ?|المنتهية\s+بـ?(?:رقم)?|رقم)?\s*(\d{4})|(?:\*+|x{2,})(\d{4})/i);
-  if (cardMatch) {
-    cardSuffix = cardMatch[1] || cardMatch[2] || '';
+  // Reference number
+  let refNumber = '';
+  const refMatch = normalized.match(/(?:برقم\s*مرجعي|رقم\s*(?:المرجع|العملية)|مرجع|\bref(?:erence)?\s*(?:no|num|number)?|\btxn\s*id|\brrn)\s*[:#]?\s*([a-zA-Z0-9]+)/i);
+  if (refMatch && refMatch[1]) {
+    refNumber = refMatch[1].trim();
   }
 
   // 6. Merchant
@@ -113,35 +218,34 @@ function parseBankSms(sender, rawBody) {
   const merchMatch = normalized.match(/(?:at|لدى|عند|merchant|store|من\s+ماكينة|from\s+atm)\s*[:\-]?\s*([^,\r\n;]+)/i);
   if (merchMatch && merchMatch[1]) {
     let m = merchMatch[1].trim();
-    m = m.split(/\s+(?:with\s+card|from\s+card|with\s+credit|with\s+debit|using\s+card|on\s+\d|باستخدام\s+بطاقة|من\s+بطاقة|بتاريخ|في\s+\d)/i)[0].trim();
-    m = m.replace(/\s+(?:with|on|from|in)$/i, '').trim();
+    m = m.split(/\s+(?:with\s+card|from\s+card|with\s+credit|with\s+debit|using|on\s+\d|باستخدام|من\s+بطاقة|من\s+حساب|بتاريخ|في\s+\d)/i)[0].trim();
+    if (m.length > 50) m = m.substring(0, 50).trim();
     merchant = m.replace(/\s+/g, ' ');
   }
 
-  // 7. Date
-  let transactionTime = null;
-  const dateMatch = normalized.match(/(?:on|بتاريخ|في|date)?\s*(\d{1,4}[/-]\d{1,2}[/-]\d{2,4}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?)/i);
-  if (dateMatch && dateMatch[1]) {
-    transactionTime = dateMatch[1].trim();
-  }
-
+  // 7. Date & Time
+  const transactionTime = extractDateTime(normalized);
   const bank = resolveBankName(sender);
 
-  // Deterministic Fingerprint
+  // Deterministic SHA-256 Compound Fingerprint
   const timeKey = transactionTime || 'static_window';
-  const fpData = `${bank}|${cardSuffix}|${type}|${amount.toFixed(2)}|${currency}|${merchant.toLowerCase()}|${timeKey}`;
+  const fpData = `${bank}|${entityType}:${identifierDigits}:${digitsPosition}|${type}|${amount.toFixed(2)}|${currency}|${timeKey}|${refNumber}`;
   const fingerprint = crypto.createHash('sha256').update(fpData).digest('hex');
 
   return {
     bank,
     cardSuffix,
+    identifierDigits,
+    entityType,
+    digitsPosition,
+    refNumber,
     type,
     amount,
     currency,
     merchant,
     transactionTime,
     fingerprint,
-    requiresCardSelection: !cardSuffix
+    requiresCardSelection: !identifierDigits
   };
 }
 
@@ -227,7 +331,7 @@ runTest('Parses standard English CIB purchase transaction', () => {
   assert.strictEqual(res.amount, 1250.50);
   assert.strictEqual(res.currency, 'EGP');
   assert.strictEqual(res.merchant, 'Amazon Egypt');
-  assert.strictEqual(res.transactionTime, '24/11/2026 14:30');
+  assert.strictEqual(res.transactionTime, '2026-11-24 14:30');
   assert.strictEqual(res.requiresCardSelection, false);
 });
 
@@ -263,7 +367,7 @@ runTest('Parses Arabic NBE transaction with Eastern Arabic numerals (١٢٣٤٥�
   assert.strictEqual(res.cardSuffix, '9011');
   assert.strictEqual(res.currency, 'EGP');
   assert.strictEqual(res.merchant, 'فودافون مصر');
-  assert.strictEqual(res.transactionTime, '2026/11/24');
+  assert.strictEqual(res.transactionTime, '2026-11-24');
 });
 
 runTest('Parses Banque Misr Arabic purchase format', () => {
@@ -555,6 +659,71 @@ runTest('Queue rejects 101st item at capacity without marking duplicate, allowin
   assert.strictEqual(retry101, true, '101st item must be accepted now that space is freed');
   assert.strictEqual(queue.length, 91);
   assert.strictEqual(processedFingerprints.has('fp_101'), true, 'Fingerprint now recorded after acceptance');
+});
+
+// 15. "was charged" with available limit in same message
+runTest('Extracts transaction amount ignoring credit limit and card ending with# digits', () => {
+  const sms = 'Your card ending with#4321 was charged for EGP 100.00 at Gourmet on 23/11/26. Your available limit is EGP 5000.00.';
+  const res = parseBankSms('CIB', sms);
+  assert.ok(res !== null, 'SMS should be parsed');
+  assert.strictEqual(res.amount, 100.00, 'Amount must be 100.00, not 4321 or 5000');
+  assert.strictEqual(res.currency, 'EGP');
+  assert.strictEqual(res.cardSuffix, '4321');
+  assert.strictEqual(res.merchant, 'Gourmet');
+  assert.strictEqual(res.type, 'expense');
+});
+
+// 16. Arabic instant transfer with "جم"
+runTest('Parses Arabic instant transfer with "جم" currency correctly', () => {
+  const sms = 'تم تنفيذ تحويل لحظي بمبلغ 250.00 جم من حسابك المنتهي بـ 9876 إلى حساب آخر برقم مرجعي 998877';
+  const res = parseBankSms('NBE', sms);
+  assert.ok(res !== null, 'SMS should be parsed');
+  assert.strictEqual(res.amount, 250.00);
+  assert.strictEqual(res.currency, 'EGP');
+  assert.strictEqual(res.entityType, 'account');
+  assert.strictEqual(res.identifierDigits, '9876');
+  assert.strictEqual(res.refNumber, '998877');
+  assert.strictEqual(res.type, 'expense');
+});
+
+// 17. Ending with card marker before amount
+runTest('Strict amount extraction ignores card number marker ending with#4321', () => {
+  const sms = 'Card ending with#8821 paid EGP 3000.00 at IKEA on 2026-11-20';
+  const res = parseBankSms('QNB', sms);
+  assert.ok(res !== null);
+  assert.strictEqual(res.amount, 3000.00);
+  assert.strictEqual(res.cardSuffix, '8821');
+});
+
+// 18. Typed identifier (starting with first digits)
+runTest('Extracts typed identifier starting with first 4 digits', () => {
+  const sms = 'Card starting with 5123 was debited USD 45.00 at Netflix on 22/11/26';
+  const res = parseBankSms('HSBC', sms);
+  assert.ok(res !== null);
+  assert.strictEqual(res.amount, 45.00);
+  assert.strictEqual(res.currency, 'USD');
+  assert.strictEqual(res.identifierDigits, '5123');
+  assert.strictEqual(res.digitsPosition, 'first');
+});
+
+// 19. Full date-time normalization (dd/mm/yy at hh:mm -> YYYY-MM-DD HH:mm)
+runTest('Normalizes 2-digit year and time to full ISO format', () => {
+  const sms = 'Purchase of EGP 500.00 at Zara on 23/11/26 at 11:44 card ending 1234';
+  const res = parseBankSms('CIB', sms);
+  assert.ok(res !== null);
+  assert.strictEqual(res.transactionTime, '2026-11-23 11:44');
+});
+
+// 20. Reference number alters compound fingerprint
+runTest('Reference number is incorporated into compound fingerprint preventing collisions', () => {
+  const sms1 = 'Debited EGP 100.00 at Carrefour card 1111 on 2026-11-24 Ref: REF001';
+  const sms2 = 'Debited EGP 100.00 at Carrefour card 1111 on 2026-11-24 Ref: REF002';
+  const res1 = parseBankSms('CIB', sms1);
+  const res2 = parseBankSms('CIB', sms2);
+  assert.ok(res1 && res2);
+  assert.strictEqual(res1.refNumber, 'REF001');
+  assert.strictEqual(res2.refNumber, 'REF002');
+  assert.notStrictEqual(res1.fingerprint, res2.fingerprint, 'Fingerprints with different ref numbers must be distinct');
 });
 
 console.log('\n----------------------------------------------------');

@@ -1,8 +1,22 @@
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 const ROOT = __dirname;
 const WWW = path.join(ROOT, 'www');
+
+// MANDATORY PRE-BUILD VERIFICATION:
+// 1. Syntax check and runtime boot lifecycle test
+// 2. Synthetic SMS parser test suite
+console.log('Running mandatory pre-build verification tests...');
+try {
+  execSync('node tests/test_boot_and_lifecycle.js', { stdio: 'inherit', cwd: ROOT });
+  execSync('node tests/test_sms_parser.js', { stdio: 'inherit', cwd: ROOT });
+  console.log('✅ Mandatory pre-build verification passed.\n');
+} catch (testErr) {
+  console.error('\n❌ BUILD REJECTED: Mandatory pre-build verification failed!');
+  process.exit(1);
+}
 
 const ASSETS = [
   'index.html',

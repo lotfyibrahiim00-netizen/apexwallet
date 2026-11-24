@@ -317,6 +317,7 @@
       if (!window.store) return;
       const allCards = window.store.cards || [];
       const allBanks = window.store.banks || [];
+      const allAccounts = window.store.accounts || [];
       const allTransactions = window.store.transactions || [];
 
       for (const c of this.pendingCandidates) {
@@ -325,36 +326,79 @@
           c.suggestedCategory = inferCategory(c.merchant);
         }
 
-        // Match card by last4 digits & bank
-        let matchingCards = [];
-        if (c.cardSuffix && c.cardSuffix.length === 4) {
-          matchingCards = allCards.filter(card => card.last4 === c.cardSuffix);
-        }
+        const candidateDigits = c.identifierDigits || c.cardSuffix || '';
+        const candidatePos = c.digitsPosition || 'last';
+        const candidateEntity = c.entityType || 'card';
 
-        // If no match by last4, try matching by bank name/shortCode
-        if (matchingCards.length === 0 && c.bank) {
-          const bLower = c.bank.toLowerCase();
-          const candidateBank = allBanks.find(b =>
+        // Resolve Bank
+        let candidateBank = null;
+        if (c.bank) {
+          const bLower = c.bank.toLowerCase().trim();
+          candidateBank = allBanks.find(b =>
             b.name.toLowerCase().includes(bLower) ||
             b.shortCode.toLowerCase().includes(bLower) ||
-            bLower.includes(b.shortCode.toLowerCase())
+            bLower.includes(b.shortCode.toLowerCase()) ||
+            bLower.includes(b.name.toLowerCase())
           );
-          if (candidateBank) {
-            matchingCards = allCards.filter(card => card.bankId === candidateBank.id);
+        }
+
+        let matchingCards = [];
+        let matchingAccounts = [];
+
+        if (candidateBank && candidateDigits && candidateDigits.length === 4) {
+          if (candidateEntity === 'account') {
+            matchingAccounts = allAccounts.filter(acc =>
+              acc.bankId === candidateBank.id &&
+              acc.identifierDigits === candidateDigits &&
+              (acc.digitsPosition || 'last') === candidatePos
+            );
+            // Also check debit cards linked to matching account or matching debit cards
+            matchingCards = allCards.filter(card =>
+              card.bankId === candidateBank.id &&
+              (card.cardType === 'debit') &&
+              (card.identifierDigits === candidateDigits || card.last4 === candidateDigits) &&
+              (card.digitsPosition || 'last') === candidatePos
+            );
+          } else {
+            // Card entity
+            matchingCards = allCards.filter(card =>
+              card.bankId === candidateBank.id &&
+              (card.identifierDigits === candidateDigits || card.last4 === candidateDigits) &&
+              (card.digitsPosition || 'last') === candidatePos
+            );
           }
         }
 
-        if (matchingCards.length === 1) {
+        // Strict Matching: Automatic match ONLY when exactly 1 match on all 4 dimensions
+        if (matchingCards.length === 1 && matchingAccounts.length <= 1) {
           c.matchedCardId = matchingCards[0].id;
+          c.matchedAccountId = matchingAccounts.length === 1 ? matchingAccounts[0].id : (matchingCards[0].linkedAccountId || null);
           c.confidence = 'high';
           c.requiresCardSelection = false;
-        } else if (matchingCards.length > 1) {
-          c.matchedCardId = matchingCards[0].id; // default to first, but require confirmation
+        } else if (matchingAccounts.length === 1 && matchingCards.length === 0) {
+          c.matchedCardId = null;
+          c.matchedAccountId = matchingAccounts[0].id;
+          // If a card is linked to this account, suggest it
+          const linkedCard = allCards.find(cd => cd.linkedAccountId === matchingAccounts[0].id);
+          if (linkedCard) {
+            c.matchedCardId = linkedCard.id;
+            c.confidence = 'high';
+            c.requiresCardSelection = false;
+          } else {
+            c.confidence = 'account_only';
+            c.requiresCardSelection = true;
+          }
+        } else if (matchingCards.length > 1 || matchingAccounts.length > 1) {
+          // Ambiguous / Multiple: MUST require user confirmation without guessing
+          c.matchedCardId = null;
+          c.matchedAccountId = null;
           c.confidence = 'multiple';
           c.requiresCardSelection = true;
           c.candidateCards = matchingCards.map(mc => mc.id);
         } else {
-          c.matchedCardId = allCards.length > 0 ? allCards[0].id : null;
+          // Zero match: Never fallback to first card
+          c.matchedCardId = null;
+          c.matchedAccountId = null;
           c.confidence = 'unknown';
           c.requiresCardSelection = true;
         }
@@ -377,11 +421,11 @@
 
             // Within 2-day transaction clearance / post window
             if (diffDays <= 2) {
-              const txCard = window.store.getCard(tx.cardId);
+              const txCard = tx.cardId ? window.store.getCard(tx.cardId) : null;
               const isCardOrBankRelated = (c.matchedCardId && c.matchedCardId === tx.cardId) ||
-                                         (txCard && c.cardSuffix && txCard.last4 === c.cardSuffix) ||
+                                         (txCard && candidateDigits && (txCard.last4 === candidateDigits || txCard.identifierDigits === candidateDigits)) ||
                                          (txCard && c.bank && txCard.bankName && txCard.bankName.toLowerCase().includes(c.bank.toLowerCase())) ||
-                                         (!c.cardSuffix);
+                                         (!candidateDigits);
 
               if (isCardOrBankRelated) {
                 c.isPotentialDuplicate = true;
@@ -390,7 +434,7 @@
                   merchant: tx.merchant,
                   amount: tx.amount,
                   date: tx.date,
-                  cardName: txCard ? `${txCard.bankName} •••• ${txCard.last4}` : 'Wallet Card'
+                  cardName: txCard ? `${txCard.name || txCard.bankName} •••• ${txCard.last4}` : 'Wallet Card'
                 };
                 c.potentialDuplicateReason = `توجد عملية سابقة بنفس المبلغ (${tx.amount} ${c.currency || 'EGP'}) بتاريخ ${tx.date} (${tx.merchant || 'بدون اسم'}).`;
                 break;
@@ -465,22 +509,22 @@
 
       const c = this.pendingCandidates[idx];
       const cardId = overrides.cardId || c.matchedCardId;
-      if (!cardId) {
-        return { success: false, error: 'Please select a card to assign this transaction.' };
+      if (!cardId && !overrides.accountId && !c.matchedAccountId) {
+        return { success: false, error: 'Please select a card or account to assign this transaction.' };
       }
 
-      const card = window.store.getCard(cardId);
-      if (!card) {
-        return { success: false, error: 'Selected card does not exist in wallet.' };
-      }
+      const card = cardId ? window.store.getCard(cardId) : null;
+      const accountId = overrides.accountId || c.matchedAccountId || (card ? card.linkedAccountId : null);
 
       const amount = parseFloat(overrides.amount !== undefined ? overrides.amount : c.amount);
       const merchant = (overrides.merchant || c.merchant || (c.bank + ' SMS Transaction')).trim();
       const category = overrides.category || c.suggestedCategory || 'other';
       const date = overrides.date || (c.transactionTime ? c.transactionTime.split(' ')[0] : new Date(c.receiptTime || Date.now()).toISOString().split('T')[0]);
+      const txDirection = overrides.direction || overrides.type || c.type || c.direction || 'expense';
+      const refNote = c.refNumber ? ` | Ref#: ${c.refNumber}` : ` | Ref: ${(c.fingerprint || '').slice(0, 8)}`;
       const notes = overrides.notes !== undefined
         ? overrides.notes
-        : `[SMS Import] Bank: ${c.bank} | Card: **${c.cardSuffix || 'N/A'} | Ref: ${(c.fingerprint || '').slice(0, 8)}`;
+        : `[SMS Import] Bank: ${c.bank} | Card/Acc: **${c.identifierDigits || c.cardSuffix || 'N/A'}${refNote}`;
 
       try {
         // Add to main ledger
@@ -489,8 +533,11 @@
           merchant,
           category,
           date,
-          bankId: card.bankId,
-          cardId: card.id,
+          bankId: card ? card.bankId : null,
+          cardId: card ? card.id : null,
+          accountId: accountId,
+          direction: txDirection,
+          type: txDirection,
           notes
         });
 
@@ -643,6 +690,123 @@
                 .replace(/[\u066c]/g, ',');
     },
 
+    normalizeCurrency: function (curr) {
+      if (!curr) return 'EGP';
+      const c = curr.trim().toUpperCase();
+      if (['LE', 'L.E', 'ج.م', 'جم', 'جنيه', 'EGP'].includes(c)) return 'EGP';
+      if (['USD', '$'].includes(c)) return 'USD';
+      if (['EUR', '€'].includes(c)) return 'EUR';
+      if (['GBP', '£'].includes(c)) return 'GBP';
+      if (['AED', 'د.إ'].includes(c)) return 'AED';
+      if (['SAR', 'ر.س'].includes(c)) return 'SAR';
+      return c;
+    },
+
+    normalizeDate: function (d) {
+      if (!d) return null;
+      const clean = d.replace(/\//g, '-');
+      const parts = clean.split('-');
+      if (parts.length !== 3) return null;
+      let year, month, day;
+      if (parts[0].length === 4) {
+        year = parts[0];
+        month = parts[1].padStart(2, '0');
+        day = parts[2].padStart(2, '0');
+      } else {
+        day = parts[0].padStart(2, '0');
+        month = parts[1].padStart(2, '0');
+        year = parts[2];
+        if (year.length === 2) {
+          year = '20' + year;
+        }
+      }
+      return `${year}-${month}-${day}`;
+    },
+
+    extractDateTime: function (text) {
+      const pDateTime = /(?:on|بتاريخ|في)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})(?:\s+(?:at|الساعة|في)?\s*(\d{1,2}:\d{2}(?::\d{2})?))?/i;
+      const m = text.match(pDateTime);
+      if (m && m[1] && m[1].length >= 6) {
+        const normDate = this.normalizeDate(m[1]);
+        if (normDate) {
+          if (m[2]) {
+            return normDate + ' ' + m[2].substring(0, 5);
+          }
+          return normDate;
+        }
+      }
+      return null;
+    },
+
+    extractTypedIdentifier: function (text) {
+      const lower = text.toLowerCase();
+      let entityType = 'card';
+      if (text.includes('حساب') || lower.includes('account')) {
+        entityType = 'account';
+      } else if (text.includes('بطاق') || text.includes('كارت') || lower.includes('card')) {
+        entityType = 'card';
+      } else {
+        entityType = 'unknown';
+      }
+
+      // First digits
+      const pFirst = /(?:starting\s+with|تبدأ\s+بـ?)\s*(\d{4})|(\d{4})(?:\*+|x{2,}|\.{2,})/i;
+      const mFirst = text.match(pFirst);
+      if (mFirst) {
+        const d = mFirst[1] || mFirst[2];
+        if (d && d.length === 4) {
+          return { entityType, digits: d, position: 'first' };
+        }
+      }
+
+      // Last digits
+      const pLast = /(?:ending\s+with(?:\s*#)?|ending\s+in|تنتهي\s+بـ?|المنتهي(?:ة)?\s+بـ?(?:رقم)?)\s*[:#*.]*\s*(\d{4})|(?:\*+|x{2,}|\.{2,})\s*(\d{4})\b|(?:card|account|بطاقة|حساب)[^\d]{0,25}?(\d{4})\b/i;
+      const mLast = text.match(pLast);
+      if (mLast) {
+        const d = mLast[1] || mLast[2] || mLast[3];
+        if (d && d.length === 4) {
+          return { entityType, digits: d, position: 'last' };
+        }
+      }
+
+      return { entityType, digits: '', position: 'last' };
+    },
+
+    extractTransactionAmount: function (text) {
+      const pCurr = /(?:(?:was\s*charged\s*for|charged\s*for|purchase\s*of|paid|بمبلغ|مبلغ)\s+)?(?:(EGP|LE|L\.E|USD|EUR|GBP|AED|SAR|ج\.م|جم|جنيه|\$|€|£|د\.إ|ر\.س)\s*)?([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s*(EGP|LE|L\.E|USD|EUR|GBP|AED|SAR|ج\.م|جم|جنيه|\$|€|£|د\.إ|ر\.س)?/gi;
+      let m;
+      while ((m = pCurr.exec(text)) !== null) {
+        const matchStart = m.index;
+        const prefixCurr = m[1];
+        const numStr = m[2];
+        const suffixCurr = m[3];
+
+        if (!prefixCurr && !suffixCurr) continue;
+
+        const textBefore = text.substring(Math.max(0, matchStart - 35), matchStart).toLowerCase();
+        if (textBefore.includes('limit') || textBefore.includes('balance') ||
+            textBefore.includes('الحد المتاح') || textBefore.includes('رصيد متاح') || textBefore.includes('رصيدك')) {
+          continue;
+        }
+
+        const trimmedBefore = textBefore.trim();
+        if (trimmedBefore.endsWith('ending with#') || trimmedBefore.endsWith('ending with') ||
+            trimmedBefore.endsWith('ending in') || trimmedBefore.endsWith('منتهي بـ') ||
+            trimmedBefore.endsWith('بطاقة رقم') || trimmedBefore.endsWith('حساب رقم')) {
+          continue;
+        }
+
+        if (numStr) {
+          const val = parseFloat(numStr.replace(/,/g, ''));
+          if (val > 0 && val < 10000000) {
+            const curr = prefixCurr ? this.normalizeCurrency(prefixCurr) : this.normalizeCurrency(suffixCurr);
+            return { amount: val, currency: curr };
+          }
+        }
+      }
+      return null;
+    },
+
     parse: function (sender, body) {
       if (!body) return null;
       const normalized = this.normalizeNumerals(body);
@@ -651,39 +815,36 @@
       const isOtp = /\b(otp|one\s*time\s*password|verification\s*code|security\s*code|activation\s*code|login\s*code|passcode)\b|رمز\s*التحقق|كود\s*التحقق|رمز\s*التأكيد|كلمة\s*السر\s*المؤقتة|رمز\s*سري|لا\s*تشارك|do\s*not\s*share/i.test(normalized);
       if (isOtp) return null;
 
-      const isPromo = /\b(special\s*offer|congratulations|discount\s*up\s*to|loan\s*approval|apply\s*now|promo\s*code)\b|عرض\s*خاص|مبروك|قسط|خصم\s*يصل/i.test(normalized);
+      const isPromo = /\b(special\s*offer|congratulations|discount\s*up\s*to|loan\s*approval|apply\s*now|promo\s*code)\b|عرض\s*خاص|مبروك|قسط|تمت?\s*الموافقة\s*على\s*القرض|خصم\s*يصل/i.test(normalized);
       if (isPromo) return null;
 
+      const isBalanceInquiry = /^\s*(your\s*balance\s*is|available\s*balance\s*is|رصيدكم\s*الحالي|رصيدك\s*هو)\b/i.test(normalized);
+      if (isBalanceInquiry) return null;
+
       // Type
-      const isDebit = /\b(purchase|paid|debited|spent|withdrawn|charge|pos|online|atm|cash\s*out)\b|شراء|خصم|مدين|سحب|دفع|عملية\s*خصم|تسوق|شحن/i.test(normalized);
-      const isCredit = /\b(refund|refunded|deposited|credited|reversed|cash\s*in|transfer\s*received)\b|استرداد|إيداع|ايداع|دائن|اضافة|إضافة|تحويل\s*وارد/i.test(normalized);
+      const isDebit = /\b(purchase|purchased|paid|debit|debited|spent|withdrawn|withdraw|charge|charged|was\s*charged|transferred|transfer|pos|online|atm|cash\s*out)\b|شراء|خصم|مدين|سحب|دفع|تمت?\s*عملية|عملية\s*خصم|تسوق|شحن|تحويل\s*صادر|تم\s*تنفيذ\s*تحويل|تحويل\s*لحظي/i.test(normalized);
+      const isCredit = /\b(refund|refunded|deposited|deposit|credited|credit|reversed|reversal|cash\s*in|transfer\s*received|received)\b|استرداد|إيداع|ايداع|دائن|اضافة|إضافة|تحويل\s*وارد|تم\s*استلام\s*تحويل|استلام\s*مبلغ/i.test(normalized);
       if (!isDebit && !isCredit) return null;
       const type = (isCredit && !isDebit) ? 'income' : 'expense';
 
       // Amount & Currency
-      const amtMatch = normalized.match(/(?:(EGP|LE|L\.E|USD|EUR|GBP|AED|SAR|ج\.م|جنيه|\$|€|£|د\.إ|ر\.س)\s*)?([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s*(EGP|LE|L\.E|USD|EUR|GBP|AED|SAR|ج\.م|جنيه|\$|€|£|د\.إ|ر\.س)?/i);
-      if (!amtMatch || !amtMatch[2]) return null;
-      const rawNum = amtMatch[2].replace(/,/g, '');
-      const amount = parseFloat(rawNum);
-      if (isNaN(amount) || amount <= 0 || amount > 10000000) return null;
+      const amtResult = this.extractTransactionAmount(normalized);
+      if (!amtResult || amtResult.amount <= 0) return null;
+      const amount = amtResult.amount;
+      const currency = amtResult.currency;
 
-      let currency = 'EGP';
-      const rawCurr = amtMatch[1] || amtMatch[3];
-      if (rawCurr) {
-        const u = rawCurr.toUpperCase();
-        if (['LE', 'L.E', 'ج.م', 'جنيه', 'EGP'].includes(u)) currency = 'EGP';
-        else if (['USD', '$'].includes(u)) currency = 'USD';
-        else if (['EUR', '€'].includes(u)) currency = 'EUR';
-        else if (['GBP', '£'].includes(u)) currency = 'GBP';
-        else if (['AED', 'د.إ'].includes(u)) currency = 'AED';
-        else if (['SAR', 'ر.س'].includes(u)) currency = 'SAR';
-      }
+      // Typed Identifier
+      const ident = this.extractTypedIdentifier(normalized);
+      const entityType = ident.entityType;
+      const identifierDigits = ident.digits;
+      const digitsPosition = ident.position;
+      const cardSuffix = identifierDigits;
 
-      // Card Suffix
-      let cardSuffix = '';
-      const cardMatch = normalized.match(/(?:card|account|بطاقة|بطاقتكم|بطاقتك|كارت)[^\d]{0,35}?(?:\*+|\.{2,}|ending\s+in|تنتهي\s+بـ?|المنتهية\s+بـ?(?:رقم)?|رقم)?\s*(\d{4})|(?:\*+|x{2,})(\d{4})/i);
-      if (cardMatch) {
-        cardSuffix = cardMatch[1] || cardMatch[2] || '';
+      // Reference number - with word boundary so it won't match inside "Carrefour"
+      let refNumber = '';
+      const refMatch = normalized.match(/(?:برقم\s*مرجعي|رقم\s*(?:المرجع|العملية)|مرجع|\bref(?:erence)?\s*(?:no|num|number)?|\btxn\s*id|\brrn)\s*[:#]?\s*([a-zA-Z0-9]+)/i);
+      if (refMatch && refMatch[1]) {
+        refNumber = refMatch[1].trim();
       }
 
       // Merchant
@@ -691,17 +852,13 @@
       const merchMatch = normalized.match(/(?:at|لدى|عند|merchant|store|من\s+ماكينة|from\s+atm)\s*[:\-]?\s*([^,\r\n;]+)/i);
       if (merchMatch && merchMatch[1]) {
         let m = merchMatch[1].trim();
-        m = m.split(/\s+(?:with\s+card|from\s+card|with\s+credit|with\s+debit|using\s+card|on\s+\d|باستخدام\s+بطاقة|من\s+بطاقة|بتاريخ|في\s+\d)/i)[0].trim();
-        m = m.replace(/\s+(?:with|on|from|in)$/i, '').trim();
+        m = m.split(/\s+(?:with\s+card|from\s+card|with\s+credit|with\s+debit|using|on\s+\d|باستخدام|من\s+بطاقة|من\s+حساب|بتاريخ|في\s+\d)/i)[0].trim();
+        if (m.length > 50) m = m.substring(0, 50).trim();
         merchant = m.replace(/\s+/g, ' ');
       }
 
-      // Date
-      let transactionTime = null;
-      const dateMatch = normalized.match(/(?:on|بتاريخ|في|date)?\s*(\d{1,4}[/-]\d{1,2}[/-]\d{2,4}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?)/i);
-      if (dateMatch && dateMatch[1]) {
-        transactionTime = dateMatch[1].trim();
-      }
+      // Date and Time
+      const transactionTime = this.extractDateTime(normalized);
 
       // Bank
       let bank = (sender || 'Bank').trim();
@@ -711,17 +868,31 @@
       else if (sUp.includes('QNB')) bank = 'QNB';
       else if (sUp.includes('NBE') || sUp.includes('AHLI')) bank = 'NBE';
       else if (sUp.includes('MISR') || sUp.includes('BM')) bank = 'Banque Misr';
-      else if (sUp.includes('ENBD')) bank = 'Emirates NBD';
+      else if (sUp.includes('ENBD') || sUp.includes('EMIRATES')) bank = 'Emirates NBD';
       else if (sUp.includes('FAB')) bank = 'FABMISR';
       else if (sUp.includes('ALEX')) bank = 'AlexBank';
+      else if (sUp.includes('ADIB')) bank = 'ADIB';
+      else if (sUp.includes('AAIB')) bank = 'AAIB';
+      else if (sUp.includes('FAISAL')) bank = 'Faisal';
 
-      const fingerprint = btoa(`${bank}|${cardSuffix}|${type}|${amount}|${currency}|${merchant}|${transactionTime || Date.now()}`);
+      const rawKey = `${bank}|${entityType}:${identifierDigits}:${digitsPosition}|${type}|${amount.toFixed(2)}|${currency}|${transactionTime || ''}|${refNumber}`;
+      let fingerprint = '';
+      try {
+        fingerprint = btoa(unescape(encodeURIComponent(rawKey)));
+      } catch (e) {
+        fingerprint = 'fp_' + Math.abs(rawKey.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0));
+      }
 
       return {
         id: 'c_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
         bank,
         cardSuffix,
+        identifierDigits,
+        entityType,
+        digitsPosition,
+        refNumber,
         type,
+        direction: type,
         amount,
         currency,
         merchant,
@@ -729,7 +900,7 @@
         receiptTime: Date.now(),
         fingerprint,
         status: 'pending',
-        requiresCardSelection: !cardSuffix
+        requiresCardSelection: !identifierDigits
       };
     }
   };
