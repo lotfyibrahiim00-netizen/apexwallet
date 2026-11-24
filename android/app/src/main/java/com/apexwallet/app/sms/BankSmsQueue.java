@@ -175,8 +175,13 @@ public class BankSmsQueue {
             return false;
         }
 
-        pending.add(candidate);
-        savePendingList(pending);
+        List<CandidateTransaction> nextPending = new ArrayList<>(pending);
+        nextPending.add(candidate);
+        boolean writeOk = savePendingList(nextPending);
+        if (!writeOk) {
+            Log.e(TAG, "Failed to commit durable write for candidate: " + candidate.getFingerprint());
+            return false;
+        }
         recordFingerprint(candidate.getFingerprint());
 
         // Update stats
@@ -208,7 +213,9 @@ public class BankSmsQueue {
         List<String> confirmed = new ArrayList<>();
         if (candidates == null || candidates.isEmpty()) return confirmed;
         List<CandidateTransaction> pending = getPendingList();
-        int added = 0;
+        List<CandidateTransaction> newlyAdded = new ArrayList<>();
+        List<String> newlyAddedFps = new ArrayList<>();
+
         for (CandidateTransaction c : candidates) {
             if (c == null || c.getFingerprint() == null) {
                 continue;
@@ -234,21 +241,30 @@ public class BankSmsQueue {
             }
 
             // Attempt to enqueue if space available
-            if (pending.size() < MAX_QUEUE_SIZE) {
-                pending.add(c);
-                recordFingerprint(c.getFingerprint());
-                confirmed.add(c.getFingerprint());
-                added++;
+            if (pending.size() + newlyAdded.size() < MAX_QUEUE_SIZE) {
+                newlyAdded.add(c);
+                newlyAddedFps.add(c.getFingerprint());
             } else {
                 // Capacity full: do NOT record fingerprint so it can be retried, record rejection stat
                 if (mSecurePrefs != null) {
                     int rej = mSecurePrefs.getInt(KEY_STATS_REJECTED_CAPACITY, 0) + 1;
-                    mSecurePrefs.edit().putInt(KEY_STATS_REJECTED_CAPACITY, rej).apply();
+                    mSecurePrefs.edit().putInt(KEY_STATS_REJECTED_CAPACITY, rej).commit();
                 }
             }
         }
-        if (added > 0) {
-            savePendingList(pending);
+
+        if (!newlyAdded.isEmpty()) {
+            List<CandidateTransaction> updatedPending = new ArrayList<>(pending);
+            updatedPending.addAll(newlyAdded);
+            boolean writeOk = savePendingList(updatedPending);
+            if (writeOk) {
+                for (String fp : newlyAddedFps) {
+                    recordFingerprint(fp);
+                    confirmed.add(fp);
+                }
+            } else {
+                Log.e(TAG, "Failed to commit durable write to encrypted storage. Newly added candidates remain unconfirmed.");
+            }
         }
         return confirmed;
     }
@@ -296,7 +312,7 @@ public class BankSmsQueue {
      */
     public synchronized void clear() {
         if (mSecurePrefs != null) {
-            mSecurePrefs.edit().remove(KEY_PENDING_QUEUE).apply();
+            mSecurePrefs.edit().remove(KEY_PENDING_QUEUE).commit();
         } else {
             mInMemoryQueue.clear();
         }
@@ -410,16 +426,17 @@ public class BankSmsQueue {
         }
     }
 
-    private void savePendingList(List<CandidateTransaction> list) {
+    private boolean savePendingList(List<CandidateTransaction> list) {
         if (mSecurePrefs != null) {
             JSONArray arr = new JSONArray();
             for (CandidateTransaction c : list) {
                 arr.put(c.toJsonObject());
             }
-            mSecurePrefs.edit().putString(KEY_PENDING_QUEUE, arr.toString()).apply();
+            return mSecurePrefs.edit().putString(KEY_PENDING_QUEUE, arr.toString()).commit();
         } else {
             mInMemoryQueue.clear();
             mInMemoryQueue.addAll(list);
+            return true;
         }
     }
 
@@ -462,7 +479,7 @@ public class BankSmsQueue {
                     for (String k : toRemove) history.remove(k);
                 }
 
-                mSecurePrefs.edit().putString(KEY_PROCESSED_FINGERPRINTS, history.toString()).apply();
+                mSecurePrefs.edit().putString(KEY_PROCESSED_FINGERPRINTS, history.toString()).commit();
             } catch (JSONException ignored) {}
         } else {
             mInMemoryFingerprints.add(fingerprint);

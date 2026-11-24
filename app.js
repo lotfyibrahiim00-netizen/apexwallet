@@ -234,7 +234,9 @@ function getInitialSampleData() {
       name: 'Titanium Miles',
       last4: '8492',
       cardType: 'credit',
+      creditLimit: 50000,
       monthlyTarget: 25000,
+      cycleBudgets: {},
       cycleStartDay: 25,
       cycleEndDay: 24,
       network: 'Mastercard',
@@ -247,7 +249,9 @@ function getInitialSampleData() {
       name: 'Plus Salary Debit',
       last4: '1044',
       cardType: 'debit',
+      creditLimit: null,
       monthlyTarget: 15000,
+      cycleBudgets: {},
       cycleStartDay: null,
       cycleEndDay: null,
       network: 'Visa',
@@ -261,7 +265,9 @@ function getInitialSampleData() {
       name: 'Advance Cashback',
       last4: '5521',
       cardType: 'credit',
+      creditLimit: 40000,
       monthlyTarget: 20000,
+      cycleBudgets: {},
       cycleStartDay: 15,
       cycleEndDay: 14,
       network: 'Visa',
@@ -274,7 +280,9 @@ function getInitialSampleData() {
       name: 'Premier Savings',
       last4: '3389',
       cardType: 'debit',
+      creditLimit: null,
       monthlyTarget: 10000,
+      cycleBudgets: {},
       cycleStartDay: null,
       cycleEndDay: null,
       network: 'Mastercard',
@@ -288,7 +296,9 @@ function getInitialSampleData() {
       name: 'First World Elite',
       last4: '7712',
       cardType: 'credit',
+      creditLimit: 80000,
       monthlyTarget: 40000,
+      cycleBudgets: {},
       cycleStartDay: 1,
       cycleEndDay: 30,
       network: 'Mastercard',
@@ -302,7 +312,9 @@ function getInitialSampleData() {
       name: 'Ahly Meeza Prepaid',
       last4: '9011',
       cardType: 'prepaid',
+      creditLimit: null,
       monthlyTarget: 5000,
+      cycleBudgets: {},
       cycleStartDay: null,
       cycleEndDay: null,
       network: 'Meeza',
@@ -315,7 +327,9 @@ function getInitialSampleData() {
       name: 'Platinum Credit',
       last4: '4120',
       cardType: 'credit',
+      creditLimit: 36000,
       monthlyTarget: 18000,
+      cycleBudgets: {},
       cycleStartDay: 20,
       cycleEndDay: 19,
       network: 'Visa',
@@ -328,7 +342,9 @@ function getInitialSampleData() {
       name: 'Gold Master Debit',
       last4: '6310',
       cardType: 'debit',
+      creditLimit: null,
       monthlyTarget: 8000,
+      cycleBudgets: {},
       cycleStartDay: null,
       cycleEndDay: null,
       network: 'Mastercard',
@@ -733,7 +749,8 @@ class WalletAppStore {
     return this.cards.find(c => c.id === cardId);
   }
 
-  addCard({ bankId, name, last4, cardType, monthlyTarget, cycleStartDay, cycleEndDay, network, colorPreset, customColor, digitsPosition, linkedAccountId }) {
+  addCard(data) {
+    const { bankId, name, last4, cardType, monthlyTarget, creditLimit, cycleBudgets, cycleStartDay, cycleEndDay, network, colorPreset, customColor, digitsPosition, linkedAccountId } = data;
     // Strict 3-card cap enforcement
     if (!this.canAddCardToBank(bankId)) {
       throw new Error('This bank already has the maximum of 3 cards allowed.');
@@ -754,6 +771,7 @@ class WalletAppStore {
     const id = 'card_' + Date.now();
     const pos = digitsPosition === 'first' ? 'first' : 'last';
     const digits = last4.trim();
+    const parsedTarget = parseFloat(monthlyTarget) || 0;
     const newCard = {
       id,
       bankId,
@@ -763,7 +781,11 @@ class WalletAppStore {
       digitsPosition: pos,
       linkedAccountId: linkedAccountId || null,
       cardType, // 'credit' | 'debit' | 'prepaid'
-      monthlyTarget: parseFloat(monthlyTarget) || 0, // optional for debit
+      creditLimit: cardType === 'credit'
+        ? (creditLimit !== undefined && creditLimit !== null && creditLimit !== '' ? parseFloat(creditLimit) : (parsedTarget ? parsedTarget * 2 : 50000))
+        : null,
+      monthlyTarget: parsedTarget, // personal spending target / budget baseline
+      cycleBudgets: cycleBudgets || {},
       cycleStartDay: cardType === 'credit' ? parseInt(cycleStartDay, 10) : null,
       cycleEndDay: cardType === 'credit' ? parseInt(cycleEndDay, 10) : null,
       network: network || (cardType === 'prepaid' ? 'Meeza' : 'Visa'),
@@ -790,6 +812,8 @@ class WalletAppStore {
     if (data.linkedAccountId !== undefined) card.linkedAccountId = data.linkedAccountId;
     if (data.cardType) card.cardType = data.cardType;
     if (data.monthlyTarget !== undefined) card.monthlyTarget = parseFloat(data.monthlyTarget) || 0;
+    if (data.creditLimit !== undefined) card.creditLimit = parseFloat(data.creditLimit) || null;
+    if (data.cycleBudgets) card.cycleBudgets = { ...(card.cycleBudgets || {}), ...data.cycleBudgets };
 
     if (card.cardType === 'credit') {
       if (data.cycleStartDay) card.cycleStartDay = parseInt(data.cycleStartDay, 10);
@@ -801,6 +825,19 @@ class WalletAppStore {
 
     this.saveState();
     return true;
+  }
+
+  setCardCycleBudget(cardId, statementKey, budget) {
+    const card = this.getCard(cardId);
+    if (!card) return false;
+    if (!card.cycleBudgets) card.cycleBudgets = {};
+    const val = parseFloat(budget);
+    if (!isNaN(val) && val >= 0) {
+      card.cycleBudgets[statementKey] = val;
+      this.saveState();
+      return true;
+    }
+    return false;
   }
 
   updateCardColor(cardId, { colorPreset, customColor }) {
@@ -980,25 +1017,51 @@ class WalletAppStore {
 
     const enriched = this.getEnrichedTransactions();
     let cardTxs = enriched.filter(t => t.cardId === cardId);
+    let activeStatementKey = null;
 
     // If filtering by a specific statement key, filter accordingly;
     // Otherwise, default to the most recent statement/cycle for this card
     if (filterStatementKey && filterStatementKey !== 'all') {
+      activeStatementKey = filterStatementKey;
       cardTxs = cardTxs.filter(t => t.statementInfo && t.statementInfo.statementKey === filterStatementKey);
     } else {
-      // Find the latest statement key for this card to show the current active billing cycle
-      const statementKeys = cardTxs.map(t => t.statementInfo?.statementKey).filter(Boolean);
-      statementKeys.sort().reverse();
-      const currentCycleKey = statementKeys[0];
-      if (currentCycleKey) {
-        cardTxs = cardTxs.filter(t => t.statementInfo && t.statementInfo.statementKey === currentCycleKey);
+      if (card.cardType === 'credit' && card.cycleStartDay && card.cycleEndDay) {
+        const todayIso = new Date().toISOString().split('T')[0];
+        const currentStmt = calculateBillingStatement(todayIso, card.cycleStartDay, card.cycleEndDay);
+        activeStatementKey = currentStmt.statementKey;
+      } else {
+        const todayIso = new Date().toISOString().split('T')[0];
+        const parts = todayIso.split('-');
+        activeStatementKey = `${parts[0]}-${parts[1]}`;
+      }
+
+      // Filter txs belonging to this active cycle
+      const cycleTxs = cardTxs.filter(t => t.statementInfo && t.statementInfo.statementKey === activeStatementKey);
+      if (cycleTxs.length > 0 || cardTxs.length === 0) {
+        cardTxs = cycleTxs;
+      } else {
+        // If no transactions in current cycle yet, fallback to latest statement that has txs
+        const statementKeys = cardTxs.map(t => t.statementInfo?.statementKey).filter(Boolean);
+        statementKeys.sort().reverse();
+        if (statementKeys[0]) {
+          activeStatementKey = statementKeys[0];
+          cardTxs = cardTxs.filter(t => t.statementInfo && t.statementInfo.statementKey === activeStatementKey);
+        }
       }
     }
 
     const cardExpenses = cardTxs.filter(t => t.direction !== 'income' && t.type !== 'income').reduce((sum, t) => sum + t.amount, 0);
     const cardIncome = cardTxs.filter(t => t.direction === 'income' || t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const spent = Math.max(0, cardExpenses - cardIncome);
-    const target = card.monthlyTarget || 0;
+
+    // Personal Spending Budget for this cycle (cycleBudgets[key] or card.monthlyTarget)
+    const target = (card.cycleBudgets && activeStatementKey && card.cycleBudgets[activeStatementKey] !== undefined)
+      ? card.cycleBudgets[activeStatementKey]
+      : (card.monthlyTarget || 0);
+
+    // Bank Credit Limit
+    const creditLimit = card.creditLimit || (card.cardType === 'credit' ? (card.monthlyTarget ? card.monthlyTarget * 2 : 50000) : null);
+
     const percentage = target > 0 ? (spent / target) * 100 : 0;
     const isExceeded = target > 0 && spent > target;
     const overAmount = isExceeded ? spent - target : 0;
@@ -1013,7 +1076,10 @@ class WalletAppStore {
       card,
       spent,
       income: cardIncome,
-      target,
+      target, // Personal budget for the cycle
+      creditLimit, // Bank Credit Limit
+      cycleBudget: target,
+      statementKey: activeStatementKey,
       percentage: Math.min(percentage, 100),
       rawPercentage: percentage,
       isExceeded,

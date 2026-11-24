@@ -300,10 +300,19 @@ function initApp() {
   function updateCardCycleInputs() {
     const cardType = document.querySelector('input[name="card-type"]:checked')?.value || 'credit';
     const cycleContainer = document.getElementById('card-cycle-section');
+    const creditLimitContainer = document.getElementById('card-credit-limit-section');
     const linkedAccContainer = document.getElementById('card-linked-account-section');
     const targetInput = document.getElementById('card-target');
     const targetLabel = document.getElementById('card-target-label');
     const submitBtnText = document.getElementById('card-submit-button-text');
+
+    if (creditLimitContainer) {
+      if (cardType === 'credit') {
+        creditLimitContainer.classList.remove('hidden');
+      } else {
+        creditLimitContainer.classList.add('hidden');
+      }
+    }
 
     if (cycleContainer) {
       if (cardType === 'credit') {
@@ -331,10 +340,10 @@ function initApp() {
 
     if (targetLabel && targetInput) {
       if (cardType === 'credit') {
-        targetLabel.textContent = 'Spending Target / Limit (Required)';
+        targetLabel.textContent = 'Personal Spending Budget (ميزانية الصرف للدورة)';
         targetInput.required = true;
       } else {
-        targetLabel.textContent = 'Spending Target / Limit (Optional)';
+        targetLabel.textContent = 'Personal Spending Budget (اختياري)';
         targetInput.required = false;
       }
     }
@@ -450,6 +459,7 @@ function initApp() {
     const cardType = document.querySelector('input[name="card-type"]:checked')?.value || 'credit';
     const digitsPosition = document.querySelector('input[name="card-digits-position"]:checked')?.value || 'last';
     const monthlyTarget = document.getElementById('card-target').value;
+    const creditLimit = document.getElementById('card-credit-limit')?.value || null;
     const linkedAccountId = document.getElementById('card-linked-account')?.value || null;
     const cycleStartDay = document.getElementById('card-cycle-start')?.value || 1;
     const cycleEndDay = document.getElementById('card-cycle-end')?.value || 30;
@@ -478,6 +488,7 @@ function initApp() {
           digitsPosition,
           linkedAccountId: cardType === 'debit' ? linkedAccountId : null,
           monthlyTarget,
+          creditLimit,
           cycleStartDay,
           cycleEndDay,
           network
@@ -665,22 +676,52 @@ function initApp() {
                   </div>
                 </div>
 
-                <!-- Spent vs Limit -->
-                <p class="text-2xl font-bold mt-3.5 font-mono tracking-tight relative z-10">
-                  ${formatCurrency(cardStat.spent)} 
-                  <span class="text-xs font-normal opacity-80">/ ${formatCurrency(cardStat.target)}</span>
-                </p>
+                <!-- Spent vs Budget / Credit Limit (Dual Budget Model) -->
+                ${isCredit ? `
+                  <div class="mt-2.5 relative z-10">
+                    <p class="text-2xl font-bold font-mono tracking-tight leading-tight">
+                      ${cardStat.isExceeded 
+                        ? `<span class="text-rose-200">+${formatCurrency(cardStat.overAmount)}</span> <span class="text-xs font-normal opacity-90 text-rose-200">تجاوز للميزانية</span>` 
+                        : `${formatCurrency(cardStat.remaining)} <span class="text-xs font-normal opacity-90">متبقي من الميزانية</span>`}
+                    </p>
+                    <div class="flex items-center justify-between text-[10.5px] opacity-90 mt-1 font-medium">
+                      <span>مصروف الدورة: ${formatCurrency(cardStat.spent)} من ميزانية ${formatCurrency(cardStat.target)}</span>
+                      <button type="button" onclick="window.promptSetCycleBudget('${card.id}', event)" class="px-1.5 py-0.5 rounded-full bg-white/20 hover:bg-white/30 text-[9px] font-bold backdrop-blur-xs transition-all active:scale-95 shadow-2xs" title="تعديل ميزانية هذه الدورة">
+                        تعديل
+                      </button>
+                    </div>
+                  </div>
+                ` : `
+                  <div class="mt-2.5 relative z-10">
+                    <p class="text-2xl font-bold font-mono tracking-tight leading-tight">
+                      ${formatCurrency(cardStat.spent)}
+                      ${cardStat.target > 0 ? `<span class="text-xs font-normal opacity-80">/ ${formatCurrency(cardStat.target)}</span>` : ''}
+                    </p>
+                    <p class="text-[10.5px] opacity-80 mt-1 font-medium">
+                      ${cardStat.target > 0 ? `متبقي: ${formatCurrency(cardStat.remaining)}` : 'إجمالي المصروفات'}
+                    </p>
+                  </div>
+                `}
 
                 <!-- Slim Progress Bar -->
-                <div class="w-full h-1.5 bg-white/20 rounded-full mt-3 overflow-hidden relative z-10">
+                <div class="w-full h-1.5 bg-white/20 rounded-full mt-2.5 overflow-hidden relative z-10">
                   <div class="${cardStat.isExceeded ? 'bg-rose-400' : (cardStat.isWarning ? 'bg-amber-400' : 'bg-white')} h-full rounded-full transition-all duration-500 shadow-sm" style="width: ${cardStat.percentage}%;"></div>
                 </div>
 
-                <!-- Bottom Row: Last 4 & Billing Cycle -->
-                <div class="flex justify-between text-[11px] opacity-80 mt-3 font-medium relative z-10">
+                <!-- Bottom Row: Last 4 & Billing Cycle / Credit Limit Badge -->
+                <div class="flex justify-between items-center text-[11px] opacity-90 mt-2.5 font-medium relative z-10">
                   <span class="font-mono">•••• ${card.last4}</span>
-                  ${isCredit && card.cycleStartDay ? `
-                    <span>Cycle: ${card.cycleStartDay}th → ${card.cycleEndDay}th</span>
+                  ${isCredit ? `
+                    <div class="flex items-center gap-1.5">
+                      <span class="px-2 py-0.5 rounded-full bg-black/25 text-[10px] font-semibold backdrop-blur-xs">
+                        الحد البنكي: ${formatCurrency(cardStat.creditLimit)}
+                      </span>
+                      ${card.cycleStartDay ? `
+                        <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-semibold">
+                          دورة ${card.cycleStartDay}
+                        </span>
+                      ` : ''}
+                    </div>
                   ` : `
                     <span>${card.network || 'VISA'}</span>
                   `}
@@ -1090,6 +1131,28 @@ function initApp() {
   // Scroll carousel smoothly to card
   window.scrollToCard = (cardId) => {
     updateActiveCardUI(cardId, true);
+  };
+
+  // --- Cycle Budget Adjustment ---
+  window.promptSetCycleBudget = (cardId, e) => {
+    if (e) e.stopPropagation();
+    const card = store.getCard(cardId);
+    if (!card) return;
+    const stat = store.getCardSpendingStats(cardId);
+    const stmtKey = stat.statementKey || 'current';
+    const currentBudget = stat.target;
+    const limit = stat.creditLimit || (currentBudget ? currentBudget * 2 : 50000);
+    const val = prompt(`تحديد ميزانية الصرف الشخصية لدورة (${stmtKey}):\n(الحد الائتماني البنكي للكارت: ${formatCurrency(limit)})\nأدخل ميزانية الدورة:`, currentBudget);
+    if (val !== null && val.trim() !== '') {
+      const num = parseFloat(val);
+      if (!isNaN(num) && num >= 0) {
+        store.setCardCycleBudget(cardId, stmtKey, num);
+        showToast(`تم تحديث ميزانية دورة (${stmtKey}) إلى ${formatCurrency(num)}`, 'success');
+        renderCurrentView();
+      } else {
+        showToast('يرجى إدخال مبلغ صحيح', 'error');
+      }
+    }
   };
 
   // --- Card Color Customization Functions ---
@@ -1781,7 +1844,7 @@ function initApp() {
 
         <div class="text-center pt-2 text-[10px] text-slate-400 space-y-0.5">
           <p class="font-bold text-slate-500">ApexWallet — Visual Card-First Tracker</p>
-          <p>Version 1.4.2 • Keystore Protected</p>
+          <p>Version 1.4.3 • Keystore Protected</p>
         </div>
 
       </div>
@@ -1993,8 +2056,8 @@ function initApp() {
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Assign Card</label>
-                <select id="candidate-card-select-${c.id}" class="w-full text-[11px] font-bold text-slate-800 bg-white border ${needsCardSelection ? 'border-amber-400' : 'border-slate-200'} rounded-xl px-2 py-1.5 outline-none cursor-pointer">
-                  ${cards.length === 0 ? '<option value="">No cards in wallet</option>' : ''}
+                <select id="candidate-card-select-${c.id}" class="w-full text-[11px] font-bold text-slate-800 bg-white border ${needsCardSelection ? 'border-amber-400 ring-2 ring-amber-400/20' : 'border-slate-200'} rounded-xl px-2 py-1.5 outline-none cursor-pointer">
+                  <option value="" ${!c.matchedCardId ? 'selected disabled' : ''}>-- اختر الكارت / الحساب --</option>
                   ${cards.map(card => {
                     const isSelected = card.id === c.matchedCardId;
                     return `<option value="${card.id}" ${isSelected ? 'selected' : ''}>${card.name} (••• ${card.last4})</option>`;
@@ -2058,14 +2121,45 @@ function initApp() {
     const merchant = merchInput ? merchInput.value : '';
     const category = catSelect ? catSelect.value : 'other';
 
-    if (!cardId) {
-      showToast('Please select a card to assign this transaction.', 'error');
+    if (!cardId || cardId === '') {
+      showToast('يرجى اختيار الكارت أو الحساب أولاً لاعتماد العملية', 'error');
+      if (cardSelect) cardSelect.focus();
       return;
     }
 
-    const res = await window.BankSmsEngine.approveCandidate(candidateId, { cardId, merchant, category });
+    const candidate = window.BankSmsEngine.pendingCandidates.find(item => item.id === candidateId);
+    const store = window.walletStore || window.store;
+    const selectedCard = store ? store.getCard(cardId) : null;
+
+    let isManualAssignment = false;
+    if (candidate && selectedCard) {
+      const candidateDigits = (candidate.identifierDigits || candidate.cardSuffix || '').trim();
+      const cardLast4 = (selectedCard.last4 || '').trim();
+      const hasDigitMismatch = candidateDigits && cardLast4 && candidateDigits !== cardLast4;
+
+      const candidateBank = (candidate.bank || '').toUpperCase().trim();
+      const cardBankObj = store ? store.getBank(selectedCard.bankId) : null;
+      const cardBankName = (cardBankObj ? cardBankObj.name : '').toUpperCase().trim();
+      const hasBankMismatch = candidateBank && cardBankName &&
+        !cardBankName.includes(candidateBank) && !candidateBank.includes(cardBankName) &&
+        candidateBank !== 'BANK';
+
+      if (hasDigitMismatch || hasBankMismatch) {
+        const mismatchDetails = [];
+        if (hasBankMismatch) mismatchDetails.push(`البنك: ${candidate.bank} مقابل ${cardBankObj ? cardBankObj.name : 'الكارت'}`);
+        if (hasDigitMismatch) mismatchDetails.push(`الأرقام: ****${candidateDigits} مقابل ****${cardLast4}`);
+
+        const confirmMsg = `تنبيه: بيانات الرسالة تختلف عن الكارت المختار!\n(${mismatchDetails.join(' | ')})\n\nهل تريد تعيين هذه العملية يدوياً لهذا الكارت؟`;
+        if (typeof confirm === 'function' && !confirm(confirmMsg)) {
+          return;
+        }
+        isManualAssignment = true;
+      }
+    }
+
+    const res = await window.BankSmsEngine.approveCandidate(candidateId, { cardId, merchant, category, isManualAssignment });
     if (res.success) {
-      showToast(`Imported ${res.transaction.merchant} (${formatCurrency(res.transaction.amount)})`, 'success');
+      showToast(`تم استيراد ${res.transaction.merchant} (${formatCurrency(res.transaction.amount)})`, 'success');
       renderSmsCandidatesList();
       renderCurrentView();
     } else {
@@ -2567,7 +2661,7 @@ function initApp() {
 
     const backupPayload = {
       app: 'ApexWallet',
-      version: '1.4.2',
+      version: '1.4.3',
       exportedAt: new Date().toISOString(),
       encryptionNote: 'Master AES-GCM vault encrypted via PBKDF2 from 4-digit PIN.',
       securityVault: rawVault ? JSON.parse(rawVault) : null,

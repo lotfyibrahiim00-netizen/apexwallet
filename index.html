@@ -506,10 +506,16 @@
             </select>
           </div>
 
-          <!-- Target / Limit (Optional for Debit & Account) -->
+          <!-- Bank Credit Limit (Visible for Credit Cards) -->
+          <div id="card-credit-limit-section" class="hidden">
+            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Bank Credit Limit (الحد الائتماني البنكي)</label>
+            <input type="number" id="card-credit-limit" min="0" step="500" placeholder="50000" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900">
+          </div>
+
+          <!-- Target / Personal Spending Budget -->
           <div id="card-target-section">
-            <label id="card-target-label" class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Spending Target / Limit</label>
-            <input type="number" id="card-target" min="0" step="100" placeholder="15000 (Optional for Debit/Account)" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900">
+            <label id="card-target-label" class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Personal Spending Budget (ميزانية الصرف للدورة)</label>
+            <input type="number" id="card-target" min="0" step="100" placeholder="20000" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900">
           </div>
 
           <!-- DYNAMIC CREDIT CARD CYCLE SECTION -->

@@ -165,13 +165,13 @@ async function testRuntimeLifecycle() {
 // Step 4: Production End-to-End Integration (app.js + sms_engine.js)
 // Verifies real runtime binding between walletStore and BankSmsEngine WITHOUT manual mocks
 // ----------------------------------------------------
-async function testSmsStoreIntegration() {
-  const mockLocalStorage = new Map();
+function createHeadlessSandbox() {
+  const mockStorage = new Map();
   const localStorageMock = {
-    getItem: (k) => mockLocalStorage.has(k) ? mockLocalStorage.get(k) : null,
-    setItem: (k, v) => mockLocalStorage.set(k, String(v)),
-    removeItem: (k) => mockLocalStorage.delete(k),
-    clear: () => mockLocalStorage.clear()
+    getItem: (k) => mockStorage.has(k) ? mockStorage.get(k) : null,
+    setItem: (k, v) => mockStorage.set(k, String(v)),
+    removeItem: (k) => mockStorage.delete(k),
+    clear: () => mockStorage.clear()
   };
 
   const windowMock = {
@@ -209,9 +209,15 @@ async function testSmsStoreIntegration() {
 
   vm.createContext(sandbox);
 
-  // 1. Load app.js naturally (creates window.walletStore and window.store)
   const appCode = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
   vm.runInContext(appCode, sandbox, { filename: 'app.js' });
+
+  return sandbox;
+}
+
+async function testSmsStoreIntegration() {
+  const sandbox = createHeadlessSandbox();
+  const mockLocalStorage = sandbox.localStorage;
 
   assert.ok(sandbox.window.walletStore, 'app.js must create window.walletStore');
   assert.ok(sandbox.window.store, 'app.js must also define window.store for global parity');
@@ -304,7 +310,7 @@ async function testSmsStoreIntegration() {
   assert.strictEqual(store.transactions.length, 2, 'Ledger transactions must remain 2 (rejected item not added)');
 
   // 8. Test 69 Staged Candidates: Safe Migration & Zero-Loss Retention
-  mockLocalStorage.delete('apex_web_sms_candidates');
+  mockLocalStorage.removeItem('apex_web_sms_candidates');
   engine.pendingCandidates = [];
 
   const staged69 = [];
@@ -323,7 +329,7 @@ async function testSmsStoreIntegration() {
       status: 'pending'
     });
   }
-  mockLocalStorage.set('apexwallet_sms_pending_staged_v1', JSON.stringify(staged69));
+  mockLocalStorage.setItem('apexwallet_sms_pending_staged_v1', JSON.stringify(staged69));
 
   // Run fetchPendingTransactions which triggers migrateAndPurgeStagedPlaintext & zero-loss merge
   await engine.fetchPendingTransactions();
@@ -340,6 +346,37 @@ async function testSmsStoreIntegration() {
   assert.strictEqual(store.transactions.length, 3);
 }
 
+async function testDualBudgetModel() {
+  const sandbox = createHeadlessSandbox();
+  const store = sandbox.window.walletStore;
+  store.resetToSampleData();
+
+  // Find a credit card (e.g. CIB Titanium Miles)
+  const creditCard = store.cards.find(c => c.cardType === 'credit');
+  assert.ok(creditCard, 'Must have at least one credit card');
+  assert.ok(creditCard.creditLimit >= 30000, 'Credit limit must be configured on card');
+  assert.ok(creditCard.monthlyTarget > 0, 'Personal spending target must be configured');
+  assert.notStrictEqual(creditCard.creditLimit, creditCard.monthlyTarget, 'Bank Credit Limit and Personal Target must be distinct');
+
+  // Verify getCardSpendingStats returns both numbers
+  const stats = store.getCardSpendingStats(creditCard.id);
+  assert.ok(stats !== null);
+  assert.strictEqual(stats.creditLimit, creditCard.creditLimit);
+  assert.strictEqual(stats.target, creditCard.monthlyTarget);
+  assert.strictEqual(stats.remaining, Math.max(0, creditCard.monthlyTarget - stats.spent));
+
+  // Set cycle budget for a specific statement key
+  const stmtKey = stats.statementKey;
+  store.setCardCycleBudget(creditCard.id, stmtKey, 15000);
+  const updatedStats = store.getCardSpendingStats(creditCard.id, stmtKey);
+  assert.strictEqual(updatedStats.target, 15000, 'Target for cycle must be 15,000');
+  assert.strictEqual(updatedStats.creditLimit, creditCard.creditLimit, 'Bank credit limit must remain unchanged');
+
+  // Check other cycle maintains baseline target without zeroing history
+  const otherStats = store.getCardSpendingStats(creditCard.id, '2025-01');
+  assert.strictEqual(otherStats.target, creditCard.monthlyTarget, 'Other cycle without override uses default monthly target');
+}
+
 (async function main() {
   await runStepAsync('New user boot: Setup PIN and configure master vault', async () => {
     await testRuntimeLifecycle();
@@ -351,6 +388,10 @@ async function testSmsStoreIntegration() {
 
   await runStepAsync('End-to-End Integration: app.js + sms_engine.js store binding, SMS auto-matching & approval', async () => {
     await testSmsStoreIntegration();
+  });
+
+  await runStepAsync('Dual Budget Model: Bank Credit Limit vs Personal Budget per billing cycle', async () => {
+    await testDualBudgetModel();
   });
 
   console.log('\n----------------------------------------------------');

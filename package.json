@@ -1,6 +1,6 @@
 {
   "name": "apexwallet",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Smart Bank & Card Transaction Tracker with Billing Cycle Engine",
   "main": "index.html",
   "scripts": {

@@ -28,7 +28,8 @@
   // Default Bank Sender Allowlist
   const DEFAULT_ALLOWLIST = [
     'CIB', 'HSBC', 'QNB', 'NBE', 'BM', 'BANQUEMISR', 'EMIRATESNBD',
-    'ENBD', 'FABMISR', 'FAB', 'ALEXBANK', 'ADIB', 'AAIB', 'FAISAL'
+    'ENBD', 'FABMISR', 'FAB', 'ALEXBANK', 'ADIB', 'AAIB', 'FAISAL',
+    'INSTAPAY', 'IPN', 'INSTA'
   ];
 
   // Category Auto-Inference Rules from Merchant/Reference keywords
@@ -40,7 +41,8 @@
     { cat: 'travel', keywords: ['uber', 'careem', 'total', 'gas station', 'shell', 'chillout', 'petrol', 'flight', 'airline', 'بنزين', 'اوبر', 'كريم', 'طيران', 'محطة'] },
     { cat: 'health', keywords: ['pharmacy', 'hospital', 'clinic', 'ezaby', 'roshdy', '19011', 'صيدلية', 'مستشفى', 'عيادة', 'العزبي', 'رشدي'] },
     { cat: 'entertainment', keywords: ['cinema', 'vox', 'netflix', 'spotify', 'movie', 'theatre', 'سينما', 'نتفلكس', 'سبوتيفاي'] },
-    { cat: 'services', keywords: ['subscription', 'apple.com', 'google', 'cloud', 'hosting', 'خدمة', 'اشتراك'] }
+    { cat: 'services', keywords: ['subscription', 'apple.com', 'google', 'cloud', 'hosting', 'خدمة', 'اشتراك'] },
+    { cat: 'transfers', keywords: ['instapay', 'إنستاباي', 'انستاباي', 'ipn', 'تحويل', 'transfer'] }
   ];
 
   function inferCategory(merchantName) {
@@ -581,9 +583,11 @@
       const date = overrides.date || (c.transactionTime ? c.transactionTime.split(' ')[0] : new Date(c.receiptTime || Date.now()).toISOString().split('T')[0]);
       const txDirection = overrides.direction || overrides.type || c.type || c.direction || 'expense';
       const refNote = c.refNumber ? ` | Ref#: ${c.refNumber}` : ` | Ref: ${(c.fingerprint || '').slice(0, 8)}`;
+      const isManual = !!overrides.isManualAssignment;
+      const manualTag = isManual ? ` [Manual Override: Detected ${c.bank} **${c.identifierDigits || c.cardSuffix || 'N/A'}]` : '';
       const notes = overrides.notes !== undefined
         ? overrides.notes
-        : `[SMS Import] Bank: ${c.bank} | Card/Acc: **${c.identifierDigits || c.cardSuffix || 'N/A'}${refNote}`;
+        : `[SMS Import] Bank: ${c.bank} | Card/Acc: **${c.identifierDigits || c.cardSuffix || 'N/A'}${refNote}${manualTag}`;
 
       try {
         // Add to main ledger
@@ -597,6 +601,9 @@
           accountId: accountId,
           direction: txDirection,
           type: txDirection,
+          isManualAssignment: isManual,
+          detectedBank: c.bank,
+          detectedDigits: c.identifierDigits || c.cardSuffix,
           notes
         });
 
@@ -907,10 +914,16 @@
       if (isBalanceInquiry) return null;
 
       // Type
-      const isDebit = /\b(purchase|purchased|paid|debit|debited|spent|withdrawn|withdraw|charge|charged|was\s*charged|transferred|transfer|pos|online|atm|cash\s*out)\b|شراء|خصم|مدين|سحب|دفع|تمت?\s*عملية|عملية\s*خصم|تسوق|شحن|تحويل\s*صادر|تم\s*تنفيذ\s*تحويل|تحويل\s*لحظي/i.test(normalized);
-      const isCredit = /\b(refund|refunded|deposited|deposit|credited|credit|reversed|reversal|cash\s*in|transfer\s*received|received)\b|استرداد|إيداع|ايداع|دائن|اضافة|إضافة|تحويل\s*وارد|تم\s*استلام\s*تحويل|استلام\s*مبلغ/i.test(normalized);
+      const isExplicitIncoming = /\b(refund|refunded|deposited|deposit|credited|credit|reversed|reversal|cash\s*in|transfer\s*received|received|received\s*from)\b|استرداد|إيداع|ايداع|دائن|اضافة|إضافة|تحويل\s*وارد|تم\s*استلام\s*تحويل|استلام\s*مبلغ|استقبلت|تم\s*استقبال|تمت?\s*إضافة/i.test(normalized);
+      const isDebit = /\b(purchase|purchased|paid|debit|debited|spent|withdrawn|withdraw|charge|charged|was\s*charged|transferred|transfer|sent|pos|online|atm|cash\s*out)\b|شراء|خصم|مدين|سحب|دفع|تمت?\s*عملية|عملية\s*خصم|تسوق|شحن|تحويل\s*صادر|تم\s*تنفيذ\s*تحويل|تحويل\s*لحظي|تم\s*تحويل|أرسلت|ارسلت|تم\s*ارسال/i.test(normalized);
+      const isCredit = isExplicitIncoming;
+
       if (!isDebit && !isCredit) return null;
-      const type = (isCredit && !isDebit) ? 'income' : 'expense';
+
+      let type = 'expense';
+      if (isExplicitIncoming && !/\b(purchase|purchased|paid|spent|withdrawn|withdraw|charged)\b|شراء|سحب|دفع|شحن/i.test(normalized)) {
+        type = 'income';
+      }
 
       // Amount & Currency
       const amtResult = this.extractTransactionAmount(normalized);
@@ -932,14 +945,44 @@
         refNumber = refMatch[1].trim();
       }
 
-      // Merchant
+      // Merchant & Counterparty extraction
       let merchant = '';
-      const merchMatch = normalized.match(/(?:at|لدى|عند|merchant|store|من\s+ماكينة|from\s+atm)\s*[:\-]?\s*([^,\r\n;]+)/i);
-      if (merchMatch && merchMatch[1]) {
-        let m = merchMatch[1].trim();
-        m = m.split(/\s+(?:with\s+card|from\s+card|with\s+credit|with\s+debit|using|on\s+\d|باستخدام|من\s+بطاقة|من\s+حساب|بتاريخ|في\s+\d)/i)[0].trim();
-        if (m.length > 50) m = m.substring(0, 50).trim();
-        merchant = m.replace(/\s+/g, ' ');
+      const isTransferOrInsta = /(?:instapay|ipn|إنستاباي|انستاباي|تحويل|transfer|transferred|sent|received)/i.test(normalized);
+      const hasInstaPay = /(?:instapay|ipn|إنستاباي|انستاباي)/i.test(normalized) || (sender && /insta/i.test(sender));
+
+      if (isTransferOrInsta) {
+        if (type === 'income') {
+          const inMatch = normalized.match(/(?:من\s+المحول|من\s+العميل|من(?!(?:\s+بطاقة|\s+كارت|\s+حسابك|\s+حساب|\s+ماكينة|\s+atm|\s+card|\s+account))|\bfrom\b|\breceived\s+from\b)\s*[:\-]?\s*([^\r\n,;]+?)(?=\s+(?:عبر|من\s+خلال|باستخدام|\bvia\b|\busing\b|\bon\b|بتاريخ|في|\bref\b|برقم|\bto\b|\d{1,2}[/-])|$)/i);
+          if (inMatch && inMatch[1]) {
+            let party = inMatch[1].trim().replace(/\s+(?:بنجاح|ناجح|ناجحة|تمت|successful|successfully)$/i, '').replace(/\s+/g, ' ');
+            if (party.length > 40) party = party.substring(0, 40).trim();
+            if (party) {
+              merchant = hasInstaPay ? ('InstaPay: ' + party) : ('تحويل من: ' + party);
+            }
+          }
+        } else {
+          const outMatch = normalized.match(/(?:إلى|الى|لحساب|للمستفيد|\bto\b|\bsent\s+to\b)\s*[:\-]?\s*([^\r\n,;]+?)(?=\s+(?:عبر|من\s+خلال|باستخدام|\bvia\b|\busing\b|\bon\b|بتاريخ|في|\bref\b|برقم|\bfrom\b|\d{1,2}[/-])|$)/i);
+          if (outMatch && outMatch[1]) {
+            let party = outMatch[1].trim().replace(/\s+(?:بنجاح|ناجح|ناجحة|تمت|successful|successfully)$/i, '').replace(/\s+/g, ' ');
+            if (party.length > 40) party = party.substring(0, 40).trim();
+            if (party) {
+              merchant = hasInstaPay ? ('InstaPay: ' + party) : ('تحويل إلى: ' + party);
+            }
+          }
+        }
+        if (!merchant && hasInstaPay) {
+          merchant = 'InstaPay';
+        }
+      }
+
+      if (!merchant) {
+        const merchMatch = normalized.match(/(?:at|لدى|عند|merchant|store|من\s+ماكينة|from\s+atm)\s*[:\-]?\s*([^,\r\n;]+)/i);
+        if (merchMatch && merchMatch[1]) {
+          let m = merchMatch[1].trim();
+          m = m.split(/\s+(?:with\s+card|from\s+card|with\s+credit|with\s+debit|using|on\s+\d|باستخدام|من\s+بطاقة|من\s+حساب|بتاريخ|في\s+\d)/i)[0].trim();
+          if (m.length > 50) m = m.substring(0, 50).trim();
+          merchant = m.replace(/\s+/g, ' ');
+        }
       }
 
       // Date and Time
@@ -948,7 +991,8 @@
       // Bank
       let bank = (sender || 'Bank').trim();
       const sUp = bank.toUpperCase();
-      if (sUp.includes('CIB')) bank = 'CIB';
+      if (sUp.includes('INSTAPAY') || sUp.includes('IPN') || sUp.includes('INSTA')) bank = 'InstaPay';
+      else if (sUp.includes('CIB')) bank = 'CIB';
       else if (sUp.includes('HSBC')) bank = 'HSBC';
       else if (sUp.includes('QNB')) bank = 'QNB';
       else if (sUp.includes('NBE') || sUp.includes('AHLI')) bank = 'NBE';
@@ -991,13 +1035,19 @@
   };
 
   // Expose global instance
-  window.BankSmsEngine = new BankSmsEngine();
-  window.WebFallbackParser = WebFallbackParser;
+  if (typeof window !== 'undefined') {
+    window.BankSmsEngine = new BankSmsEngine();
+    window.WebFallbackParser = WebFallbackParser;
+    if (typeof document !== 'undefined') {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => window.BankSmsEngine.init());
+      } else {
+        window.BankSmsEngine.init();
+      }
+    }
+  }
 
-  // Auto-init when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => window.BankSmsEngine.init());
-  } else {
-    window.BankSmsEngine.init();
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { BankSmsEngine, WebFallbackParser };
   }
 })();

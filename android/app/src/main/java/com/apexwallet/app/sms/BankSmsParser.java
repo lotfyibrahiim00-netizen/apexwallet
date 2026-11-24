@@ -24,7 +24,8 @@ public class BankSmsParser {
 
     public static final Set<String> DEFAULT_BANK_ALLOWLIST = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             "CIB", "HSBC", "QNB", "NBE", "BM", "BANQUEMISR", "EMIRATESNBD",
-            "ENBD", "FABMISR", "FAB", "ALEXBANK", "ADIB", "AAIB", "FAISAL"
+            "ENBD", "FABMISR", "FAB", "ALEXBANK", "ADIB", "AAIB", "FAISAL",
+            "INSTAPAY", "IPN", "INSTA"
     )));
 
     // Negative triggers: OTP, 2FA, verification passcodes, promo, balance inquiry
@@ -44,13 +45,13 @@ public class BankSmsParser {
 
     // Transaction direction patterns (Item 3 & Item 4)
     private static final Pattern DEBIT_PATTERN = Pattern.compile(
-            "(?i)\\b(purchase|purchased|paid|debit|debited|spent|withdrawn|withdraw|charge|charged|was\\s*charged|transferred|transfer|pos|online|atm|cash\\s*out)\\b|" +
-            "شراء|خصم|مدين|سحب|دفع|تمت?\\s*عملية|عملية\\s*خصم|تسوق|شحن|تحويل\\s*صادر|تم\\s*تنفيذ\\s*تحويل|تحويل\\s*لحظي"
+            "(?i)\\b(purchase|purchased|paid|debit|debited|spent|withdrawn|withdraw|charge|charged|was\\s*charged|transferred|transfer|sent|pos|online|atm|cash\\s*out)\\b|" +
+            "شراء|خصم|مدين|سحب|دفع|تمت?\\s*عملية|عملية\\s*خصم|تسوق|شحن|تحويل\\s*صادر|تم\\s*تنفيذ\\s*تحويل|تحويل\\s*لحظي|تم\\s*تحويل|أرسلت|ارسلت|تم\\s*ارسال"
     );
 
     private static final Pattern CREDIT_PATTERN = Pattern.compile(
-            "(?i)\\b(refund|refunded|deposited|deposit|credited|credit|reversed|reversal|cash\\s*in|transfer\\s*received|received)\\b|" +
-            "استرداد|إيداع|ايداع|دائن|اضافة|إضافة|تحويل\\s*وارد|تم\\s*استلام\\s*تحويل|استلام\\s*مبلغ"
+            "(?i)\\b(refund|refunded|deposited|deposit|credited|credit|reversed|reversal|cash\\s*in|transfer\\s*received|received|received\\s*from)\\b|" +
+            "استرداد|إيداع|ايداع|دائن|اضافة|إضافة|تحويل\\s*وارد|تم\\s*استلام\\s*تحويل|استلام\\s*مبلغ|استقبلت|تم\\s*استقبال|تمت?\\s*إضافة"
     );
 
     // Reference number pattern (Item 8) - with word boundary so it won't match inside "Carrefour"
@@ -61,6 +62,15 @@ public class BankSmsParser {
     // Merchant pattern: "at Amazon" or "لدى Carrefour"
     private static final Pattern MERCHANT_PATTERN = Pattern.compile(
             "(?i)(?:at|لدى|عند|merchant|store|من\\s+ماكينة|from\\s+atm)\\s*[:\\-]?\\s*([^,\\r\\n;]+)"
+    );
+
+    // Counterparty patterns for transfers and InstaPay
+    private static final Pattern TRANSFER_TO_PATTERN = Pattern.compile(
+            "(?i)(?:إلى|الى|لحساب|للمستفيد|\\bto\\b|\\bsent\\s+to\\b)\\s*[:\\-]?\\s*([^\\r\\n,;]+?)(?=\\s+(?:عبر|من\\s+خلال|باستخدام|\\bvia\\b|\\busing\\b|\\bon\\b|بتاريخ|في|\\bref\\b|برقم|\\bfrom\\b|\\d{1,2}[/-])|$)"
+    );
+
+    private static final Pattern TRANSFER_FROM_PATTERN = Pattern.compile(
+            "(?i)(?:من\\s+المحول|من\\s+العميل|من(?!(?:\\s+بطاقة|\\s+كارت|\\s+حسابك|\\s+حساب|\\s+ماكينة|\\s+atm|\\s+card|\\s+account))|\\bfrom\\b|\\breceived\\s+from\\b)\\s*[:\\-]?\\s*([^\\r\\n,;]+?)(?=\\s+(?:عبر|من\\s+خلال|باستخدام|\\bvia\\b|\\busing\\b|\\bon\\b|بتاريخ|في|\\bref\\b|برقم|\\bto\\b|\\d{1,2}[/-])|$)"
     );
 
     public static boolean isSenderAllowed(String sender, Set<String> allowlist) {
@@ -82,6 +92,7 @@ public class BankSmsParser {
     public static String resolveBankName(String sender) {
         if (sender == null) return "Bank";
         String s = sender.toUpperCase(Locale.US);
+        if (s.contains("INSTAPAY") || s.contains("IPN") || s.contains("INSTA")) return "InstaPay";
         if (s.contains("CIB")) return "CIB";
         if (s.contains("HSBC")) return "HSBC";
         if (s.contains("QNB")) return "QNB";
@@ -147,7 +158,7 @@ public class BankSmsParser {
         boolean isCredit = CREDIT_PATTERN.matcher(normalized).find();
         boolean isDebit = DEBIT_PATTERN.matcher(normalized).find();
 
-        if (isCredit && !isDebit) {
+        if (isCredit && !Pattern.compile("(?i)\\b(purchase|purchased|paid|spent|withdrawn|withdraw|charged)\\b|شراء|سحب|دفع|شحن").matcher(normalized).find()) {
             type = "income";
         } else if (!isCredit && !isDebit) {
             return null;
@@ -169,14 +180,42 @@ public class BankSmsParser {
         String position = ident.position;
         boolean requiresCardSelection = digits.isEmpty();
 
-        // 5. Merchant extraction
+        // 5. Merchant & Counterparty extraction
         String merchant = "";
-        Matcher merchMatcher = MERCHANT_PATTERN.matcher(normalized);
-        if (merchMatcher.find()) {
-            String m = merchMatcher.group(1).trim();
-            m = m.split("(?i)\\s+(?:with\\s+card|from\\s+card|with\\s+credit|with\\s+debit|using|on\\s+\\d|باستخدام|من\\s+بطاقة|من\\s+حساب|بتاريخ|في\\s+\\d)")[0].trim();
-            if (m.length() > 50) m = m.substring(0, 50).trim();
-            merchant = m;
+        boolean isTransferOrInsta = Pattern.compile("(?i)(instapay|ipn|إنستاباي|انستاباي|تحويل|transfer|transferred|sent|received)").matcher(normalized).find();
+        boolean hasInstaPay = Pattern.compile("(?i)(instapay|ipn|إنستاباي|انستاباي)").matcher(normalized).find() || (sender != null && sender.toUpperCase(Locale.US).contains("INSTA"));
+
+        if (isTransferOrInsta) {
+            if ("income".equals(type)) {
+                Matcher inMatcher = TRANSFER_FROM_PATTERN.matcher(normalized);
+                if (inMatcher.find() && inMatcher.group(1) != null) {
+                    String party = cleanCounterparty(inMatcher.group(1));
+                    if (!party.isEmpty()) {
+                        merchant = hasInstaPay ? ("InstaPay: " + party) : ("تحويل من: " + party);
+                    }
+                }
+            } else {
+                Matcher outMatcher = TRANSFER_TO_PATTERN.matcher(normalized);
+                if (outMatcher.find() && outMatcher.group(1) != null) {
+                    String party = cleanCounterparty(outMatcher.group(1));
+                    if (!party.isEmpty()) {
+                        merchant = hasInstaPay ? ("InstaPay: " + party) : ("تحويل إلى: " + party);
+                    }
+                }
+            }
+            if (merchant.isEmpty() && hasInstaPay) {
+                merchant = "InstaPay";
+            }
+        }
+
+        if (merchant.isEmpty()) {
+            Matcher merchMatcher = MERCHANT_PATTERN.matcher(normalized);
+            if (merchMatcher.find()) {
+                String m = merchMatcher.group(1).trim();
+                m = m.split("(?i)\\s+(?:with\\s+card|from\\s+card|with\\s+credit|with\\s+debit|using|on\\s+\\d|باستخدام|من\\s+بطاقة|من\\s+حساب|بتاريخ|في\\s+\\d)")[0].trim();
+                if (m.length() > 50) m = m.substring(0, 50).trim();
+                merchant = m;
+            }
         }
 
         // 6. Full Date and Time Extraction (Item 7)
@@ -208,6 +247,16 @@ public class BankSmsParser {
                 fingerprint,
                 requiresCardSelection
         );
+    }
+
+    private static String cleanCounterparty(String raw) {
+        if (raw == null) return "";
+        String s = raw.trim()
+                .replaceAll("(?i)\\s+(?:بنجاح|ناجح|ناجحة|تمت|successful|successfully)$", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+        if (s.length() > 40) s = s.substring(0, 40).trim();
+        return s;
     }
 
     private static class AmountResult {
