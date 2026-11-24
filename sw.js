@@ -1,11 +1,13 @@
 // Service Worker for ApexWallet PWA
-const CACHE_NAME = 'apexwallet-v2';
+const CACHE_NAME = 'apexwallet-v3';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
   './ui.js',
+  './security.js',
+  './sms_engine.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'

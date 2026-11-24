@@ -29,7 +29,9 @@ function initApp() {
     card: document.getElementById('modal-card'),
     quickActions: document.getElementById('modal-quick-actions'),
     customizeCard: document.getElementById('modal-customize-card'),
-    'customize-card': document.getElementById('modal-customize-card')
+    'customize-card': document.getElementById('modal-customize-card'),
+    smsReview: document.getElementById('modal-sms-review'),
+    'sms-review': document.getElementById('modal-sms-review')
   };
 
   // --- Toast System ---
@@ -447,6 +449,29 @@ function initApp() {
     }
   }
 
+  // --- Bank SMS Notification Banner Helper ---
+  function renderSmsBannerHtml() {
+    const count = (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates) ? window.BankSmsEngine.pendingCandidates.length : 0;
+    if (count === 0) return '';
+    return `
+      <div id="sms-inbox-banner" onclick="window.openSmsReviewInbox()" class="cursor-pointer bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-3.5 rounded-3xl shadow-sm border border-indigo-700/50 flex items-center justify-between active-press transition-all hover:border-indigo-400">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-9 h-9 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
+            <i data-lucide="mail-check" class="w-4 h-4 text-emerald-400"></i>
+          </div>
+          <div class="min-w-0 pr-1">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-extrabold text-white">Bank SMS Import</span>
+              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white shrink-0">${count} Ready</span>
+            </div>
+            <p class="text-[10px] text-slate-300 truncate mt-0.5">Review parsed bank transactions & assign cards</p>
+          </div>
+        </div>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400 shrink-0"></i>
+      </div>
+    `;
+  }
+
   // ==========================================
   // VIEW 1: OVERVIEW (SWIPEABLE CARDS CAROUSEL)
   // ==========================================
@@ -457,37 +482,43 @@ function initApp() {
     if (store.cards.length === 0) {
       if (store.banks.length === 0) {
         container.innerHTML = `
-          <div class="bg-white p-7 rounded-3xl border border-slate-200/90 text-center shadow-xs space-y-4 my-auto mt-4">
-            <div class="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs">
-              <i data-lucide="building-2" class="w-7 h-7"></i>
-            </div>
-            <div>
-              <h3 class="text-base font-extrabold text-slate-900">Your Wallet is Ready</h3>
-              <p class="text-xs text-slate-400 mt-1 max-w-[270px] mx-auto">Start by adding your bank, then add your cards (up to 3 per bank) and track your expenses.</p>
-            </div>
-            <div class="pt-2 max-w-[220px] mx-auto">
-              <button onclick="window.openModal('bank')" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white text-xs font-bold rounded-full shadow-md active-press flex items-center justify-center gap-1.5 transition-all">
-                <i data-lucide="plus" class="w-4 h-4"></i>
-                <span>Add Your Bank</span>
-              </button>
+          <div class="space-y-4">
+            ${renderSmsBannerHtml()}
+            <div class="bg-white p-7 rounded-3xl border border-slate-200/90 text-center shadow-xs space-y-4 my-auto mt-4">
+              <div class="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs">
+                <i data-lucide="building-2" class="w-7 h-7"></i>
+              </div>
+              <div>
+                <h3 class="text-base font-extrabold text-slate-900">Your Wallet is Ready</h3>
+                <p class="text-xs text-slate-400 mt-1 max-w-[270px] mx-auto">Start by adding your bank, then add your cards (up to 3 per bank) and track your expenses.</p>
+              </div>
+              <div class="pt-2 max-w-[220px] mx-auto">
+                <button onclick="window.openModal('bank')" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white text-xs font-bold rounded-full shadow-md active-press flex items-center justify-center gap-1.5 transition-all">
+                  <i data-lucide="plus" class="w-4 h-4"></i>
+                  <span>Add Your Bank</span>
+                </button>
+              </div>
             </div>
           </div>
         `;
       } else {
         container.innerHTML = `
-          <div class="bg-white p-7 rounded-3xl border border-slate-200/90 text-center shadow-xs space-y-4 my-auto mt-4">
-            <div class="w-14 h-14 mx-auto rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs">
-              <i data-lucide="credit-card" class="w-7 h-7"></i>
-            </div>
-            <div>
-              <h3 class="text-base font-extrabold text-slate-900">No Cards Added Yet</h3>
-              <p class="text-xs text-slate-400 mt-1 max-w-[270px] mx-auto">You have banks linked. Now add a credit, debit, or prepaid card to start tracking your statements.</p>
-            </div>
-            <div class="pt-2 max-w-[220px] mx-auto">
-              <button onclick="window.openModal('card')" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white text-xs font-bold rounded-full shadow-md active-press flex items-center justify-center gap-1.5 transition-all">
-                <i data-lucide="plus" class="w-4 h-4"></i>
-                <span>Add Your First Card</span>
-              </button>
+          <div class="space-y-4">
+            ${renderSmsBannerHtml()}
+            <div class="bg-white p-7 rounded-3xl border border-slate-200/90 text-center shadow-xs space-y-4 my-auto mt-4">
+              <div class="w-14 h-14 mx-auto rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs">
+                <i data-lucide="credit-card" class="w-7 h-7"></i>
+              </div>
+              <div>
+                <h3 class="text-base font-extrabold text-slate-900">No Cards Added Yet</h3>
+                <p class="text-xs text-slate-400 mt-1 max-w-[270px] mx-auto">You have banks linked. Now add a credit, debit, or prepaid card to start tracking your statements.</p>
+              </div>
+              <div class="pt-2 max-w-[220px] mx-auto">
+                <button onclick="window.openModal('card')" class="w-full py-3 bg-[#111827] hover:bg-slate-800 text-white text-xs font-bold rounded-full shadow-md active-press flex items-center justify-center gap-1.5 transition-all">
+                  <i data-lucide="plus" class="w-4 h-4"></i>
+                  <span>Add Your First Card</span>
+                </button>
+              </div>
             </div>
           </div>
         `;
@@ -507,6 +538,9 @@ function initApp() {
     container.innerHTML = `
       <div class="space-y-4">
         
+        <!-- PENDING BANK SMS NOTIFICATION BANNER -->
+        ${renderSmsBannerHtml()}
+
         <!-- Header Subtitle with Active Card Info & Carousel Hint -->
         <div class="flex justify-between items-center px-1">
           <div class="flex items-center gap-1.5">
@@ -1409,6 +1443,140 @@ function initApp() {
           </div>
         </div>
 
+        <!-- SECTION: BANK SMS TRANSACTION IMPORT -->
+        <div class="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-4">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div class="flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-xs font-extrabold text-slate-900 tracking-tight">Bank SMS Transaction Import</h3>
+                <p class="text-[10px] text-slate-400">On-device parsing & Keystore queue</p>
+              </div>
+            </div>
+            ${window.BankSmsEngine && window.BankSmsEngine.isPlatformSupported()
+              ? '<span class="text-[9px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Android Native</span>'
+              : '<span class="text-[9px] font-extrabold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">PWA / Web View</span>'}
+          </div>
+
+          <!-- Explanation Banner -->
+          <div class="bg-indigo-50/70 rounded-2xl p-3 border border-indigo-100/80 text-[10px] text-indigo-900 leading-relaxed space-y-1">
+            <div class="font-extrabold flex items-center gap-1.5 text-indigo-950">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 text-indigo-600"></i>
+              <span>Privacy & Security Guarantee</span>
+            </div>
+            <p class="text-indigo-800/90">
+              Only incoming SMS from enabled banks are processed on-device. Raw SMS text is discarded immediately in memory. OTPs, passwords, and verification codes are strictly rejected.
+            </p>
+          </div>
+
+          <!-- Toggle: Opt-In Switch -->
+          <div class="flex items-center justify-between py-1">
+            <div>
+              <div class="text-xs font-bold text-slate-900">Enable Bank SMS Import</div>
+              <div class="text-[10px] text-slate-400">Off by default • Explicit opt-in</div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="settings-sms-import-toggle" ${window.BankSmsEngine && window.BankSmsEngine.stats.isSmsImportEnabled ? 'checked' : ''} onchange="window.toggleSmsImport(this.checked)" class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+            </label>
+          </div>
+
+          <!-- Permission Status Row -->
+          <div class="flex items-center justify-between py-1 border-t border-slate-100 pt-3">
+            <div>
+              <div class="text-xs font-bold text-slate-900">RECEIVE_SMS Permission</div>
+              <div class="text-[10px] text-slate-400">Android runtime permission state</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                (window.BankSmsEngine && window.BankSmsEngine.stats.permissionStatus === 'granted')
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : (window.BankSmsEngine && window.BankSmsEngine.stats.permissionStatus === 'denied')
+                  ? 'bg-rose-100 text-rose-800'
+                  : 'bg-amber-100 text-amber-800'
+              }">
+                ${((window.BankSmsEngine && window.BankSmsEngine.stats.permissionStatus) || 'UNAVAILABLE').toUpperCase()}
+              </span>
+              ${window.BankSmsEngine && window.BankSmsEngine.isPlatformSupported() && window.BankSmsEngine.stats.permissionStatus !== 'granted'
+                ? `<button onclick="window.requestSmsPermission()" class="text-[10px] font-bold px-2 py-1 bg-slate-900 text-white rounded-lg active-press">Request</button>`
+                : ''}
+            </div>
+          </div>
+
+          <!-- Keystore Protection Row -->
+          <div class="flex items-center justify-between py-1 border-t border-slate-100 pt-3">
+            <div>
+              <div class="text-xs font-bold text-slate-900">Hardware Keystore Vault</div>
+              <div class="text-[10px] text-slate-400">MasterKey AES-256-GCM queue</div>
+            </div>
+            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+              window.BankSmsEngine && window.BankSmsEngine.stats.isKeystoreProtected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+            }">
+              ${window.BankSmsEngine && window.BankSmsEngine.stats.isKeystoreProtected ? 'ACTIVE' : 'READY / MEMORY'}
+            </span>
+          </div>
+
+          <!-- Pending Queue & Review Inbox Trigger -->
+          <div class="flex items-center justify-between py-1 border-t border-slate-100 pt-3">
+            <div>
+              <div class="text-xs font-bold text-slate-900">Pending Transactions</div>
+              <div class="text-[10px] text-slate-400">${(window.BankSmsEngine && window.BankSmsEngine.pendingCandidates.length) || 0} awaiting review</div>
+            </div>
+            <button onclick="window.openSmsReviewInbox()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-full active-press transition-all flex items-center gap-1 shadow-xs">
+              <i data-lucide="inbox" class="w-3.5 h-3.5"></i>
+              <span>Review (${(window.BankSmsEngine && window.BankSmsEngine.pendingCandidates.length) || 0})</span>
+            </button>
+          </div>
+
+          <!-- Bank Allowlist Manager -->
+          <div class="border-t border-slate-100 pt-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-bold text-slate-900">Allowed Bank Senders</label>
+              <span class="text-[10px] text-slate-400">${(window.BankSmsEngine && window.BankSmsEngine.allowlist.length) || 0} enabled</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded-2xl border border-slate-100">
+              ${(window.BankSmsEngine && window.BankSmsEngine.allowlist || []).map(b => `
+                <span class="inline-flex items-center gap-1 text-[10px] font-bold bg-white text-slate-800 px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs">
+                  <span>${b}</span>
+                  <button type="button" onclick="window.removeBankSender('${b}')" class="text-slate-400 hover:text-rose-600 font-black ml-0.5">&times;</button>
+                </span>
+              `).join('')}
+            </div>
+            <div class="flex gap-1.5 pt-1">
+              <input type="text" id="new-bank-sender-input" placeholder="Add bank (e.g. ALEXBANK)" class="flex-1 text-[11px] font-bold px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 uppercase">
+              <button type="button" onclick="window.addBankSender()" class="px-3 py-1.5 bg-[#111827] text-white text-[11px] font-bold rounded-xl active-press">Add</button>
+            </div>
+          </div>
+
+          <!-- In-App Synthetic SMS Test Simulator -->
+          <div class="border-t border-slate-100 pt-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <i data-lucide="flask-conical" class="w-3.5 h-3.5 text-indigo-600"></i>
+                <span class="text-xs font-bold text-slate-900">SMS Parser Test Simulator</span>
+              </div>
+              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">Dev & Demo</span>
+            </div>
+            <p class="text-[10px] text-slate-400">Test fabricated English & Arabic messages through the parser pipeline:</p>
+            <div class="flex gap-2">
+              <select id="sms-simulator-select" class="flex-1 text-[11px] font-bold bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 outline-none cursor-pointer">
+                <option value="0">CIB Purchase (EGP 1,250.50 at Amazon Egypt)</option>
+                <option value="1">HSBC POS Debit (EGP 450.00 at Starbucks Arkan)</option>
+                <option value="2">NBE Arabic + Eastern Numerals (١,٤٥٠.٠٠ ج.م لدى فودافون)</option>
+                <option value="3">Banque Misr Arabic (850.00 جنيه لدى كارفور)</option>
+                <option value="4">Amazon Refund (EGP 600.00 Income Credit)</option>
+                <option value="5">Security OTP (Must be REJECTED)</option>
+              </select>
+              <button type="button" onclick="window.simulatePresetSms()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-xl active-press transition-all shrink-0">
+                Simulate
+              </button>
+            </div>
+          </div>
+
+        </div>
+
         <!-- SECTION 2: PREFERENCES -->
         <div class="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-2xs space-y-3">
           <div class="flex items-center gap-2.5 pb-2 border-b border-slate-100">
@@ -1469,6 +1637,28 @@ function initApp() {
             </div>
             <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
           </button>
+
+          <!-- Vault Backup & Restore Migration -->
+          <div class="pt-2 border-t border-slate-100 space-y-2">
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Vault Backup & Migration (Browser &harr; Android)</p>
+            
+            <button onclick="window.exportEncryptedVaultBackup()" class="w-full p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-800 flex items-center justify-between text-xs font-bold border border-slate-200/70 transition-all active-press">
+              <div class="flex items-center gap-2.5">
+                <i data-lucide="hard-drive-download" class="w-4 h-4 text-indigo-600"></i>
+                <span>Export Encrypted Vault Backup (JSON)</span>
+              </div>
+              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+            </button>
+
+            <label class="w-full p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-800 flex items-center justify-between text-xs font-bold border border-slate-200/70 transition-all active-press cursor-pointer">
+              <div class="flex items-center gap-2.5">
+                <i data-lucide="hard-drive-upload" class="w-4 h-4 text-emerald-600"></i>
+                <span>Import Vault Backup (Restore)</span>
+              </div>
+              <input type="file" accept=".json" onchange="window.importEncryptedVaultBackup(event)" class="hidden">
+              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+            </label>
+          </div>
 
           <button onclick="window.clearAllData()" class="w-full p-3 rounded-2xl bg-rose-50 hover:bg-rose-100/80 text-rose-700 border border-rose-100 flex items-center justify-between text-xs font-bold transition-all active-press">
             <div class="flex items-center gap-2.5">
@@ -1612,6 +1802,316 @@ function initApp() {
     document.body.removeChild(link);
     showToast('Exported CSV file!', 'success');
   };
+
+  // ==========================================
+  // BANK SMS IMPORT & REVIEW INBOX CONTROLLER
+  // ==========================================
+  function renderSmsCandidatesList() {
+    const listEl = document.getElementById('sms-candidates-container');
+    const counterEl = document.getElementById('sms-inbox-counter');
+    if (!listEl) return;
+
+    const candidates = (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates) ? window.BankSmsEngine.pendingCandidates : [];
+    if (counterEl) {
+      counterEl.textContent = `${candidates.length} New`;
+    }
+
+    if (candidates.length === 0) {
+      listEl.innerHTML = `
+        <div class="py-10 text-center space-y-2">
+          <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+            <i data-lucide="inbox" class="w-6 h-6"></i>
+          </div>
+          <p class="text-xs font-bold text-slate-700">Inbox is empty</p>
+          <p class="text-[10px] text-slate-400 max-w-[220px] mx-auto">New incoming bank transactions will automatically appear here when received via SMS.</p>
+        </div>
+      `;
+      if (window.lucide) {
+        try { lucide.createIcons({ root: listEl }); } catch (e) {}
+      }
+      return;
+    }
+
+    const cards = store.cards || [];
+
+    listEl.innerHTML = candidates.map(c => {
+      const isCredit = c.type === 'income';
+      const typeBadge = isCredit
+        ? '<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">REFUND / INCOME</span>'
+        : '<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">EXPENSE</span>';
+
+      const needsCardSelection = c.requiresCardSelection || !c.matchedCardId;
+
+      return `
+        <div id="candidate-card-${c.id}" class="bg-slate-50 border ${needsCardSelection ? 'border-amber-300 ring-1 ring-amber-300/40' : 'border-slate-200'} rounded-2xl p-3.5 space-y-2.5 transition-all">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] font-black tracking-tight text-slate-900 bg-white px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">${c.bank}</span>
+              ${typeBadge}
+              ${c.cardSuffix ? `<span class="text-[10px] font-mono text-slate-500 font-bold">•••• ${c.cardSuffix}</span>` : '<span class="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">Select Card</span>'}
+            </div>
+            <span class="text-xs font-black font-mono ${isCredit ? 'text-emerald-600' : 'text-slate-900'}">
+              ${isCredit ? '+' : '-'}${c.amount.toFixed(2)} ${c.currency}
+            </span>
+          </div>
+
+          <div class="space-y-1.5">
+            <div>
+              <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Merchant / Reference</label>
+              <input type="text" id="candidate-merchant-${c.id}" value="${c.merchant ? c.merchant.replace(/"/g, '&quot;') : (c.bank + ' Transaction')}" class="w-full text-xs font-bold text-slate-900 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 outline-none focus:border-indigo-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Assign Card</label>
+                <select id="candidate-card-select-${c.id}" class="w-full text-[11px] font-bold text-slate-800 bg-white border ${needsCardSelection ? 'border-amber-400' : 'border-slate-200'} rounded-xl px-2 py-1.5 outline-none cursor-pointer">
+                  ${cards.length === 0 ? '<option value="">No cards in wallet</option>' : ''}
+                  ${cards.map(card => {
+                    const isSelected = card.id === c.matchedCardId;
+                    return `<option value="${card.id}" ${isSelected ? 'selected' : ''}>${card.name} (••• ${card.last4})</option>`;
+                  }).join('')}
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Category</label>
+                <select id="candidate-category-select-${c.id}" class="w-full text-[11px] font-bold text-slate-800 bg-white border border-slate-200 rounded-xl px-2 py-1.5 outline-none cursor-pointer">
+                  <option value="shopping" ${c.suggestedCategory === 'shopping' ? 'selected' : ''}>Shopping</option>
+                  <option value="food" ${c.suggestedCategory === 'food' ? 'selected' : ''}>Food & Dining</option>
+                  <option value="groceries" ${c.suggestedCategory === 'groceries' ? 'selected' : ''}>Groceries</option>
+                  <option value="utilities" ${c.suggestedCategory === 'utilities' ? 'selected' : ''}>Utilities</option>
+                  <option value="travel" ${c.suggestedCategory === 'travel' ? 'selected' : ''}>Travel / Fuel</option>
+                  <option value="health" ${c.suggestedCategory === 'health' ? 'selected' : ''}>Health</option>
+                  <option value="entertainment" ${c.suggestedCategory === 'entertainment' ? 'selected' : ''}>Entertainment</option>
+                  <option value="services" ${c.suggestedCategory === 'services' ? 'selected' : ''}>Subscriptions</option>
+                  <option value="other" ${!c.suggestedCategory || c.suggestedCategory === 'other' ? 'selected' : ''}>Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="text-[9px] text-slate-400 flex items-center justify-between px-0.5 pt-0.5">
+              <span>Date: ${c.transactionTime || new Date(c.receiptTime).toLocaleString()}</span>
+              <span>Ref: ${(c.fingerprint || '').slice(0, 10)}</span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 pt-1 border-t border-slate-200/60">
+            <button type="button" onclick="window.approveSmsCandidate('${c.id}')" class="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl active-press transition-all flex items-center justify-center gap-1 shadow-xs">
+              <i data-lucide="check" class="w-3.5 h-3.5"></i>
+              <span>Approve (Import)</span>
+            </button>
+            <button type="button" onclick="window.rejectSmsCandidate('${c.id}')" class="py-1.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold rounded-xl active-press transition-all flex items-center justify-center gap-1">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span>Reject</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    if (window.lucide) {
+      try { lucide.createIcons({ root: listEl }); } catch (e) {}
+    }
+  }
+
+  window.openSmsReviewInbox = () => {
+    openModal('smsReview');
+    renderSmsCandidatesList();
+  };
+
+  window.approveSmsCandidate = async (candidateId) => {
+    if (!window.BankSmsEngine) return;
+    const cardSelect = document.getElementById(`candidate-card-select-${candidateId}`);
+    const merchInput = document.getElementById(`candidate-merchant-${candidateId}`);
+    const catSelect = document.getElementById(`candidate-category-select-${candidateId}`);
+
+    const cardId = cardSelect ? cardSelect.value : null;
+    const merchant = merchInput ? merchInput.value : '';
+    const category = catSelect ? catSelect.value : 'other';
+
+    if (!cardId) {
+      showToast('Please select a card to assign this transaction.', 'error');
+      return;
+    }
+
+    const res = await window.BankSmsEngine.approveCandidate(candidateId, { cardId, merchant, category });
+    if (res.success) {
+      showToast(`Imported ${res.transaction.merchant} (${formatCurrency(res.transaction.amount)})`, 'success');
+      renderSmsCandidatesList();
+      renderCurrentView();
+    } else {
+      showToast(res.error || 'Failed to approve transaction', 'error');
+    }
+  };
+
+  window.rejectSmsCandidate = async (candidateId) => {
+    if (!window.BankSmsEngine) return;
+    await window.BankSmsEngine.rejectCandidate(candidateId);
+    showToast('Transaction discarded from queue', 'info');
+    renderSmsCandidatesList();
+    renderCurrentView();
+  };
+
+  window.approveAllVerifiedSms = async () => {
+    if (!window.BankSmsEngine) return;
+    const approved = await window.BankSmsEngine.approveAllVerified();
+    if (approved.length > 0) {
+      showToast(`Imported ${approved.length} verified transactions!`, 'success');
+      renderSmsCandidatesList();
+      renderCurrentView();
+    } else {
+      showToast('No auto-matched transactions. Please select cards individually.', 'info');
+    }
+  };
+
+  window.clearAllPendingSms = async () => {
+    if (!window.BankSmsEngine) return;
+    if (confirm('Clear all pending transactions from inbox?')) {
+      await window.BankSmsEngine.clearAllPending();
+      showToast('SMS review inbox cleared', 'info');
+      renderSmsCandidatesList();
+      renderCurrentView();
+    }
+  };
+
+  window.toggleSmsImport = async (enabled) => {
+    if (!window.BankSmsEngine) return;
+    await window.BankSmsEngine.setSmsImportEnabled(enabled);
+    showToast(enabled ? 'Bank SMS Import Enabled' : 'Bank SMS Import Disabled', enabled ? 'success' : 'info');
+    renderCurrentView();
+  };
+
+  window.requestSmsPermission = async () => {
+    if (!window.BankSmsEngine) return;
+    const res = await window.BankSmsEngine.requestPermission();
+    if (res.granted) {
+      showToast('RECEIVE_SMS permission granted!', 'success');
+    } else {
+      showToast('SMS permission denied or restricted in Android settings', 'error');
+    }
+    renderCurrentView();
+  };
+
+  window.addBankSender = async () => {
+    const input = document.getElementById('new-bank-sender-input');
+    if (!input || !input.value.trim()) return;
+    const sender = input.value.trim().toUpperCase();
+    if (window.BankSmsEngine) {
+      const current = window.BankSmsEngine.allowlist || [];
+      if (!current.includes(sender)) {
+        await window.BankSmsEngine.updateAllowlist([...current, sender]);
+        showToast(`Added ${sender} to allowed senders`, 'success');
+        input.value = '';
+        renderCurrentView();
+      }
+    }
+  };
+
+  window.removeBankSender = async (sender) => {
+    if (window.BankSmsEngine) {
+      const current = window.BankSmsEngine.allowlist || [];
+      const updated = current.filter(s => s !== sender);
+      await window.BankSmsEngine.updateAllowlist(updated);
+      showToast(`Removed ${sender}`, 'info');
+      renderCurrentView();
+    }
+  };
+
+  window.simulatePresetSms = async () => {
+    const select = document.getElementById('sms-simulator-select');
+    if (!select || !window.BankSmsEngine) return;
+
+    const PRESETS = [
+      { sender: 'CIB', body: 'Dear Customer, purchase of EGP 1,250.50 at Amazon Egypt with card ending in 8492 on 24/11/2026 14:30. Available limit EGP 23,749.50.' },
+      { sender: 'HSBC', body: 'HSBC Alert: Debited EGP 450.00 for POS transaction at Starbucks Arkan from card **5521 on 24/11/2026.' },
+      { sender: 'NBE', body: 'تم خصم مبلغ ١,٤٥٠.٠٠ ج.م من بطاقتكم المنتهية برقم ٩٠١١ لدى فودافون مصر بتاريخ ٢٠٢٦/١١/٢٤.' },
+      { sender: 'Banque Misr', body: 'عملية شراء بمبلغ 850.00 جنيه لدى كارفور المعادي باستخدام بطاقة رقم ...4120 بتاريخ 2026/11/24.' },
+      { sender: 'CIB', body: 'Refund of EGP 600.00 received from Amazon Egypt to card ending in 8492 on 24/11/2026.' },
+      { sender: 'CIB', body: 'Your CIB OTP is 492011 for EGP 500 purchase. Valid for 5 mins. Do not share.' }
+    ];
+
+    const idx = parseInt(select.value, 10);
+    const chosen = PRESETS[idx] || PRESETS[0];
+
+    const res = await window.BankSmsEngine.simulateTestSms(chosen.sender, chosen.body);
+    if (res.parsed) {
+      showToast(`Parsed: ${res.candidate.bank} ${res.candidate.amount} ${res.candidate.currency}! Opening inbox...`, 'success');
+      setTimeout(() => window.openSmsReviewInbox(), 300);
+    } else {
+      showToast(`Message safely rejected: ${res.reason || 'Not a valid transaction'}`, 'info');
+    }
+    renderCurrentView();
+  };
+
+  // --- Vault Backup & Restore Migration ---
+  window.exportEncryptedVaultBackup = () => {
+    const rawVault = localStorage.getItem('apexwallet_security_vault_v1');
+    const userStore = localStorage.getItem('apexwallet_user_vault_v1');
+    const currency = localStorage.getItem('wallet_currency') || 'EGP';
+
+    const backupPayload = {
+      app: 'ApexWallet',
+      version: '1.2.0',
+      exportedAt: new Date().toISOString(),
+      securityVault: rawVault ? JSON.parse(rawVault) : null,
+      userStore: userStore ? JSON.parse(userStore) : null,
+      currency: currency
+    };
+
+    const blob = new Blob([JSON.stringify(backupPayload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `apexwallet_vault_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Vault backup exported successfully!', 'success');
+  };
+
+  window.importEncryptedVaultBackup = (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!data || data.app !== 'ApexWallet') {
+          showToast('Invalid ApexWallet backup file.', 'error');
+          return;
+        }
+
+        if (data.securityVault) {
+          localStorage.setItem('apexwallet_security_vault_v1', JSON.stringify(data.securityVault));
+        }
+        if (data.userStore) {
+          localStorage.setItem('apexwallet_user_vault_v1', JSON.stringify(data.userStore));
+        }
+        if (data.currency) {
+          localStorage.setItem('wallet_currency', data.currency);
+        }
+
+        showToast('Vault imported! Please enter your PIN to unlock.', 'success');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1200);
+      } catch (err) {
+        showToast('Error reading backup file: ' + err.message, 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Real-time listener for SMS engine updates
+  if (window.BankSmsEngine) {
+    window.BankSmsEngine.subscribe(() => {
+      if (store.activeTab === 'dashboard') renderOverviewView();
+      if (store.activeTab === 'settings') renderSettingsView();
+      renderSmsCandidatesList();
+    });
+  }
 
   // ==========================================
   // PIN SECURITY & BIOMETRIC LOCK CONTROLLER

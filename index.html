@@ -620,11 +620,56 @@
       </div>
     </div>
 
+    <!-- ============================================== -->
+    <!-- SLIDE-UP MODAL 6: SMS TRANSACTION REVIEW INBOX -->
+    <!-- ============================================== -->
+    <div id="modal-sms-review" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
+      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      
+      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] flex flex-col">
+        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3 shrink-0"></div>
+
+        <div class="flex items-center justify-between mb-3 shrink-0">
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-extrabold text-slate-900">SMS Transaction Inbox</h3>
+              <span id="sms-inbox-counter" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">0 New</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Review and approve parsed bank transactions</p>
+          </div>
+          <button data-close-modal="smsReview" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- Controls: Approve Verified / Clear All -->
+        <div id="sms-inbox-batch-actions" class="flex items-center justify-between gap-2 mb-3 shrink-0">
+          <button type="button" onclick="window.approveAllVerifiedSms()" class="flex-1 py-1.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold rounded-xl border border-emerald-200 flex items-center justify-center gap-1.5 transition-all">
+            <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
+            <span>Approve Verified</span>
+          </button>
+          <button type="button" onclick="window.clearAllPendingSms()" class="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold rounded-xl transition-all">
+            <span>Clear All</span>
+          </button>
+        </div>
+
+        <!-- Scrollable Candidates List -->
+        <div id="sms-candidates-container" class="flex-1 overflow-y-auto space-y-3 pr-0.5 pb-2">
+          <!-- Dynamically populated via ui.js -->
+        </div>
+
+        <button data-close-modal="smsReview" class="mt-3 w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition-all shrink-0">
+          Close Inbox
+        </button>
+      </div>
+    </div>
+
   </main>
 
   <!-- Application Logic Scripts -->
   <script src="security.js"></script>
   <script src="app.js"></script>
+  <script src="sms_engine.js"></script>
   <script src="ui.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
