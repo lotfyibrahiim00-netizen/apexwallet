@@ -302,6 +302,42 @@ async function testSmsStoreIntegration() {
   assert.strictEqual(rejectSuccess, true);
   assert.strictEqual(engine.pendingCandidates.length, 0);
   assert.strictEqual(store.transactions.length, 2, 'Ledger transactions must remain 2 (rejected item not added)');
+
+  // 8. Test 69 Staged Candidates: Safe Migration & Zero-Loss Retention
+  mockLocalStorage.delete('apex_web_sms_candidates');
+  engine.pendingCandidates = [];
+
+  const staged69 = [];
+  for (let i = 1; i <= 69; i++) {
+    staged69.push({
+      id: 'staged_' + i,
+      fingerprint: 'staged_fp_' + i,
+      bank: 'CIB',
+      cardSuffix: '8492',
+      identifierDigits: '8492',
+      digitsPosition: 'last',
+      entityType: 'card',
+      amount: i * 50,
+      currency: 'EGP',
+      merchant: 'Staged Merchant ' + i,
+      status: 'pending'
+    });
+  }
+  mockLocalStorage.set('apexwallet_sms_pending_staged_v1', JSON.stringify(staged69));
+
+  // Run fetchPendingTransactions which triggers migrateAndPurgeStagedPlaintext & zero-loss merge
+  await engine.fetchPendingTransactions();
+
+  // All 69 candidates MUST be loaded in pendingCandidates without losing a single item!
+  assert.strictEqual(engine.pendingCandidates.length, 69, 'All 69 staged candidates must be preserved and available for review');
+  assert.strictEqual(engine.pendingCandidates[0].matchedCardId, cibCard.id, 'Candidate 1 must be auto-matched with CIB card');
+  assert.strictEqual(engine.pendingCandidates[0].requiresCardSelection, false);
+
+  // Approve first staged candidate
+  const approveStaged1 = await engine.approveCandidate(engine.pendingCandidates[0].id);
+  assert.strictEqual(approveStaged1.success, true);
+  assert.strictEqual(engine.pendingCandidates.length, 68);
+  assert.strictEqual(store.transactions.length, 3);
 }
 
 (async function main() {

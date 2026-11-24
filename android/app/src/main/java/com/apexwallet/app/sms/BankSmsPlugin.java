@@ -499,10 +499,15 @@ public class BankSmsPlugin extends Plugin {
                 list.add(CandidateTransaction.fromJsonObject(arr.getJSONObject(i)));
             } catch (JSONException ignored) {}
         }
-        int added = mQueue.enqueueBatch(list);
+        List<String> confirmed = mQueue.enqueueBatch(list);
         JSObject ret = new JSObject();
         ret.put("success", true);
-        ret.put("addedCount", added);
+        ret.put("addedCount", confirmed.size());
+        JSArray confirmedArr = new JSArray();
+        for (String fp : confirmed) {
+            confirmedArr.put(fp);
+        }
+        ret.put("confirmedFingerprints", confirmedArr);
         call.resolve(ret);
     }
 

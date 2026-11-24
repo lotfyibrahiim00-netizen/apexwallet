@@ -199,38 +199,58 @@ public class BankSmsQueue {
      * Enqueues a batch of candidates into the encrypted queue up to MAX_QUEUE_SIZE.
      * Rejects duplicates based on fingerprint. Never silently drops existing items.
      */
-    public synchronized int enqueueBatch(List<CandidateTransaction> candidates) {
-        if (candidates == null || candidates.isEmpty()) return 0;
+    /**
+     * Batch enqueue used during safe migration.
+     * Returns the list of fingerprints that are safely confirmed stored in Keystore (or already stored).
+     * Any candidate that cannot be enqueued due to capacity limit is excluded from the returned list.
+     */
+    public synchronized List<String> enqueueBatch(List<CandidateTransaction> candidates) {
+        List<String> confirmed = new ArrayList<>();
+        if (candidates == null || candidates.isEmpty()) return confirmed;
         List<CandidateTransaction> pending = getPendingList();
         int added = 0;
         for (CandidateTransaction c : candidates) {
-            if (c == null || c.getFingerprint() == null || isDuplicate(c.getFingerprint())) {
+            if (c == null || c.getFingerprint() == null) {
                 continue;
             }
-            boolean exists = false;
+
+            // If already pending in Keystore queue, it is confirmed safe
+            boolean alreadyPending = false;
             for (CandidateTransaction existing : pending) {
                 if (c.getFingerprint().equals(existing.getFingerprint())) {
-                    exists = true;
+                    alreadyPending = true;
                     break;
                 }
             }
-            if (!exists) {
-                if (pending.size() < MAX_QUEUE_SIZE) {
-                    pending.add(c);
-                    recordFingerprint(c.getFingerprint());
-                    added++;
-                } else {
-                    if (mSecurePrefs != null) {
-                        int rej = mSecurePrefs.getInt(KEY_STATS_REJECTED_CAPACITY, 0) + 1;
-                        mSecurePrefs.edit().putInt(KEY_STATS_REJECTED_CAPACITY, rej).apply();
-                    }
+            if (alreadyPending) {
+                confirmed.add(c.getFingerprint());
+                continue;
+            }
+
+            // If already acknowledged in history, it is confirmed safe
+            if (isDuplicate(c.getFingerprint())) {
+                confirmed.add(c.getFingerprint());
+                continue;
+            }
+
+            // Attempt to enqueue if space available
+            if (pending.size() < MAX_QUEUE_SIZE) {
+                pending.add(c);
+                recordFingerprint(c.getFingerprint());
+                confirmed.add(c.getFingerprint());
+                added++;
+            } else {
+                // Capacity full: do NOT record fingerprint so it can be retried, record rejection stat
+                if (mSecurePrefs != null) {
+                    int rej = mSecurePrefs.getInt(KEY_STATS_REJECTED_CAPACITY, 0) + 1;
+                    mSecurePrefs.edit().putInt(KEY_STATS_REJECTED_CAPACITY, rej).apply();
                 }
             }
         }
         if (added > 0) {
             savePendingList(pending);
         }
-        return added;
+        return confirmed;
     }
 
     /**

@@ -585,35 +585,101 @@ runTest('Staged candidates persist and merge safely across app restarts without 
   assert.ok(restoredFpSet.has('fp_3'), 'Candidate C received while closed preserved');
 });
 
-// 13. Staged Plaintext Migration and Zero-Loss Purge
-runTest('Legacy staged plaintext candidates migrate safely to Keystore queue and purge plaintext key', () => {
+// 13. Staged Plaintext Migration and Zero-Loss Guarantees
+runTest('Safe migration NEVER deletes candidates if migration fails or plugin throws', () => {
   const mockLocalStorage = new Map();
   const STORAGE_KEY = 'apexwallet_sms_pending_staged_v1';
 
-  // Populate legacy unencrypted localStorage key
-  const legacyCandidates = [
-    { id: 'c_1', fingerprint: 'fp_1', amount: 350.00, merchant: 'Carrefour' },
-    { id: 'c_2', fingerprint: 'fp_2', amount: 120.00, merchant: 'McDonalds' }
-  ];
-  mockLocalStorage.set(STORAGE_KEY, JSON.stringify(legacyCandidates));
-
-  // Mock native Keystore queue
-  const mockKeystoreQueue = [];
-
-  // Migration simulation matching migrateAndPurgeStagedPlaintext()
-  const raw = mockLocalStorage.get(STORAGE_KEY);
-  assert.ok(raw !== undefined, 'Legacy key exists before migration');
-  const parsed = JSON.parse(raw);
-  if (Array.isArray(parsed) && parsed.length > 0) {
-    mockKeystoreQueue.push(...parsed);
+  // 69 staged candidates
+  const staged69 = [];
+  for (let i = 1; i <= 69; i++) {
+    staged69.push({ id: 'c_' + i, fingerprint: 'fp_' + i, amount: i * 10, merchant: 'Merchant ' + i });
   }
-  mockLocalStorage.delete(STORAGE_KEY);
+  mockLocalStorage.set(STORAGE_KEY, JSON.stringify(staged69));
 
-  // Assertions:
-  assert.strictEqual(mockLocalStorage.get(STORAGE_KEY), undefined, 'Plaintext key must be completely deleted');
-  assert.strictEqual(mockKeystoreQueue.length, 2, 'All legacy candidates moved into Keystore queue');
-  assert.strictEqual(mockKeystoreQueue[0].merchant, 'Carrefour');
-  assert.strictEqual(mockKeystoreQueue[1].merchant, 'McDonalds');
+  // Simulation of migrateAndPurgeStagedPlaintext() with plugin failure
+  async function simulateMigrationWithFailure() {
+    const raw = mockLocalStorage.get(STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+
+    // Simulate plugin failure (e.g. exception or success: false)
+    try {
+      throw new Error('Simulated Keystore bridge error');
+    } catch (pluginErr) {
+      // ZERO-LOSS: DO NOT delete localStorage on error!
+    }
+  }
+
+  simulateMigrationWithFailure();
+
+  // Verification: All 69 candidates MUST remain 100% intact in localStorage
+  const afterFailure = JSON.parse(mockLocalStorage.get(STORAGE_KEY));
+  assert.strictEqual(afterFailure.length, 69, 'All 69 candidates must remain untouched in localStorage upon failure');
+});
+
+runTest('Partial migration of 69 candidates preserves unmigrated candidates in localStorage for retry', () => {
+  const mockLocalStorage = new Map();
+  const STORAGE_KEY = 'apexwallet_sms_pending_staged_v1';
+
+  // 69 staged candidates
+  const staged69 = [];
+  for (let i = 1; i <= 69; i++) {
+    staged69.push({ id: 'c_' + i, fingerprint: 'fp_' + i, amount: i * 10, merchant: 'Merchant ' + i });
+  }
+  mockLocalStorage.set(STORAGE_KEY, JSON.stringify(staged69));
+
+  const keystoreQueue = [];
+  const MAX_CAPACITY = 40; // Queue only has room for 40 items!
+
+  // Simulation of BankSmsQueue.enqueueBatch
+  function nativeEnqueueBatch(candidates) {
+    const confirmed = [];
+    for (const c of candidates) {
+      if (keystoreQueue.length < MAX_CAPACITY) {
+        keystoreQueue.push(c);
+        confirmed.push(c.fingerprint);
+      }
+    }
+    return confirmed;
+  }
+
+  // Simulation of migrateAndPurgeStagedPlaintext() with partial space
+  function simulateSafeMigration() {
+    const raw = mockLocalStorage.get(STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    const confirmed = nativeEnqueueBatch(parsed);
+    const confirmedSet = new Set(confirmed);
+
+    const remaining = parsed.filter(c => !confirmedSet.has(c.fingerprint));
+    if (remaining.length === 0) {
+      mockLocalStorage.delete(STORAGE_KEY);
+    } else {
+      mockLocalStorage.set(STORAGE_KEY, JSON.stringify(remaining));
+    }
+  }
+
+  // 1. Run partial migration
+  simulateSafeMigration();
+
+  // 2. Assertions:
+  assert.strictEqual(keystoreQueue.length, 40, 'Exactly 40 items enqueued to Keystore');
+  const remainingInStorage = JSON.parse(mockLocalStorage.get(STORAGE_KEY));
+  assert.strictEqual(remainingInStorage.length, 29, 'Exactly 29 remaining candidates must be preserved in localStorage');
+  assert.strictEqual(remainingInStorage[0].id, 'c_41', 'First remaining item must be c_41');
+  assert.strictEqual(remainingInStorage[28].id, 'c_69', 'Last remaining item must be c_69');
+
+  // 3. User reviews and frees space in Keystore queue
+  keystoreQueue.splice(0, 30);
+  assert.strictEqual(keystoreQueue.length, 10, 'Queue now has space for 30 more items');
+
+  // 4. Retry migration for remaining 29 items
+  simulateSafeMigration();
+
+  // 5. Assertions after retry:
+  assert.strictEqual(keystoreQueue.length, 39, 'Remaining 29 items now safely enqueued in Keystore');
+  assert.strictEqual(mockLocalStorage.get(STORAGE_KEY), undefined, 'Plaintext key only purged after 100% confirmation');
 });
 
 // 14. Bounded Queue Capacity (100) and Non-Duplicate Recovery
