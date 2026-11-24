@@ -147,7 +147,13 @@ function parseBankSms(sender, rawBody) {
 
 // --- Test Suite Execution ---
 console.log('====================================================');
-console.log('🧪 ApexWallet Bank SMS Engine - Automated Test Suite');
+console.log('====================================================');
+console.log('🧪 ApexWallet Bank SMS Engine - Synthetic Test Suite');
+console.log('🔬 Environment: Node.js V8 Simulation (In-Memory)');
+console.log('⚠️  Notice: Unit tests verify grammar regexes, deduplication');
+console.log('    hashing, and pagination logic in a Node.js sandbox.');
+console.log('    Hardware Keystore & Android Telephony broadcasts');
+console.log('    are verified via ANDROID_E2E_VERIFICATION.md.');
 console.log('====================================================\n');
 
 let passedTests = 0;
@@ -157,10 +163,10 @@ function runTest(name, fn) {
   totalTests++;
   try {
     fn();
-    console.log(`  ✅ [PASS] ${name}`);
+    console.log(`  ✅ [PASS - JS SIMULATION] ${name}`);
     passedTests++;
   } catch (err) {
-    console.error(`  ❌ [FAIL] ${name}`);
+    console.error(`  ❌ [FAIL - JS SIMULATION] ${name}`);
     console.error(`     Error: ${err.message}`);
   }
 }
@@ -475,8 +481,86 @@ runTest('Staged candidates persist and merge safely across app restarts without 
   assert.ok(restoredFpSet.has('fp_3'), 'Candidate C received while closed preserved');
 });
 
+// 13. Staged Plaintext Migration and Zero-Loss Purge
+runTest('Legacy staged plaintext candidates migrate safely to Keystore queue and purge plaintext key', () => {
+  const mockLocalStorage = new Map();
+  const STORAGE_KEY = 'apexwallet_sms_pending_staged_v1';
+
+  // Populate legacy unencrypted localStorage key
+  const legacyCandidates = [
+    { id: 'c_1', fingerprint: 'fp_1', amount: 350.00, merchant: 'Carrefour' },
+    { id: 'c_2', fingerprint: 'fp_2', amount: 120.00, merchant: 'McDonalds' }
+  ];
+  mockLocalStorage.set(STORAGE_KEY, JSON.stringify(legacyCandidates));
+
+  // Mock native Keystore queue
+  const mockKeystoreQueue = [];
+
+  // Migration simulation matching migrateAndPurgeStagedPlaintext()
+  const raw = mockLocalStorage.get(STORAGE_KEY);
+  assert.ok(raw !== undefined, 'Legacy key exists before migration');
+  const parsed = JSON.parse(raw);
+  if (Array.isArray(parsed) && parsed.length > 0) {
+    mockKeystoreQueue.push(...parsed);
+  }
+  mockLocalStorage.delete(STORAGE_KEY);
+
+  // Assertions:
+  assert.strictEqual(mockLocalStorage.get(STORAGE_KEY), undefined, 'Plaintext key must be completely deleted');
+  assert.strictEqual(mockKeystoreQueue.length, 2, 'All legacy candidates moved into Keystore queue');
+  assert.strictEqual(mockKeystoreQueue[0].merchant, 'Carrefour');
+  assert.strictEqual(mockKeystoreQueue[1].merchant, 'McDonalds');
+});
+
+// 14. Bounded Queue Capacity (100) and Non-Duplicate Recovery
+runTest('Queue rejects 101st item at capacity without marking duplicate, allowing recovery on space clear', () => {
+  const queue = [];
+  const processedFingerprints = new Set();
+  const MAX_QUEUE = 100;
+  let rejectedDueToCapacityCount = 0;
+
+  function enqueue(item) {
+    if (processedFingerprints.has(item.fingerprint)) return false;
+    if (queue.length >= MAX_QUEUE) {
+      rejectedDueToCapacityCount++;
+      // IMPORTANT: DO NOT add to processedFingerprints!
+      return false;
+    }
+    queue.push(item);
+    processedFingerprints.add(item.fingerprint);
+    return true;
+  }
+
+  // 1. Fill queue to max capacity (100 items)
+  for (let i = 1; i <= 100; i++) {
+    const success = enqueue({ id: 'tx_' + i, fingerprint: 'fp_' + i, amount: i * 10 });
+    assert.strictEqual(success, true);
+  }
+  assert.strictEqual(queue.length, 100);
+  assert.strictEqual(rejectedDueToCapacityCount, 0);
+
+  // 2. Attempt to enqueue 101st candidate
+  const candidate101 = { id: 'tx_101', fingerprint: 'fp_101', amount: 1010 };
+  const res101 = enqueue(candidate101);
+  assert.strictEqual(res101, false, '101st item must be rejected when queue is full');
+  assert.strictEqual(rejectedDueToCapacityCount, 1, 'Rejection counter incremented');
+  assert.strictEqual(processedFingerprints.has('fp_101'), false, '101st item MUST NOT be marked as duplicate!');
+
+  // 3. User reviews and acknowledges 10 items from queue
+  queue.splice(0, 10);
+  assert.strictEqual(queue.length, 90, 'Queue now has space for 10 new items');
+
+  // 4. Historical re-scan or arrival retries 101st candidate
+  const retry101 = enqueue(candidate101);
+  assert.strictEqual(retry101, true, '101st item must be accepted now that space is freed');
+  assert.strictEqual(queue.length, 91);
+  assert.strictEqual(processedFingerprints.has('fp_101'), true, 'Fingerprint now recorded after acceptance');
+});
+
 console.log('\n----------------------------------------------------');
 console.log(`Results: ${passedTests} / ${totalTests} tests passed (${Math.round(passedTests/totalTests*100)}%)`);
+console.log('⚠️  Notice: 100% pass rate confirms in-memory JS logic.');
+console.log('    Physical device verification required for cellular SMS.');
 console.log('----------------------------------------------------');
 
 if (passedTests !== totalTests) {

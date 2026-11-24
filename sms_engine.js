@@ -65,6 +65,10 @@
         isSmsImportEnabled: false,
         isKeystoreProtected: false,
         pendingCount: 0,
+        queueCapacity: 100,
+        isQueueNearFull: false,
+        isQueueFull: false,
+        rejectedCapacityCount: 0,
         totalReceived: 0,
         lastReceivedAt: 0,
         lastBroadcastAt: 0,
@@ -211,6 +215,10 @@
           this.stats.isSmsImportEnabled = statsRes.isSmsImportEnabled || false;
           this.stats.isKeystoreProtected = statsRes.isKeystoreProtected || false;
           this.stats.pendingCount = statsRes.pendingCount || 0;
+          this.stats.queueCapacity = statsRes.queueCapacity || 100;
+          this.stats.isQueueNearFull = !!statsRes.isQueueNearFull;
+          this.stats.isQueueFull = !!statsRes.isQueueFull;
+          this.stats.rejectedCapacityCount = statsRes.rejectedCapacityCount || 0;
           this.stats.totalReceived = statsRes.totalReceived || 0;
           this.stats.lastReceivedAt = statsRes.lastReceivedAt || 0;
           this.stats.lastBroadcastAt = statsRes.lastBroadcastAt || 0;
@@ -240,67 +248,50 @@
       this.notifyChange();
     }
 
-    savePendingStagedCandidates() {
+    /**
+     * Safely migrates any legacy plaintext staged candidates from localStorage into
+     * the Keystore-backed native queue and permanently deletes the unencrypted key.
+     */
+    async migrateAndPurgeStagedPlaintext() {
       try {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('apexwallet_sms_pending_staged_v1', JSON.stringify(this.pendingCandidates));
-        }
-      } catch (e) {
-        console.warn('Failed to persist staged SMS candidates to localStorage:', e);
-      }
-    }
+        if (typeof localStorage === 'undefined') return;
+        const raw = localStorage.getItem('apexwallet_sms_pending_staged_v1');
+        if (!raw) return;
 
-    loadPendingStagedCandidates() {
-      try {
-        if (typeof localStorage !== 'undefined') {
-          const raw = localStorage.getItem('apexwallet_sms_pending_staged_v1');
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-              return parsed;
-            }
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const plugin = getNativePlugin();
+          if (plugin && typeof plugin.enqueueCandidates === 'function') {
+            await plugin.enqueueCandidates({ candidates: parsed });
           }
         }
-      } catch (e) {}
-      return [];
+        // Permanently purge unencrypted plaintext staging
+        localStorage.removeItem('apexwallet_sms_pending_staged_v1');
+      } catch (e) {
+        console.warn('Error during staged SMS plaintext purge/migration:', e);
+        try { localStorage.removeItem('apexwallet_sms_pending_staged_v1'); } catch (ignored) {}
+      }
     }
 
     async fetchPendingTransactions() {
+      // 1. Run migration and purge of legacy plaintext staging
+      await this.migrateAndPurgeStagedPlaintext();
+
       const plugin = getNativePlugin();
-      let nativePending = [];
       if (plugin) {
         try {
           const res = await plugin.getPendingTransactions();
-          nativePending = (res && res.pending) ? res.pending : [];
+          this.pendingCandidates = (res && res.pending) ? res.pending : [];
         } catch (e) {
           console.error('Error fetching pending transactions from native plugin:', e);
+          this.pendingCandidates = [];
         }
       } else {
-        nativePending = this.loadWebQueue();
+        this.pendingCandidates = this.loadWebQueue();
       }
 
-      // Merge native pending with locally staged candidates so nothing is lost across restarts
-      const staged = this.loadPendingStagedCandidates();
-      const mergedMap = new Map();
-
-      // Native queue candidates
-      for (const item of nativePending) {
-        if (item && (item.fingerprint || item.id)) {
-          mergedMap.set(item.fingerprint || item.id, item);
-        }
-      }
-
-      // Staged candidates from local storage
-      for (const item of staged) {
-        const key = item.fingerprint || item.id;
-        if (key && !mergedMap.has(key)) {
-          mergedMap.set(key, item);
-        }
-      }
-
-      this.pendingCandidates = Array.from(mergedMap.values());
       this.enrichCandidates();
-      this.savePendingStagedCandidates();
+      this.stats.pendingCount = this.pendingCandidates.length;
       this.notifyChange();
       return this.pendingCandidates;
     }
@@ -314,7 +305,6 @@
         this.enrichCandidates();
         this.stats.pendingCount = this.pendingCandidates.length;
         this.stats.lastReceivedAt = Date.now();
-        this.savePendingStagedCandidates();
         this.notifyChange();
       }
     }
@@ -445,7 +435,6 @@
           }
           this.enrichCandidates();
           this.stats.pendingCount = this.pendingCandidates.length;
-          this.savePendingStagedCandidates();
           this.notifyChange();
 
           return {
@@ -508,10 +497,9 @@
         // Acknowledge from native queue
         await this.acknowledgeIds([c.id, c.fingerprint]);
 
-        // Remove from memory and update persistent stage
+        // Remove from memory
         this.pendingCandidates.splice(idx, 1);
         this.stats.pendingCount = this.pendingCandidates.length;
-        this.savePendingStagedCandidates();
         this.notifyChange();
 
         return { success: true, transaction: newTx };
@@ -532,7 +520,6 @@
       await this.acknowledgeIds([c.id, c.fingerprint]);
       this.pendingCandidates.splice(idx, 1);
       this.stats.pendingCount = this.pendingCandidates.length;
-      this.savePendingStagedCandidates();
       this.notifyChange();
       return true;
     }
@@ -565,7 +552,6 @@
       }
       this.pendingCandidates = [];
       this.stats.pendingCount = 0;
-      this.savePendingStagedCandidates();
       this.saveWebQueue();
       this.notifyChange();
     }

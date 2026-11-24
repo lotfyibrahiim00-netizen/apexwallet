@@ -35,8 +35,12 @@ public class BankSmsQueue {
     private static final String KEY_STATS_LAST_RECEIVED = "stats_last_received";
     private static final String KEY_STATS_LAST_BROADCAST = "stats_last_broadcast";
     private static final String KEY_STATS_LAST_BROADCAST_SENDER = "stats_last_broadcast_sender";
+    private static final String KEY_STATS_REJECTED_CAPACITY = "stats_rejected_capacity";
+    private static final String KEY_BIO_IV = "biometric_keystore_iv";
+    private static final String KEY_BIO_ENCRYPTED_PIN = "biometric_keystore_encrypted_pin";
 
-    private static final int MAX_QUEUE_SIZE = 100;
+    public static final int MAX_QUEUE_SIZE = 100;
+    public static final int NEAR_FULL_THRESHOLD = 80;
     private static final int MAX_PROCESSED_HISTORY = 300;
     private static final long DEDUPLICATION_WINDOW_MS = 90 * 24 * 60 * 60 * 1000L; // 90 days
 
@@ -163,7 +167,11 @@ public class BankSmsQueue {
 
         // Enforce maximum queue bounds without silent FIFO drop
         if (pending.size() >= MAX_QUEUE_SIZE) {
-            Log.w(TAG, "Queue reached capacity (" + MAX_QUEUE_SIZE + "). Rejecting new enqueue without silent drop.");
+            if (mSecurePrefs != null) {
+                int rej = mSecurePrefs.getInt(KEY_STATS_REJECTED_CAPACITY, 0) + 1;
+                mSecurePrefs.edit().putInt(KEY_STATS_REJECTED_CAPACITY, rej).apply();
+            }
+            Log.w(TAG, "Queue reached capacity (" + MAX_QUEUE_SIZE + "). Rejecting new enqueue without silent drop or recording duplicate.");
             return false;
         }
 
@@ -206,10 +214,17 @@ public class BankSmsQueue {
                     break;
                 }
             }
-            if (!exists && pending.size() < MAX_QUEUE_SIZE) {
-                pending.add(c);
-                recordFingerprint(c.getFingerprint());
-                added++;
+            if (!exists) {
+                if (pending.size() < MAX_QUEUE_SIZE) {
+                    pending.add(c);
+                    recordFingerprint(c.getFingerprint());
+                    added++;
+                } else {
+                    if (mSecurePrefs != null) {
+                        int rej = mSecurePrefs.getInt(KEY_STATS_REJECTED_CAPACITY, 0) + 1;
+                        mSecurePrefs.edit().putInt(KEY_STATS_REJECTED_CAPACITY, rej).apply();
+                    }
+                }
             }
         }
         if (added > 0) {
@@ -298,9 +313,14 @@ public class BankSmsQueue {
             long lastReceived = mSecurePrefs != null ? mSecurePrefs.getLong(KEY_STATS_LAST_RECEIVED, 0L) : mInMemoryLastReceived;
             long lastBroadcast = mSecurePrefs != null ? mSecurePrefs.getLong(KEY_STATS_LAST_BROADCAST, 0L) : mInMemoryLastBroadcast;
             String lastBroadcastSender = mSecurePrefs != null ? mSecurePrefs.getString(KEY_STATS_LAST_BROADCAST_SENDER, "") : mInMemoryLastBroadcastSender;
+            int rejectedCapacity = mSecurePrefs != null ? mSecurePrefs.getInt(KEY_STATS_REJECTED_CAPACITY, 0) : 0;
             boolean enabled = isSmsImportEnabled();
 
             stats.put("pendingCount", pendingCount);
+            stats.put("queueCapacity", MAX_QUEUE_SIZE);
+            stats.put("isQueueNearFull", pendingCount >= NEAR_FULL_THRESHOLD);
+            stats.put("isQueueFull", pendingCount >= MAX_QUEUE_SIZE);
+            stats.put("rejectedCapacityCount", rejectedCapacity);
             stats.put("totalReceived", total);
             stats.put("lastReceivedAt", lastReceived);
             stats.put("lastBroadcastAt", lastBroadcast);
@@ -309,6 +329,43 @@ public class BankSmsQueue {
             stats.put("isKeystoreProtected", mIsKeystoreProtected);
         } catch (JSONException ignored) {}
         return stats;
+    }
+
+    // ==========================================
+    // Keystore-Protected Biometric PIN Record Storage
+    // ==========================================
+
+    public synchronized void saveBiometricPinRecord(String ivB64, String encryptedPinB64) {
+        if (mSecurePrefs != null) {
+            mSecurePrefs.edit()
+                    .putString(KEY_BIO_IV, ivB64)
+                    .putString(KEY_BIO_ENCRYPTED_PIN, encryptedPinB64)
+                    .apply();
+        }
+    }
+
+    public synchronized String[] getBiometricPinRecord() {
+        if (mSecurePrefs != null && mSecurePrefs.contains(KEY_BIO_ENCRYPTED_PIN)) {
+            String iv = mSecurePrefs.getString(KEY_BIO_IV, null);
+            String encPin = mSecurePrefs.getString(KEY_BIO_ENCRYPTED_PIN, null);
+            if (iv != null && encPin != null) {
+                return new String[]{ iv, encPin };
+            }
+        }
+        return null;
+    }
+
+    public synchronized void clearBiometricPinRecord() {
+        if (mSecurePrefs != null) {
+            mSecurePrefs.edit()
+                    .remove(KEY_BIO_IV)
+                    .remove(KEY_BIO_ENCRYPTED_PIN)
+                    .apply();
+        }
+    }
+
+    public synchronized boolean hasBiometricPinRecord() {
+        return mSecurePrefs != null && mSecurePrefs.contains(KEY_BIO_ENCRYPTED_PIN);
     }
 
     // ==========================================

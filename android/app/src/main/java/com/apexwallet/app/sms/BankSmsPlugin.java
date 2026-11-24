@@ -2,6 +2,11 @@ package com.apexwallet.app.sms;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.os.Build;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyPermanentlyInvalidatedException;
+import android.security.keystore.KeyProperties;
+import android.util.Base64;
 import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.biometric.BiometricManager;
@@ -21,11 +26,17 @@ import com.getcapacitor.annotation.PermissionCallback;
 import org.json.JSONArray;
 import org.json.JSONException;
 
+import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executor;
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
 
 /**
  * Capacitor bridge plugin for Bank SMS Transaction Import.
@@ -444,6 +455,57 @@ public class BankSmsPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    private static final String BIOMETRIC_KEY_ALIAS = "ApexWalletBiometricAuthKey_v1";
+
+    private SecretKey getOrCreateBiometricKey() throws Exception {
+        KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+        keyStore.load(null);
+        if (!keyStore.containsAlias(BIOMETRIC_KEY_ALIAS)) {
+            KeyGenerator keyGenerator = KeyGenerator.getInstance(
+                    KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+            KeyGenParameterSpec.Builder builder = new KeyGenParameterSpec.Builder(
+                    BIOMETRIC_KEY_ALIAS,
+                    KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setKeySize(256)
+                    .setUserAuthenticationRequired(true);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                builder.setUserAuthenticationParameters(0, KeyProperties.AUTH_BIOMETRIC_STRONG);
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                builder.setInvalidatedByBiometricEnrollment(true);
+            }
+            keyGenerator.init(builder.build());
+            keyGenerator.generateKey();
+        }
+        return (SecretKey) keyStore.getKey(BIOMETRIC_KEY_ALIAS, null);
+    }
+
+    /**
+     * Safely migrates and enqueues candidate transactions into the Keystore queue.
+     */
+    @PluginMethod
+    public void enqueueCandidates(PluginCall call) {
+        JSArray arr = call.getArray("candidates");
+        if (arr == null) {
+            call.reject("candidates array is required");
+            return;
+        }
+        List<CandidateTransaction> list = new ArrayList<>();
+        for (int i = 0; i < arr.length(); i++) {
+            try {
+                list.add(CandidateTransaction.fromJsonObject(arr.getJSONObject(i)));
+            } catch (JSONException ignored) {}
+        }
+        int added = mQueue.enqueueBatch(list);
+        JSObject ret = new JSObject();
+        ret.put("success", true);
+        ret.put("addedCount", added);
+        call.resolve(ret);
+    }
+
     /**
      * Check if hardware biometric authentication (Fingerprint / Face ID) is supported and enrolled.
      */
@@ -451,13 +513,18 @@ public class BankSmsPlugin extends Plugin {
     public void isBiometricAvailable(PluginCall call) {
         try {
             BiometricManager biometricManager = BiometricManager.from(getContext());
-            int canAuthenticate = biometricManager.canAuthenticate(
+            int strongAuth = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+            int anyAuth = biometricManager.canAuthenticate(
                     BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.BIOMETRIC_WEAK
             );
-            boolean isAvailable = (canAuthenticate == BiometricManager.BIOMETRIC_SUCCESS);
+            boolean isStrongAvailable = (strongAuth == BiometricManager.BIOMETRIC_SUCCESS);
+            boolean isAnyAvailable = (anyAuth == BiometricManager.BIOMETRIC_SUCCESS);
+
             JSObject ret = new JSObject();
-            ret.put("isAvailable", isAvailable);
-            ret.put("statusCode", canAuthenticate);
+            ret.put("isAvailable", isStrongAvailable || isAnyAvailable);
+            ret.put("isStrongAvailable", isStrongAvailable);
+            ret.put("hasKeystoreRecord", mQueue.hasBiometricPinRecord());
+            ret.put("statusCode", strongAuth);
             call.resolve(ret);
         } catch (Exception e) {
             JSObject ret = new JSObject();
@@ -468,13 +535,17 @@ public class BankSmsPlugin extends Plugin {
     }
 
     /**
-     * Show native Android BiometricPrompt dialog for fingerprint/face verification.
+     * Hardware Keystore-bound Biometric Setup:
+     * Generates AES-256 key in Android KeyStore requiring biometric auth,
+     * encrypts PIN via BiometricPrompt.CryptoObject, and saves IV + ciphertext in EncryptedSharedPreferences.
      */
     @PluginMethod
-    public void authenticateBiometric(PluginCall call) {
-        String title = call.getString("title", "ApexWallet Biometrics");
-        String subtitle = call.getString("subtitle", "Verify your fingerprint or face");
-        String negativeButtonText = call.getString("negativeButtonText", "Use PIN");
+    public void setupBiometricPin(PluginCall call) {
+        String pin = call.getString("pin");
+        if (pin == null || pin.isEmpty()) {
+            call.reject("PIN is required for biometric setup");
+            return;
+        }
 
         getActivity().runOnUiThread(() -> {
             try {
@@ -486,12 +557,24 @@ public class BankSmsPlugin extends Plugin {
                     return;
                 }
 
+                // Delete old key if exists to ensure key is bound to current biometric enrollment
+                KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+                keyStore.load(null);
+                if (keyStore.containsAlias(BIOMETRIC_KEY_ALIAS)) {
+                    keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS);
+                }
+
+                SecretKey secretKey = getOrCreateBiometricKey();
+                Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+                cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+                BiometricPrompt.CryptoObject cryptoObject = new BiometricPrompt.CryptoObject(cipher);
+
                 Executor executor = ContextCompat.getMainExecutor(getActivity());
                 BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
-                        .setTitle(title)
-                        .setSubtitle(subtitle)
-                        .setNegativeButtonText(negativeButtonText)
-                        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                        .setTitle(call.getString("title", "تفعيل فتح المحفظة بالبصمة"))
+                        .setSubtitle(call.getString("subtitle", "المس مستشعر البصمة لحماية مفتاح فك التشفير في عتاد الجهاز"))
+                        .setNegativeButtonText(call.getString("negativeButtonText", "إلغاء"))
+                        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
                         .build();
 
                 BiometricPrompt biometricPrompt = new BiometricPrompt(
@@ -511,9 +594,29 @@ public class BankSmsPlugin extends Plugin {
                             @Override
                             public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
                                 super.onAuthenticationSucceeded(result);
-                                JSObject ret = new JSObject();
-                                ret.put("success", true);
-                                call.resolve(ret);
+                                try {
+                                    Cipher authenticatedCipher = result.getCryptoObject() != null ? result.getCryptoObject().getCipher() : null;
+                                    if (authenticatedCipher == null) {
+                                        throw new IllegalStateException("CryptoObject cipher unavailable");
+                                    }
+                                    byte[] iv = authenticatedCipher.getIV();
+                                    byte[] encryptedPin = authenticatedCipher.doFinal(pin.getBytes(StandardCharsets.UTF_8));
+
+                                    String ivB64 = Base64.encodeToString(iv, Base64.NO_WRAP);
+                                    String encPinB64 = Base64.encodeToString(encryptedPin, Base64.NO_WRAP);
+
+                                    mQueue.saveBiometricPinRecord(ivB64, encPinB64);
+
+                                    JSObject ret = new JSObject();
+                                    ret.put("success", true);
+                                    ret.put("isKeystoreBound", true);
+                                    call.resolve(ret);
+                                } catch (Exception e) {
+                                    JSObject ret = new JSObject();
+                                    ret.put("success", false);
+                                    ret.put("error", "Encryption error: " + e.getMessage());
+                                    call.resolve(ret);
+                                }
                             }
 
                             @Override
@@ -523,13 +626,166 @@ public class BankSmsPlugin extends Plugin {
                         }
                 );
 
-                biometricPrompt.authenticate(promptInfo);
+                biometricPrompt.authenticate(promptInfo, cryptoObject);
+
             } catch (Exception e) {
                 JSObject ret = new JSObject();
                 ret.put("success", false);
-                ret.put("error", e.getMessage());
+                ret.put("error", "Setup error: " + e.getMessage());
                 call.resolve(ret);
             }
         });
+    }
+
+    /**
+     * Hardware Keystore-bound Biometric Unlock:
+     * Authorizes decryption of PIN via BiometricPrompt.CryptoObject.
+     * If device biometrics changed in Android settings, catches KeyPermanentlyInvalidatedException
+     * and safely routes user to unlock with manual PIN without data loss.
+     */
+    @PluginMethod
+    public void unlockWithBiometricPin(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            try {
+                if (!(getActivity() instanceof FragmentActivity)) {
+                    JSObject ret = new JSObject();
+                    ret.put("success", false);
+                    ret.put("error", "Host activity is not a FragmentActivity");
+                    call.resolve(ret);
+                    return;
+                }
+
+                KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+                keyStore.load(null);
+                if (!keyStore.containsAlias(BIOMETRIC_KEY_ALIAS)) {
+                    JSObject ret = new JSObject();
+                    ret.put("success", false);
+                    ret.put("error", "Biometric key not found in Keystore");
+                    ret.put("requiresReEnrollment", true);
+                    call.resolve(ret);
+                    return;
+                }
+
+                String[] record = mQueue.getBiometricPinRecord();
+                if (record == null) {
+                    JSObject ret = new JSObject();
+                    ret.put("success", false);
+                    ret.put("error", "No encrypted PIN record found");
+                    ret.put("requiresReEnrollment", true);
+                    call.resolve(ret);
+                    return;
+                }
+
+                byte[] iv = Base64.decode(record[0], Base64.DEFAULT);
+                byte[] encryptedPin = Base64.decode(record[1], Base64.DEFAULT);
+
+                SecretKey secretKey = (SecretKey) keyStore.getKey(BIOMETRIC_KEY_ALIAS, null);
+                Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+                GCMParameterSpec spec = new GCMParameterSpec(128, iv);
+
+                try {
+                    cipher.init(Cipher.DECRYPT_MODE, secretKey, spec);
+                } catch (KeyPermanentlyInvalidatedException e) {
+                    // Biometric credentials changed in device settings (added/removed fingerprint)
+                    // Safe recovery: clear invalidated key and prompt user to enter manual PIN
+                    try {
+                        keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS);
+                    } catch (Exception ignored) {}
+                    mQueue.clearBiometricPinRecord();
+
+                    JSObject ret = new JSObject();
+                    ret.put("success", false);
+                    ret.put("invalidated", true);
+                    ret.put("error", "تم تعديل بصمات الأصابع في إعدادات النظام. يرجى إدخال رمز الـ PIN يدوياً لفتح المحفظة.");
+                    call.resolve(ret);
+                    return;
+                }
+
+                BiometricPrompt.CryptoObject cryptoObject = new BiometricPrompt.CryptoObject(cipher);
+
+                Executor executor = ContextCompat.getMainExecutor(getActivity());
+                BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                        .setTitle(call.getString("title", "فتح محفظة ApexWallet"))
+                        .setSubtitle(call.getString("subtitle", "استخدم بصمة الإصبع أو الوجه لفك تشفير المحفظة"))
+                        .setNegativeButtonText(call.getString("negativeButtonText", "استخدام رمز PIN"))
+                        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                        .build();
+
+                BiometricPrompt biometricPrompt = new BiometricPrompt(
+                        (FragmentActivity) getActivity(),
+                        executor,
+                        new BiometricPrompt.AuthenticationCallback() {
+                            @Override
+                            public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                                super.onAuthenticationError(errorCode, errString);
+                                JSObject ret = new JSObject();
+                                ret.put("success", false);
+                                ret.put("error", errString.toString());
+                                ret.put("cancelled", errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON || errorCode == BiometricPrompt.ERROR_USER_CANCELED);
+                                call.resolve(ret);
+                            }
+
+                            @Override
+                            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                                super.onAuthenticationSucceeded(result);
+                                try {
+                                    Cipher authenticatedCipher = result.getCryptoObject() != null ? result.getCryptoObject().getCipher() : null;
+                                    if (authenticatedCipher == null) {
+                                        throw new IllegalStateException("CryptoObject cipher unavailable");
+                                    }
+                                    byte[] decrypted = authenticatedCipher.doFinal(encryptedPin);
+                                    String pin = new String(decrypted, StandardCharsets.UTF_8);
+
+                                    JSObject ret = new JSObject();
+                                    ret.put("success", true);
+                                    ret.put("pin", pin);
+                                    call.resolve(ret);
+                                } catch (Exception e) {
+                                    JSObject ret = new JSObject();
+                                    ret.put("success", false);
+                                    ret.put("error", "Decryption failed: " + e.getMessage());
+                                    call.resolve(ret);
+                                }
+                            }
+
+                            @Override
+                            public void onAuthenticationFailed() {
+                                super.onAuthenticationFailed();
+                            }
+                        }
+                );
+
+                biometricPrompt.authenticate(promptInfo, cryptoObject);
+
+            } catch (Exception e) {
+                JSObject ret = new JSObject();
+                ret.put("success", false);
+                ret.put("error", "Biometric unlock error: " + e.getMessage());
+                call.resolve(ret);
+            }
+        });
+    }
+
+    @PluginMethod
+    public void clearBiometricPin(PluginCall call) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+            keyStore.load(null);
+            if (keyStore.containsAlias(BIOMETRIC_KEY_ALIAS)) {
+                keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS);
+            }
+        } catch (Exception ignored) {}
+        mQueue.clearBiometricPinRecord();
+        JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void hasBiometricPin(PluginCall call) {
+        boolean hasRecord = mQueue.hasBiometricPinRecord();
+        JSObject ret = new JSObject();
+        ret.put("hasRecord", hasRecord);
+        call.resolve(ret);
     }
 }

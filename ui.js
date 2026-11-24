@@ -1438,12 +1438,33 @@ function initApp() {
             </select>
           </div>
 
-          <!-- Vault Security Architecture Note -->
-          <div class="bg-slate-50 rounded-2xl p-3 border border-slate-100 flex items-start gap-2.5">
-            <i data-lucide="lock" class="w-4 h-4 text-emerald-600 mt-0.5 shrink-0"></i>
-            <div class="text-[10px] text-slate-500 leading-relaxed">
-              <strong class="text-slate-800">Military-Grade Encryption:</strong> Local vault is protected by AES-GCM (256-bit) and PBKDF2 (100,000 iterations). Your cards & data never touch an unencrypted server.
+          <!-- Vault Security Architecture Note & Boundaries -->
+          <div class="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 space-y-2 text-[10px] leading-relaxed">
+            <div class="flex items-center gap-1.5 font-bold text-slate-800">
+              <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-indigo-600"></i>
+              <span>بنية الحماية وحدود الأنظمة (Threat Model & Security Boundaries)</span>
             </div>
+            ${window.BankSmsEngine && window.BankSmsEngine.isPlatformSupported() ? `
+              <div class="space-y-1 text-slate-600">
+                <div class="flex items-center gap-1 font-bold text-emerald-800">
+                  <i data-lucide="cpu" class="w-3 h-3 text-emerald-600"></i>
+                  <span>أندرويد أصلي (Hardware Keystore TEE):</span>
+                </div>
+                <p>
+                  مفتاح البصمة مربوط بعتاد الجهاز الآمن (Keystore) عبر BiometricPrompt.CryptoObject ولا يُفك تشفير رمز الـ PIN بدون بصمة حقيقية. طابور رسائل الـ SMS مشفر بـ MasterKey AES-256. فتح المحفظة بالـ PIN اليدوي مستقل تماماً ويضمن عدم فقدان بياناتك في حال تعديل البصمات من إعدادات النظام.
+                </p>
+              </div>
+            ` : `
+              <div class="space-y-1 text-slate-600">
+                <div class="flex items-center gap-1 font-bold text-blue-800">
+                  <i data-lucide="globe" class="w-3 h-3 text-blue-600"></i>
+                  <span>نسخة المتصفح / PWA (Web Crypto & WebAuthn):</span>
+                </div>
+                <p>
+                  تشفير الخزنة محلياً بـ AES-256-GCM مع اشتقاق PBKDF2 (100,000 تكرار). مصادقة WebAuthn تتأكد من وجود المستخدم، ورمز الـ PIN اليدوي هو جذر التشفير الأساسي؛ نظراً لعدم إتاحة المتصفحات وصولاً مباشراً لعتاد Keystore بدون خادم مصادقة أو امتدادات PRF.
+                </p>
+              </div>
+            `}
           </div>
         </div>
 
@@ -2144,6 +2165,10 @@ function initApp() {
     const lastBroadcast = stats.lastBroadcastAt ? new Date(stats.lastBroadcastAt).toLocaleTimeString() + ' (' + new Date(stats.lastBroadcastAt).toLocaleDateString() + ')' : 'لم يصل أي بث من أندرويد حتى الآن';
     const lastSender = stats.lastBroadcastSender || '';
     const queueCount = (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates.length) || 0;
+    const queueCapacity = stats.queueCapacity || 100;
+    const isQueueFull = queueCount >= queueCapacity;
+    const isQueueNearFull = queueCount >= 80 && !isQueueFull;
+    const rejectedCapacity = stats.rejectedCapacityCount || 0;
 
     container.innerHTML = `
       <div class="space-y-3">
@@ -2189,14 +2214,43 @@ function initApp() {
           </div>
 
           <div class="flex items-center justify-between border-t border-slate-100 pt-1.5">
-            <span class="text-slate-600 font-bold">تشفير الخزنة (Keystore):</span>
-            <span class="font-bold text-slate-800">${stats.isKeystoreProtected ? 'Hardware AES-256 🔒' : 'ذاكرة آمنة 🛡️'}</span>
+            <span class="text-slate-600 font-bold">تشفير طابور الرسائل (SMS Vault):</span>
+            <span class="font-bold text-slate-800">${stats.isKeystoreProtected ? 'Hardware Keystore AES-256 🔒' : 'ذاكرة آمنة 🛡️'}</span>
           </div>
 
           <div class="flex items-center justify-between border-t border-slate-100 pt-1.5">
-            <span class="text-slate-600 font-bold">الرسائل في الانتظار:</span>
-            <span class="font-bold text-indigo-700 font-mono">${queueCount} من 50 عنصر</span>
+            <span class="text-slate-600 font-bold">سعة قائمة الانتظار المشفرة:</span>
+            <span class="font-bold font-mono ${isQueueFull ? 'text-rose-600' : (isQueueNearFull ? 'text-amber-600' : 'text-indigo-700')}">
+              ${queueCount} من ${queueCapacity} عنصر
+            </span>
           </div>
+
+          <!-- Capacity Alert Banners -->
+          ${isQueueFull ? `
+            <div class="bg-rose-50 border border-rose-200 rounded-xl p-2.5 text-[10px] text-rose-900 space-y-1">
+              <div class="font-bold flex items-center gap-1 text-rose-950">
+                <i data-lucide="alert-octagon" class="w-3.5 h-3.5 text-rose-600"></i>
+                <span>القائمة ممتلئة تماماً (100 / 100)</span>
+              </div>
+              <p class="leading-relaxed">
+                تم إيقاف إضافة رسائل جديدة مؤقتاً لحماية رسائلك غير المراجعة من الحذف الصامت. الرسائل التي تصل الآن لا تُسجل كمكررة وستتمكن من جلبها عبر "استيراد الرسائل القديمة" فور اعتماد أو تفريغ بعض العمليات.
+              </p>
+            </div>
+          ` : (isQueueNearFull ? `
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-[10px] text-amber-900 space-y-0.5">
+              <div class="font-bold flex items-center gap-1 text-amber-950">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600"></i>
+                <span>تنبيه: القائمة تقترب من الامتلاء (${queueCount} / ${queueCapacity})</span>
+              </div>
+              <p>يُفضل مراجعة بعض العمليات لتفريغ مساحة وضمان استقبال الرسائل اللاسلكية فوراً.</p>
+            </div>
+          ` : '')}
+
+          ${rejectedCapacity > 0 ? `
+            <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-2 text-[10px] text-indigo-900">
+              وصلت <b>${rejectedCapacity}</b> رسالة أثناء امتلاء القائمة. يمكنك استيرادها الآن عبر فحص الرسائل القديمة بعد مراجعة الصندوق الحالي.
+            </div>
+          ` : ''}
 
           <div class="border-t border-slate-100 pt-1.5 space-y-1">
             <div class="flex items-center justify-between">
@@ -2205,6 +2259,24 @@ function initApp() {
             </div>
             ${lastSender ? `<div class="text-[10px] text-slate-500 text-right">المصدر: <b class="text-slate-700">${lastSender}</b></div>` : ''}
           </div>
+        </div>
+
+        <!-- Real Telephony Verification Protocol Card -->
+        <div class="bg-slate-100/80 border border-slate-200 rounded-2xl p-3 space-y-1.5 text-[10px] text-slate-600 leading-relaxed">
+          <div class="font-bold text-slate-900 flex items-center gap-1">
+            <i data-lucide="radio" class="w-3.5 h-3.5 text-indigo-600"></i>
+            <span>دليل التحقق الواقعي على هاتفك (On-Device Test):</span>
+          </div>
+          <p>
+            اختبارات Node.js تؤكد سلامة خوارزميات النصوص والتكرار، ولكن لإثبات مسار الاستقبال الحقيقي كاملاً على الجهاز:
+          </p>
+          <ol class="list-decimal list-inside space-y-0.5 text-slate-700 font-medium">
+            <li>تأكد من ظهور صلاحية RECEIVE_SMS بلون أخضر أعلاه.</li>
+            <li>تأكد من ضبط البطارية على "بدون قيود" (Unrestricted).</li>
+            <li>أرسل أو انتظر رسالة بنكية حقيقية من أحد بنوكك المعتمدة.</li>
+            <li>تحقق من تحديث وقت "آخر بث وصل للتطبيق" بالثواني الحقيقية.</li>
+            <li>افتح صندوق المراجعة واعتمد العملية لتظهر في رصيد محفظتك.</li>
+          </ol>
         </div>
 
         <!-- Battery Manager Warning Note -->

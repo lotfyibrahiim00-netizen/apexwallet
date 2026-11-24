@@ -1,6 +1,26 @@
 /**
  * ApexWallet Security & Cryptography Engine
- * Military-grade AES-256-GCM encryption with PBKDF2 key derivation & WebAuthn biometrics.
+ * 
+ * Cryptographic Architecture & Threat Model:
+ * 
+ * 1. Native Android Architecture (High Security - Hardware Keystore Bound):
+ *    - Master Vault Encryption: AES-256-GCM authenticated encryption.
+ *    - Key Derivation: PBKDF2-HMAC-SHA256 with 100,000 iterations and a cryptographically secure 16-byte salt.
+ *    - Biometric Protection: Handled natively via AndroidKeyStore (TEE / StrongBox).
+ *      An AES-256-GCM key is generated with setUserAuthenticationRequired(true) and invalidatedByBiometricEnrollment(true).
+ *      PIN decryption is impossible without a valid BiometricPrompt.CryptoObject hardware match.
+ *      No plaintext bioKey or PIN is stored in localStorage or WebKit disk storage.
+ *    - SMS Queue Protection: BankSmsQueue is protected by Android Keystore MasterKey (AES-256-GCM EncryptedSharedPreferences).
+ *    - Recovery Guarantee: Manual 4-digit PIN unlock is completely independent from biometrics.
+ *      If biometric credentials are changed, invalidated, or deleted in Android OS Settings,
+ *      the user simply unlocks with their manual PIN with 0 data loss and can re-enroll biometrics.
+ * 
+ * 2. Web / Browser PWA Architecture (Standard Browser Security & Documented Boundaries):
+ *    - Master Vault Encryption: WebCrypto AES-256-GCM with 100,000 PBKDF2 iterations.
+ *    - Biometric Verification: WebAuthn (FIDO2 / Platform Authenticator) confirms physical user presence.
+ *    - Browser Boundary & Honest Limitations: Pure browsers (PWA) lack hardware Keystore access for custom key wrapping
+ *      without the experimental WebAuthn PRF extension. In web mode, the manual PIN is the primary cryptographic root
+ *      of trust. The WebAuthn key confirms user presence, while the vault remains securely encrypted by the PIN-derived key.
  */
 
 (function (window) {
@@ -322,30 +342,42 @@
       // If biometrics is active, update the encrypted PIN stored for biometrics
       if (this.isBiometricsEnabled()) {
         try {
-          const bioRaw = localStorage.getItem(BIOMETRIC_KEY);
-          if (bioRaw) {
-            const bioData = JSON.parse(bioRaw);
-            const bioKeyBytes = b64ToBuf(bioData.bioKey);
-            const enc = new TextEncoder();
-            const bioCryptoKey = await crypto.subtle.importKey(
-              'raw',
-              bioKeyBytes,
-              { name: 'AES-GCM' },
-              false,
-              ['encrypt']
-            );
-            const iv = crypto.getRandomValues(new Uint8Array(12));
-            const encryptedPinBuffer = await crypto.subtle.encrypt(
-              { name: 'AES-GCM', iv: iv },
-              bioCryptoKey,
-              enc.encode(newPin)
-            );
-            const packed = new Uint8Array(iv.length + encryptedPinBuffer.byteLength);
-            packed.set(iv);
-            packed.set(new Uint8Array(encryptedPinBuffer), iv.length);
-            bioData.encryptedPin = bufToB64(packed);
-            bioData.updatedAt = new Date().toISOString();
-            localStorage.setItem(BIOMETRIC_KEY, JSON.stringify(bioData));
+          const nativePlugin = getNativeSmsPlugin();
+          if (nativePlugin && typeof nativePlugin.setupBiometricPin === 'function') {
+            await nativePlugin.setupBiometricPin({
+              pin: newPin,
+              title: 'تحديث رمز PIN للبصمة',
+              subtitle: 'المس مستشعر البصمة لحفظ رمز الـ PIN الجديد في عتاد الجهاز',
+              negativeButtonText: 'إلغاء'
+            });
+          } else {
+            const bioRaw = localStorage.getItem(BIOMETRIC_KEY);
+            if (bioRaw) {
+              const bioData = JSON.parse(bioRaw);
+              if (bioData.bioKey) {
+                const bioKeyBytes = b64ToBuf(bioData.bioKey);
+                const enc = new TextEncoder();
+                const bioCryptoKey = await crypto.subtle.importKey(
+                  'raw',
+                  bioKeyBytes,
+                  { name: 'AES-GCM' },
+                  false,
+                  ['encrypt']
+                );
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const encryptedPinBuffer = await crypto.subtle.encrypt(
+                  { name: 'AES-GCM', iv: iv },
+                  bioCryptoKey,
+                  enc.encode(newPin)
+                );
+                const packed = new Uint8Array(iv.length + encryptedPinBuffer.byteLength);
+                packed.set(iv);
+                packed.set(new Uint8Array(encryptedPinBuffer), iv.length);
+                bioData.encryptedPin = bufToB64(packed);
+                bioData.updatedAt = new Date().toISOString();
+                localStorage.setItem(BIOMETRIC_KEY, JSON.stringify(bioData));
+              }
+            }
           }
         } catch (bioErr) {
           console.warn('Note: Could not refresh biometric pin record:', bioErr);
@@ -388,6 +420,9 @@
       if (!raw) return false;
       try {
         const parsed = JSON.parse(raw);
+        if (parsed && (parsed.credId === 'native_android_keystore' || parsed.isKeystoreBound)) {
+          return true;
+        }
         return !!(parsed && parsed.credId && parsed.encryptedPin && parsed.bioKey);
       } catch (e) {
         return false;
@@ -422,14 +457,14 @@
     }
 
     /**
-     * Enable Biometrics (Native Android Fingerprint/Face or WebAuthn)
+     * Enable Biometrics (Hardware Keystore on Android or WebAuthn on Browser)
      */
     async enableBiometrics(currentPin) {
       if (!this.isConfigured()) {
         return { success: false, error: 'Security PIN is not set up' };
       }
 
-      // Verify current PIN first
+      // Verify current PIN first against PBKDF2 verifier
       const rawVault = localStorage.getItem(STORAGE_KEY);
       const securityRecord = JSON.parse(rawVault);
       const calculatedVerifier = await this._computeVerifier(currentPin, securityRecord.salt);
@@ -438,56 +473,36 @@
       }
 
       const nativePlugin = getNativeSmsPlugin();
-      if (nativePlugin && typeof nativePlugin.authenticateBiometric === 'function') {
+      if (nativePlugin && typeof nativePlugin.setupBiometricPin === 'function') {
         try {
-          const authRes = await nativePlugin.authenticateBiometric({
-            title: 'Enable Biometrics',
-            subtitle: 'Scan your fingerprint or face to enable biometric unlock',
-            negativeButtonText: 'Cancel'
+          const authRes = await nativePlugin.setupBiometricPin({
+            pin: currentPin,
+            title: 'تفعيل فتح المحفظة بالبصمة',
+            subtitle: 'المس مستشعر البصمة لحماية مفتاح فك التشفير في عتاد الجهاز',
+            negativeButtonText: 'إلغاء'
           });
 
           if (!authRes || !authRes.success) {
             return {
               success: false,
-              error: (authRes && authRes.error) || 'Biometric authentication cancelled'
+              error: (authRes && authRes.error) || 'تم إلغاء المصادقة بالبصمة'
             };
           }
 
-          // Biometric verified! Generate 256-bit local secret to encrypt PIN
-          const bioKeyBytes = crypto.getRandomValues(new Uint8Array(32));
-          const enc = new TextEncoder();
-          const bioCryptoKey = await crypto.subtle.importKey(
-            'raw',
-            bioKeyBytes,
-            { name: 'AES-GCM' },
-            false,
-            ['encrypt', 'decrypt']
-          );
-
-          const iv = crypto.getRandomValues(new Uint8Array(12));
-          const encryptedPinBuffer = await crypto.subtle.encrypt(
-            { name: 'AES-GCM', iv: iv },
-            bioCryptoKey,
-            enc.encode(currentPin)
-          );
-
-          // Pack IV + ciphertext
-          const packed = new Uint8Array(iv.length + encryptedPinBuffer.byteLength);
-          packed.set(iv);
-          packed.set(new Uint8Array(encryptedPinBuffer), iv.length);
-
+          // Hardware Keystore binding:
+          // The PIN is encrypted with AES-256 inside AndroidKeyStore requiring biometric authentication.
+          // No bioKey or plaintext PIN is stored in localStorage.
           const bioRecord = {
-            credId: 'native_android_biometric',
-            encryptedPin: bufToB64(packed),
-            bioKey: bufToB64(bioKeyBytes),
+            credId: 'native_android_keystore',
+            isKeystoreBound: true,
             enabledAt: new Date().toISOString()
           };
 
           localStorage.setItem(BIOMETRIC_KEY, JSON.stringify(bioRecord));
           return { success: true };
         } catch (err) {
-          console.error('Native biometric enable error:', err);
-          return { success: false, error: err.message || 'Biometric setup failed' };
+          console.error('Native biometric Keystore enable error:', err);
+          return { success: false, error: err.message || 'فشل إعداد البصمة' };
         }
       }
 
@@ -530,7 +545,7 @@
           return { success: false, error: 'Biometric registration was cancelled' };
         }
 
-        // Generate 256-bit local secret to encrypt PIN
+        // Web mode: Generate 256-bit local secret to encrypt PIN
         const bioKeyBytes = crypto.getRandomValues(new Uint8Array(32));
         const enc = new TextEncoder();
         const bioCryptoKey = await crypto.subtle.importKey(
@@ -557,6 +572,7 @@
           credId: bufToB64(credential.rawId),
           encryptedPin: bufToB64(packed),
           bioKey: bufToB64(bioKeyBytes),
+          isWebAuthn: true,
           enabledAt: new Date().toISOString()
         };
 
@@ -571,65 +587,68 @@
     /**
      * Disable Biometrics
      */
-    disableBiometrics() {
+    async disableBiometrics() {
+      const nativePlugin = getNativeSmsPlugin();
+      if (nativePlugin && typeof nativePlugin.clearBiometricPin === 'function') {
+        try {
+          await nativePlugin.clearBiometricPin();
+        } catch (e) {
+          console.warn('Error clearing native biometric pin:', e);
+        }
+      }
       localStorage.removeItem(BIOMETRIC_KEY);
       return { success: true };
     }
 
     /**
-     * Unlock using Biometrics (Native Android Fingerprint/Face or WebAuthn)
+     * Unlock using Biometrics (Native Android Keystore-bound BiometricPrompt or Web WebAuthn)
      */
     async unlockWithBiometrics() {
       if (!this.isBiometricsEnabled()) {
         return { success: false, error: 'Biometrics is not enabled' };
       }
 
-      const bioData = JSON.parse(localStorage.getItem(BIOMETRIC_KEY));
+      const rawBio = localStorage.getItem(BIOMETRIC_KEY);
+      const bioData = rawBio ? JSON.parse(rawBio) : {};
       const nativePlugin = getNativeSmsPlugin();
 
-      if (nativePlugin && typeof nativePlugin.authenticateBiometric === 'function') {
+      // Native Android Keystore CryptoObject Route
+      if (nativePlugin && typeof nativePlugin.unlockWithBiometricPin === 'function') {
         try {
-          const authRes = await nativePlugin.authenticateBiometric({
-            title: 'Unlock ApexWallet',
-            subtitle: 'Scan your fingerprint or face to unlock',
-            negativeButtonText: 'Use PIN'
+          const authRes = await nativePlugin.unlockWithBiometricPin({
+            title: 'فتح محفظة ApexWallet',
+            subtitle: 'استخدم بصمة الإصبع أو الوجه لفك تشفير المحفظة',
+            negativeButtonText: 'استخدام رمز PIN'
           });
 
           if (!authRes || !authRes.success) {
+            if (authRes && authRes.invalidated) {
+              // Biometric credentials changed in Android Settings (Condition B)
+              // Safe recovery without data loss: delete invalid record and route user to manual PIN
+              localStorage.removeItem(BIOMETRIC_KEY);
+              return {
+                success: false,
+                invalidated: true,
+                error: authRes.error || 'تم تغيير بصمات الجهاز في إعدادات النظام. يرجى الدخول برمز الـ PIN يدوياً.'
+              };
+            }
             return {
               success: false,
-              error: (authRes && authRes.error) || 'Biometric authentication cancelled'
+              error: (authRes && authRes.error) || 'تم إلغاء المصادقة'
             };
           }
 
-          // Decrypt PIN using stored bioKey
-          const bioKeyBytes = b64ToBuf(bioData.bioKey);
-          const bioCryptoKey = await crypto.subtle.importKey(
-            'raw',
-            bioKeyBytes,
-            { name: 'AES-GCM' },
-            false,
-            ['decrypt']
-          );
-
-          const packed = b64ToBuf(bioData.encryptedPin);
-          const iv = packed.slice(0, 12);
-          const ciphertext = packed.slice(12);
-
-          const decryptedBuffer = await crypto.subtle.decrypt(
-            { name: 'AES-GCM', iv: iv },
-            bioCryptoKey,
-            ciphertext
-          );
-
-          const dec = new TextDecoder();
-          const pin = dec.decode(decryptedBuffer);
+          if (!authRes.pin) {
+            return { success: false, error: 'لم يتم استرجاع رمز PIN من العتاد الآمن' };
+          }
 
           // Unlock vault with decrypted PIN
+          const pin = authRes.pin;
+          authRes.pin = null; // immediately zero out in memory
           return await this.unlock(pin);
         } catch (err) {
-          console.error('Native biometric unlock error:', err);
-          return { success: false, error: err.message || 'Biometric authentication failed' };
+          console.error('Native biometric Keystore unlock error:', err);
+          return { success: false, error: err.message || 'فشلت المصادقة بالبصمة' };
         }
       }
 
@@ -646,6 +665,50 @@
           publicKey: {
             challenge: challenge,
             rpId: window.location.hostname,
+            allowCredentials: [{
+              id: credIdBytes,
+              type: 'public-key',
+              transports: ['internal']
+            }],
+            userVerification: 'required',
+            timeout: 60000
+          }
+        });
+
+        if (!assertion) {
+          return { success: false, error: 'Biometric verification cancelled' };
+        }
+
+        // Decrypt PIN using stored bioKey
+        const bioKeyBytes = b64ToBuf(bioData.bioKey);
+        const bioCryptoKey = await crypto.subtle.importKey(
+          'raw',
+          bioKeyBytes,
+          { name: 'AES-GCM' },
+          false,
+          ['decrypt']
+        );
+
+        const packed = b64ToBuf(bioData.encryptedPin);
+        const iv = packed.slice(0, 12);
+        const ciphertext = packed.slice(12);
+
+        const decryptedBuffer = await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: iv },
+          bioCryptoKey,
+          ciphertext
+        );
+
+        const dec = new TextDecoder();
+        const pin = dec.decode(decryptedBuffer);
+
+        // Unlock vault with decrypted PIN
+        return await this.unlock(pin);
+      } catch (err) {
+        console.error('WebAuthn unlock error:', err);
+        return { success: false, error: err.message || 'Biometric authentication failed' };
+      }
+    }
             allowCredentials: [{
               id: credIdBytes,
               type: 'public-key'
