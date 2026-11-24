@@ -161,6 +161,149 @@ async function testRuntimeLifecycle() {
   assert.strictEqual(JSON.stringify(correctUnlock.data), JSON.stringify(testPayload), 'Decrypted vault data must match saved payload with 100% fidelity');
 }
 
+// ----------------------------------------------------
+// Step 4: Production End-to-End Integration (app.js + sms_engine.js)
+// Verifies real runtime binding between walletStore and BankSmsEngine WITHOUT manual mocks
+// ----------------------------------------------------
+async function testSmsStoreIntegration() {
+  const mockLocalStorage = new Map();
+  const localStorageMock = {
+    getItem: (k) => mockLocalStorage.has(k) ? mockLocalStorage.get(k) : null,
+    setItem: (k, v) => mockLocalStorage.set(k, String(v)),
+    removeItem: (k) => mockLocalStorage.delete(k),
+    clear: () => mockLocalStorage.clear()
+  };
+
+  const windowMock = {
+    localStorage: localStorageMock,
+    crypto: crypto.webcrypto,
+    TextEncoder: TextEncoder,
+    TextDecoder: TextDecoder,
+    btoa: (str) => Buffer.from(str, 'binary').toString('base64'),
+    atob: (b64) => Buffer.from(b64, 'base64').toString('binary'),
+    location: { hostname: 'localhost' },
+    addEventListener: () => {},
+    removeEventListener: () => {}
+  };
+
+  const documentMock = {
+    readyState: 'complete',
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    hidden: false
+  };
+
+  const sandbox = {
+    window: windowMock,
+    document: documentMock,
+    localStorage: localStorageMock,
+    crypto: crypto.webcrypto,
+    TextEncoder: TextEncoder,
+    TextDecoder: TextDecoder,
+    btoa: windowMock.btoa,
+    atob: windowMock.atob,
+    console: console,
+    setTimeout: setTimeout,
+    clearTimeout: clearTimeout
+  };
+
+  vm.createContext(sandbox);
+
+  // 1. Load app.js naturally (creates window.walletStore and window.store)
+  const appCode = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+  vm.runInContext(appCode, sandbox, { filename: 'app.js' });
+
+  assert.ok(sandbox.window.walletStore, 'app.js must create window.walletStore');
+  assert.ok(sandbox.window.store, 'app.js must also define window.store for global parity');
+  assert.strictEqual(sandbox.window.store, sandbox.window.walletStore, 'window.store and window.walletStore must reference identical instance');
+
+  // 2. Load sms_engine.js naturally (creates window.BankSmsEngine and window.WebFallbackParser)
+  const smsEngineCode = fs.readFileSync(path.join(__dirname, '..', 'sms_engine.js'), 'utf8');
+  vm.runInContext(smsEngineCode, sandbox, { filename: 'sms_engine.js' });
+
+  assert.ok(sandbox.window.BankSmsEngine, 'sms_engine.js must create window.BankSmsEngine');
+  assert.ok(sandbox.window.WebFallbackParser, 'sms_engine.js must create window.WebFallbackParser');
+
+  const engine = sandbox.window.BankSmsEngine;
+  const store = sandbox.window.walletStore;
+
+  // 3. Populate store with Bank, Account, and Card
+  const cibBank = store.addBank({ name: 'Commercial International Bank', shortCode: 'CIB', accentColor: '#002D62' });
+  const cibCard = store.addCard({
+    bankId: cibBank.id,
+    name: 'Titanium Miles',
+    last4: '8492',
+    digitsPosition: 'last',
+    cardType: 'credit',
+    monthlyTarget: 25000,
+    cycleStartDay: 25,
+    cycleEndDay: 24,
+    network: 'Mastercard'
+  });
+
+  assert.strictEqual(store.cards.length, 1);
+  assert.strictEqual(store.transactions.length, 0);
+
+  // 4. Test Candidate 1: Exact 4-dimension match -> Must auto-match with high confidence!
+  const sms1 = 'Your card ending with#8492 was charged for EGP 450.00 at Starbucks Arkan on 24/11/26. Available limit EGP 24550.00.';
+  const candidate1 = sandbox.window.WebFallbackParser.parse('CIB', sms1);
+  assert.ok(candidate1, 'Candidate 1 must be successfully parsed');
+  assert.strictEqual(candidate1.amount, 450.00);
+  assert.strictEqual(candidate1.cardSuffix, '8492');
+
+  engine.handleIncomingCandidate(candidate1);
+  assert.strictEqual(engine.pendingCandidates.length, 1);
+
+  // Verify auto-matching
+  const pending1 = engine.pendingCandidates[0];
+  assert.strictEqual(pending1.matchedCardId, cibCard.id, 'Candidate 1 must auto-match CIB Titanium card');
+  assert.strictEqual(pending1.confidence, 'high', 'Confidence must be high for exact 4-dimension match');
+  assert.strictEqual(pending1.requiresCardSelection, false, 'requiresCardSelection must be false');
+
+  // 5. Approve Candidate 1 -> Must write to walletStore.transactions without TypeError!
+  const approveRes1 = await engine.approveCandidate(pending1.id);
+  assert.strictEqual(approveRes1.success, true, 'approveCandidate must succeed cleanly');
+  assert.strictEqual(store.transactions.length, 1, 'Transaction must be written to ledger');
+  assert.strictEqual(store.transactions[0].amount, 450.00);
+  assert.strictEqual(store.transactions[0].cardId, cibCard.id);
+  assert.strictEqual(store.transactions[0].direction, 'expense');
+  assert.strictEqual(engine.pendingCandidates.length, 0, 'Candidate must be removed from review queue upon approval');
+
+  // 6. Test Candidate 2: Ambiguous/Unknown card digits -> Must NOT guess or crash!
+  const sms2 = 'Debited EGP 120.00 at Costa Coffee card ending with 9999 on 24/11/26';
+  const candidate2 = sandbox.window.WebFallbackParser.parse('CIB', sms2);
+  assert.ok(candidate2);
+  engine.handleIncomingCandidate(candidate2);
+
+  const pending2 = engine.pendingCandidates[0];
+  assert.strictEqual(pending2.matchedCardId, null, 'Unmatched digits must NOT pick a random or first card');
+  assert.strictEqual(pending2.requiresCardSelection, true, 'User card selection must be strictly required');
+
+  // Attempt approve without selecting card -> Must gracefully reject with user error message, NOT crash
+  const failApprove = await engine.approveCandidate(pending2.id);
+  assert.strictEqual(failApprove.success, false);
+  assert.ok(failApprove.error && failApprove.error.includes('select a card'));
+
+  // Approve with explicit user selection override
+  const manualApprove = await engine.approveCandidate(pending2.id, { cardId: cibCard.id });
+  assert.strictEqual(manualApprove.success, true);
+  assert.strictEqual(store.transactions.length, 2);
+  assert.strictEqual(store.transactions[0].amount, 120.00, 'Most recent transaction is unshifted to index 0');
+  assert.strictEqual(store.transactions[1].amount, 450.00);
+  assert.strictEqual(engine.pendingCandidates.length, 0);
+
+  // 7. Test Candidate 3: Reject flow
+  const sms3 = 'Purchase of EGP 30.00 at Kiosk card 8492 on 24/11/26';
+  const candidate3 = sandbox.window.WebFallbackParser.parse('CIB', sms3);
+  engine.handleIncomingCandidate(candidate3);
+  assert.strictEqual(engine.pendingCandidates.length, 1);
+
+  const rejectSuccess = await engine.rejectCandidate(candidate3.id);
+  assert.strictEqual(rejectSuccess, true);
+  assert.strictEqual(engine.pendingCandidates.length, 0);
+  assert.strictEqual(store.transactions.length, 2, 'Ledger transactions must remain 2 (rejected item not added)');
+}
+
 (async function main() {
   await runStepAsync('New user boot: Setup PIN and configure master vault', async () => {
     await testRuntimeLifecycle();
@@ -168,6 +311,10 @@ async function testRuntimeLifecycle() {
 
   await runStepAsync('Existing user boot: Lock, wrong PIN rejection, correct PIN unlock & decryption', async () => {
     // verified in testRuntimeLifecycle
+  });
+
+  await runStepAsync('End-to-End Integration: app.js + sms_engine.js store binding, SMS auto-matching & approval', async () => {
+    await testSmsStoreIntegration();
   });
 
   console.log('\n----------------------------------------------------');

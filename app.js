@@ -1079,5 +1079,6 @@ class WalletAppStore {
   }
 }
 
-// Export global instance
+// Export global instance (dual-export to guarantee compatibility across all modules)
 window.walletStore = new WalletAppStore();
+window.store = window.walletStore;

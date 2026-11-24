@@ -8,7 +8,7 @@
 
 function initApp() {
   try {
-    const store = window.walletStore;
+    const store = window.walletStore || window.store;
 
   // Selected featured card on Overview
   let activeFeaturedCardId = store.cards.length > 0 ? store.cards[0].id : null;
@@ -1781,7 +1781,7 @@ function initApp() {
 
         <div class="text-center pt-2 text-[10px] text-slate-400 space-y-0.5">
           <p class="font-bold text-slate-500">ApexWallet — Visual Card-First Tracker</p>
-          <p>Version 1.4.0 • Keystore Protected</p>
+          <p>Version 1.4.1 • Keystore Protected</p>
         </div>
 
       </div>
@@ -2567,7 +2567,7 @@ function initApp() {
 
     const backupPayload = {
       app: 'ApexWallet',
-      version: '1.4.0',
+      version: '1.4.1',
       exportedAt: new Date().toISOString(),
       encryptionNote: 'Master AES-GCM vault encrypted via PBKDF2 from 4-digit PIN.',
       securityVault: rawVault ? JSON.parse(rawVault) : null,

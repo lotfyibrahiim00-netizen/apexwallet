@@ -314,11 +314,12 @@
      * and performs Level B Potential Duplicate Detection against existing manual/ledger transactions.
      */
     enrichCandidates() {
-      if (!window.store) return;
-      const allCards = window.store.cards || [];
-      const allBanks = window.store.banks || [];
-      const allAccounts = window.store.accounts || [];
-      const allTransactions = window.store.transactions || [];
+      const store = typeof window !== 'undefined' ? (window.walletStore || window.store) : null;
+      if (!store) return;
+      const allCards = store.cards || [];
+      const allBanks = store.banks || [];
+      const allAccounts = store.accounts || [];
+      const allTransactions = store.transactions || [];
 
       for (const c of this.pendingCandidates) {
         // Suggested category
@@ -421,7 +422,7 @@
 
             // Within 2-day transaction clearance / post window
             if (diffDays <= 2) {
-              const txCard = tx.cardId ? window.store.getCard(tx.cardId) : null;
+              const txCard = tx.cardId ? store.getCard(tx.cardId) : null;
               const isCardOrBankRelated = (c.matchedCardId && c.matchedCardId === tx.cardId) ||
                                          (txCard && candidateDigits && (txCard.last4 === candidateDigits || txCard.identifierDigits === candidateDigits)) ||
                                          (txCard && c.bank && txCard.bankName && txCard.bankName.toLowerCase().includes(c.bank.toLowerCase())) ||
@@ -507,13 +508,18 @@
       const idx = this.pendingCandidates.findIndex(c => c.id === candidateId);
       if (idx === -1) return { success: false, error: 'Candidate not found' };
 
+      const store = typeof window !== 'undefined' ? (window.walletStore || window.store) : null;
+      if (!store) {
+        return { success: false, error: 'Wallet storage is not initialized.' };
+      }
+
       const c = this.pendingCandidates[idx];
       const cardId = overrides.cardId || c.matchedCardId;
       if (!cardId && !overrides.accountId && !c.matchedAccountId) {
         return { success: false, error: 'Please select a card or account to assign this transaction.' };
       }
 
-      const card = cardId ? window.store.getCard(cardId) : null;
+      const card = cardId ? store.getCard(cardId) : null;
       const accountId = overrides.accountId || c.matchedAccountId || (card ? card.linkedAccountId : null);
 
       const amount = parseFloat(overrides.amount !== undefined ? overrides.amount : c.amount);
@@ -528,7 +534,7 @@
 
       try {
         // Add to main ledger
-        const newTx = window.store.addTransaction({
+        const newTx = store.addTransaction({
           amount,
           merchant,
           category,
