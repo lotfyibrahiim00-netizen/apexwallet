@@ -37,6 +37,18 @@
       .join('');
   }
 
+  function getNativeSmsPlugin() {
+    if (typeof window !== 'undefined' &&
+        window.Capacitor &&
+        typeof window.Capacitor.isNativePlatform === 'function' &&
+        window.Capacitor.isNativePlatform() &&
+        window.Capacitor.Plugins &&
+        window.Capacitor.Plugins.BankSms) {
+      return window.Capacitor.Plugins.BankSms;
+    }
+    return null;
+  }
+
   class WalletSecurityEngine {
     constructor() {
       this.activeKey = null;
@@ -383,9 +395,20 @@
     }
 
     /**
-     * Check if device supports Biometrics (WebAuthn)
+     * Check if device supports Biometrics (Native Android BiometricPrompt or Web WebAuthn)
      */
     async isBiometricsAvailable() {
+      const nativePlugin = getNativeSmsPlugin();
+      if (nativePlugin && typeof nativePlugin.isBiometricAvailable === 'function') {
+        try {
+          const res = await nativePlugin.isBiometricAvailable();
+          return !!(res && res.isAvailable);
+        } catch (e) {
+          console.warn('Native biometric check error:', e);
+          return false;
+        }
+      }
+
       if (typeof window !== 'undefined' &&
           window.PublicKeyCredential &&
           typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
@@ -399,7 +422,7 @@
     }
 
     /**
-     * Enable Biometrics (Face ID / Touch ID / Fingerprint / Windows Hello)
+     * Enable Biometrics (Native Android Fingerprint/Face or WebAuthn)
      */
     async enableBiometrics(currentPin) {
       if (!this.isConfigured()) {
@@ -414,6 +437,61 @@
         return { success: false, error: 'Incorrect PIN' };
       }
 
+      const nativePlugin = getNativeSmsPlugin();
+      if (nativePlugin && typeof nativePlugin.authenticateBiometric === 'function') {
+        try {
+          const authRes = await nativePlugin.authenticateBiometric({
+            title: 'Enable Biometrics',
+            subtitle: 'Scan your fingerprint or face to enable biometric unlock',
+            negativeButtonText: 'Cancel'
+          });
+
+          if (!authRes || !authRes.success) {
+            return {
+              success: false,
+              error: (authRes && authRes.error) || 'Biometric authentication cancelled'
+            };
+          }
+
+          // Biometric verified! Generate 256-bit local secret to encrypt PIN
+          const bioKeyBytes = crypto.getRandomValues(new Uint8Array(32));
+          const enc = new TextEncoder();
+          const bioCryptoKey = await crypto.subtle.importKey(
+            'raw',
+            bioKeyBytes,
+            { name: 'AES-GCM' },
+            false,
+            ['encrypt', 'decrypt']
+          );
+
+          const iv = crypto.getRandomValues(new Uint8Array(12));
+          const encryptedPinBuffer = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv: iv },
+            bioCryptoKey,
+            enc.encode(currentPin)
+          );
+
+          // Pack IV + ciphertext
+          const packed = new Uint8Array(iv.length + encryptedPinBuffer.byteLength);
+          packed.set(iv);
+          packed.set(new Uint8Array(encryptedPinBuffer), iv.length);
+
+          const bioRecord = {
+            credId: 'native_android_biometric',
+            encryptedPin: bufToB64(packed),
+            bioKey: bufToB64(bioKeyBytes),
+            enabledAt: new Date().toISOString()
+          };
+
+          localStorage.setItem(BIOMETRIC_KEY, JSON.stringify(bioRecord));
+          return { success: true };
+        } catch (err) {
+          console.error('Native biometric enable error:', err);
+          return { success: false, error: err.message || 'Biometric setup failed' };
+        }
+      }
+
+      // WebAuthn Browser Fallback
       if (typeof navigator === 'undefined' || !navigator.credentials || !navigator.credentials.create) {
         return { success: false, error: 'Biometric WebAuthn not supported on this browser' };
       }
@@ -499,7 +577,7 @@
     }
 
     /**
-     * Unlock using Biometrics (Face ID / Touch ID)
+     * Unlock using Biometrics (Native Android Fingerprint/Face or WebAuthn)
      */
     async unlockWithBiometrics() {
       if (!this.isBiometricsEnabled()) {
@@ -507,6 +585,55 @@
       }
 
       const bioData = JSON.parse(localStorage.getItem(BIOMETRIC_KEY));
+      const nativePlugin = getNativeSmsPlugin();
+
+      if (nativePlugin && typeof nativePlugin.authenticateBiometric === 'function') {
+        try {
+          const authRes = await nativePlugin.authenticateBiometric({
+            title: 'Unlock ApexWallet',
+            subtitle: 'Scan your fingerprint or face to unlock',
+            negativeButtonText: 'Use PIN'
+          });
+
+          if (!authRes || !authRes.success) {
+            return {
+              success: false,
+              error: (authRes && authRes.error) || 'Biometric authentication cancelled'
+            };
+          }
+
+          // Decrypt PIN using stored bioKey
+          const bioKeyBytes = b64ToBuf(bioData.bioKey);
+          const bioCryptoKey = await crypto.subtle.importKey(
+            'raw',
+            bioKeyBytes,
+            { name: 'AES-GCM' },
+            false,
+            ['decrypt']
+          );
+
+          const packed = b64ToBuf(bioData.encryptedPin);
+          const iv = packed.slice(0, 12);
+          const ciphertext = packed.slice(12);
+
+          const decryptedBuffer = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: iv },
+            bioCryptoKey,
+            ciphertext
+          );
+
+          const dec = new TextDecoder();
+          const pin = dec.decode(decryptedBuffer);
+
+          // Unlock vault with decrypted PIN
+          return await this.unlock(pin);
+        } catch (err) {
+          console.error('Native biometric unlock error:', err);
+          return { success: false, error: err.message || 'Biometric authentication failed' };
+        }
+      }
+
+      // WebAuthn Browser Fallback
       if (typeof navigator === 'undefined' || !navigator.credentials || !navigator.credentials.get) {
         return { success: false, error: 'WebAuthn not supported' };
       }

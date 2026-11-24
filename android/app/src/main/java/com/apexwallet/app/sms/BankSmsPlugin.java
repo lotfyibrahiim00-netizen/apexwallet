@@ -2,7 +2,11 @@ package com.apexwallet.app.sms;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import androidx.annotation.NonNull;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
+import androidx.fragment.app.FragmentActivity;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -20,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 /**
  * Capacitor bridge plugin for Bank SMS Transaction Import.
@@ -237,5 +242,94 @@ public class BankSmsPlugin extends Plugin {
             ret.put("reason", "Rejected: Non-transaction, OTP, promo, or unparseable format");
         }
         call.resolve(ret);
+    }
+
+    /**
+     * Check if hardware biometric authentication (Fingerprint / Face ID) is supported and enrolled.
+     */
+    @PluginMethod
+    public void isBiometricAvailable(PluginCall call) {
+        try {
+            BiometricManager biometricManager = BiometricManager.from(getContext());
+            int canAuthenticate = biometricManager.canAuthenticate(
+                    BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.BIOMETRIC_WEAK
+            );
+            boolean isAvailable = (canAuthenticate == BiometricManager.BIOMETRIC_SUCCESS);
+            JSObject ret = new JSObject();
+            ret.put("isAvailable", isAvailable);
+            ret.put("statusCode", canAuthenticate);
+            call.resolve(ret);
+        } catch (Exception e) {
+            JSObject ret = new JSObject();
+            ret.put("isAvailable", false);
+            ret.put("error", e.getMessage());
+            call.resolve(ret);
+        }
+    }
+
+    /**
+     * Show native Android BiometricPrompt dialog for fingerprint/face verification.
+     */
+    @PluginMethod
+    public void authenticateBiometric(PluginCall call) {
+        String title = call.getString("title", "ApexWallet Biometrics");
+        String subtitle = call.getString("subtitle", "Verify your fingerprint or face");
+        String negativeButtonText = call.getString("negativeButtonText", "Use PIN");
+
+        getActivity().runOnUiThread(() -> {
+            try {
+                if (!(getActivity() instanceof FragmentActivity)) {
+                    JSObject ret = new JSObject();
+                    ret.put("success", false);
+                    ret.put("error", "Host activity is not a FragmentActivity");
+                    call.resolve(ret);
+                    return;
+                }
+
+                Executor executor = ContextCompat.getMainExecutor(getActivity());
+                BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                        .setTitle(title)
+                        .setSubtitle(subtitle)
+                        .setNegativeButtonText(negativeButtonText)
+                        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                        .build();
+
+                BiometricPrompt biometricPrompt = new BiometricPrompt(
+                        (FragmentActivity) getActivity(),
+                        executor,
+                        new BiometricPrompt.AuthenticationCallback() {
+                            @Override
+                            public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                                super.onAuthenticationError(errorCode, errString);
+                                JSObject ret = new JSObject();
+                                ret.put("success", false);
+                                ret.put("error", errString.toString());
+                                ret.put("cancelled", errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON || errorCode == BiometricPrompt.ERROR_USER_CANCELED);
+                                call.resolve(ret);
+                            }
+
+                            @Override
+                            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                                super.onAuthenticationSucceeded(result);
+                                JSObject ret = new JSObject();
+                                ret.put("success", true);
+                                call.resolve(ret);
+                            }
+
+                            @Override
+                            public void onAuthenticationFailed() {
+                                super.onAuthenticationFailed();
+                            }
+                        }
+                );
+
+                biometricPrompt.authenticate(promptInfo);
+            } catch (Exception e) {
+                JSObject ret = new JSObject();
+                ret.put("success", false);
+                ret.put("error", e.getMessage());
+                call.resolve(ret);
+            }
+        });
     }
 }
