@@ -35,7 +35,9 @@ function initApp() {
     smsDiagnostics: document.getElementById('modal-sms-diagnostics'),
     'sms-diagnostics': document.getElementById('modal-sms-diagnostics'),
     smsHistorical: document.getElementById('modal-sms-historical'),
-    'sms-historical': document.getElementById('modal-sms-historical')
+    'sms-historical': document.getElementById('modal-sms-historical'),
+    cycleBudgetPrompt: document.getElementById('modal-cycle-budget-prompt'),
+    'cycle-budget-prompt': document.getElementById('modal-cycle-budget-prompt')
   };
 
   // --- Toast System ---
@@ -714,7 +716,7 @@ function initApp() {
                   ${isCredit ? `
                     <div class="flex items-center gap-1.5">
                       <span class="px-2 py-0.5 rounded-full bg-black/25 text-[10px] font-semibold backdrop-blur-xs">
-                        الحد البنكي: ${formatCurrency(cardStat.creditLimit)}
+                        الحد البنكي: ${cardStat.creditLimit !== null ? formatCurrency(cardStat.creditLimit) : 'غير مسجل'}
                       </span>
                       ${card.cycleStartDay ? `
                         <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-semibold">
@@ -761,6 +763,11 @@ function initApp() {
     if (initialEl) {
       initialEl.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
     }
+
+    // Auto-check and prompt for any new billing cycles
+    setTimeout(() => {
+      checkAndPromptPendingCycleBudgets();
+    }, 350);
   }
 
   // --- Dynamic Sub-Renderers (Smooth updates without wiping carousel DOM) ---
@@ -1141,8 +1148,8 @@ function initApp() {
     const stat = store.getCardSpendingStats(cardId);
     const stmtKey = stat.statementKey || 'current';
     const currentBudget = stat.target;
-    const limit = stat.creditLimit || (currentBudget ? currentBudget * 2 : 50000);
-    const val = prompt(`تحديد ميزانية الصرف الشخصية لدورة (${stmtKey}):\n(الحد الائتماني البنكي للكارت: ${formatCurrency(limit)})\nأدخل ميزانية الدورة:`, currentBudget);
+    const limitText = stat.creditLimit !== null ? `\n(الحد الائتماني البنكي للكارت: ${formatCurrency(stat.creditLimit)})` : '\n(الحد الائتماني البنكي: غير مسجل)';
+    const val = prompt(`تحديد ميزانية الصرف الشخصية لدورة (${stmtKey}):${limitText}\nأدخل ميزانية الدورة:`, currentBudget);
     if (val !== null && val.trim() !== '') {
       const num = parseFloat(val);
       if (!isNaN(num) && num >= 0) {
@@ -1154,6 +1161,111 @@ function initApp() {
       }
     }
   };
+
+  // --- New Billing Cycle Budget Prompt System ---
+  let activeCyclePromptCard = null;
+
+  function checkAndPromptPendingCycleBudgets() {
+    if (!store || typeof store.getCardsWithPendingCycleBudgetPrompt !== 'function') return;
+    const pendingList = store.getCardsWithPendingCycleBudgetPrompt();
+    if (!pendingList || pendingList.length === 0) return;
+
+    const p = pendingList[0];
+    activeCyclePromptCard = p;
+
+    const modal = document.getElementById('modal-cycle-budget-prompt');
+    if (!modal) {
+      // Headless / fallback prompt
+      if (typeof confirm === 'function') {
+        const limitStr = p.creditLimit !== null ? `\n(الحد الائتماني البنكي للكارت: ${formatCurrency(p.creditLimit)})` : '\n(الحد الائتماني البنكي: غير مسجل)';
+        const msg = `بدء دورة كشف جديدة (${p.statementBadge || p.cycleKey}) لكارت ${p.cardName} (•••• ${p.last4}):${limitStr}\nميزانية الدورة السابقة: ${formatCurrency(p.previousBudget)}\n\nاضغط OK للاستمرار على ميزانية الدورة السابقة (${formatCurrency(p.previousBudget)})\nأو اضغط Cancel لإدخال ميزانية جديدة.`;
+        if (confirm(msg)) {
+          store.confirmCycleBudget(p.cardId, p.cycleKey, p.previousBudget);
+          showToast(`تم اعتماد استمرار ميزانية ${formatCurrency(p.previousBudget)} لدورة (${p.cycleKey})`, 'success');
+          renderCurrentView();
+        } else if (typeof prompt === 'function') {
+          const newVal = prompt(`أدخل الميزانية الجديدة لدورة (${p.cycleKey}):`, p.previousBudget);
+          if (newVal !== null && newVal.trim() !== '') {
+            const num = parseFloat(newVal);
+            if (!isNaN(num) && num >= 0) {
+              store.confirmCycleBudget(p.cardId, p.cycleKey, num);
+              showToast(`تم تعيين ميزانية جديدة ${formatCurrency(num)} لدورة (${p.cycleKey})`, 'success');
+              renderCurrentView();
+            }
+          }
+        }
+      }
+      return;
+    }
+
+    const nameEl = document.getElementById('cycle-prompt-card-name');
+    const stmtEl = document.getElementById('cycle-prompt-statement');
+    const prevEl = document.getElementById('cycle-prompt-prev-budget');
+    const limitRow = document.getElementById('cycle-prompt-limit-row');
+    const limitEl = document.getElementById('cycle-prompt-limit');
+    const inputNew = document.getElementById('input-cycle-new-budget');
+    const btnContinue = document.getElementById('btn-cycle-continue');
+
+    if (nameEl) nameEl.textContent = `${p.cardName} (•••• ${p.last4}) - ${p.bankName}`;
+    if (stmtEl) stmtEl.textContent = `${p.statementBadge || p.cycleKey} (${p.cycleRange || ''})`;
+    if (prevEl) prevEl.textContent = formatCurrency(p.previousBudget);
+
+    if (limitRow && limitEl) {
+      if (p.creditLimit !== null) {
+        limitRow.classList.remove('hidden');
+        limitEl.textContent = formatCurrency(p.creditLimit);
+      } else {
+        limitRow.classList.add('hidden');
+      }
+    }
+
+    if (inputNew) {
+      inputNew.value = '';
+      inputNew.placeholder = `مثال: ${p.previousBudget}`;
+    }
+
+    if (btnContinue) {
+      btnContinue.innerHTML = `
+        <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+        <span>الاستمرار على ميزانية الدورة السابقة (${formatCurrency(p.previousBudget)})</span>
+      `;
+    }
+
+    if (window.lucide) {
+      try { lucide.createIcons({ root: modal }); } catch (e) {}
+    }
+
+    openModal('cycleBudgetPrompt');
+  }
+
+  window.checkAndPromptPendingCycleBudgets = checkAndPromptPendingCycleBudgets;
+
+  document.getElementById('btn-cycle-continue')?.addEventListener('click', () => {
+    if (!activeCyclePromptCard) return;
+    const { cardId, cycleKey, previousBudget } = activeCyclePromptCard;
+    store.confirmCycleBudget(cardId, cycleKey, previousBudget);
+    closeModal('cycleBudgetPrompt');
+    showToast(`تم اعتماد استمرار ميزانية ${formatCurrency(previousBudget)} لدورة (${cycleKey})`, 'success');
+    renderCurrentView();
+    setTimeout(() => checkAndPromptPendingCycleBudgets(), 350);
+  });
+
+  document.getElementById('btn-cycle-save-new')?.addEventListener('click', () => {
+    if (!activeCyclePromptCard) return;
+    const { cardId, cycleKey } = activeCyclePromptCard;
+    const input = document.getElementById('input-cycle-new-budget');
+    const val = input ? input.value : '';
+    const num = parseFloat(val);
+    if (isNaN(num) || num < 0) {
+      showToast('يرجى إدخال مبلغ ميزانية صحيح', 'error');
+      return;
+    }
+    store.confirmCycleBudget(cardId, cycleKey, num);
+    closeModal('cycleBudgetPrompt');
+    showToast(`تم تعيين ميزانية جديدة ${formatCurrency(num)} لدورة (${cycleKey})`, 'success');
+    renderCurrentView();
+    setTimeout(() => checkAndPromptPendingCycleBudgets(), 350);
+  });
 
   // --- Card Color Customization Functions ---
   window.openCustomizeCardModal = (cardId, e) => {
@@ -1844,7 +1956,7 @@ function initApp() {
 
         <div class="text-center pt-2 text-[10px] text-slate-400 space-y-0.5">
           <p class="font-bold text-slate-500">ApexWallet — Visual Card-First Tracker</p>
-          <p>Version 1.4.3 • Keystore Protected</p>
+          <p>Version 1.4.4 • Keystore Protected</p>
         </div>
 
       </div>
@@ -2661,7 +2773,7 @@ function initApp() {
 
     const backupPayload = {
       app: 'ApexWallet',
-      version: '1.4.3',
+      version: '1.4.4',
       exportedAt: new Date().toISOString(),
       encryptionNote: 'Master AES-GCM vault encrypted via PBKDF2 from 4-digit PIN.',
       securityVault: rawVault ? JSON.parse(rawVault) : null,

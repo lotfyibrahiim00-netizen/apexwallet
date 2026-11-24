@@ -509,7 +509,7 @@
           <!-- Bank Credit Limit (Visible for Credit Cards) -->
           <div id="card-credit-limit-section" class="hidden">
             <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Bank Credit Limit (الحد الائتماني البنكي)</label>
-            <input type="number" id="card-credit-limit" min="0" step="500" placeholder="50000" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900">
+            <input type="number" id="card-credit-limit" min="0" step="500" placeholder="اختياري (مثال: 50000)" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900">
           </div>
 
           <!-- Target / Personal Spending Budget -->
@@ -770,6 +770,66 @@
         <button data-close-modal="smsHistorical" class="mt-3 w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition-all shrink-0">
           إغلاق
         </button>
+      </div>
+    </div>
+
+    <!-- MODAL 9: NEW BILLING CYCLE BUDGET PROMPT -->
+    <div id="modal-cycle-budget-prompt" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
+      <div class="modal-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      <div class="modal-sheet bg-white rounded-t-[32px] p-6 max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl relative z-10 transform translate-y-full transition-transform duration-300 space-y-4">
+        <!-- Drag Handle -->
+        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto -mt-1 mb-2"></div>
+
+        <!-- Header -->
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+            <i data-lucide="calendar" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-extrabold text-slate-900">بدء دورة كشف جديدة</h3>
+            <p id="cycle-prompt-card-name" class="text-xs text-slate-500 font-medium"></p>
+          </div>
+        </div>
+
+        <!-- Cycle Info Box -->
+        <div class="bg-slate-50 rounded-2xl p-3.5 text-xs space-y-2 border border-slate-100">
+          <div class="flex justify-between items-center text-slate-600">
+            <span>دورة الفوترة:</span>
+            <span id="cycle-prompt-statement" class="font-bold text-slate-900"></span>
+          </div>
+          <div class="flex justify-between items-center text-slate-600">
+            <span>ميزانية الدورة السابقة:</span>
+            <span id="cycle-prompt-prev-budget" class="font-bold text-slate-900 font-mono"></span>
+          </div>
+          <div class="flex justify-between items-center text-slate-600" id="cycle-prompt-limit-row">
+            <span>الحد الائتماني البنكي:</span>
+            <span id="cycle-prompt-limit" class="font-bold text-slate-900 font-mono"></span>
+          </div>
+        </div>
+
+        <!-- Option 1: Continue with previous budget -->
+        <button type="button" id="btn-cycle-continue" class="w-full py-3 px-4 bg-[#111827] hover:bg-slate-800 text-white rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active-press">
+          <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+          <span>الاستمرار على ميزانية الدورة السابقة</span>
+        </button>
+
+        <!-- Divider -->
+        <div class="relative flex py-1 items-center">
+          <div class="flex-grow border-t border-slate-200"></div>
+          <span class="flex-shrink mx-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider">أو تحديد ميزانية جديدة</span>
+          <div class="flex-grow border-t border-slate-200"></div>
+        </div>
+
+        <!-- Option 2: Enter new budget -->
+        <div class="space-y-2">
+          <label class="block text-[11px] font-bold text-slate-700">ميزانية جديدة لهذه الدورة فقط:</label>
+          <div class="flex gap-2">
+            <input type="number" id="input-cycle-new-budget" min="0" step="100" placeholder="المبلغ بالجنيه" class="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold text-slate-900 font-mono outline-none focus:ring-2 focus:ring-indigo-500">
+            <button type="button" id="btn-cycle-save-new" class="py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all active-press">
+              تأكيد
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 

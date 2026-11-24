@@ -782,10 +782,11 @@ class WalletAppStore {
       linkedAccountId: linkedAccountId || null,
       cardType, // 'credit' | 'debit' | 'prepaid'
       creditLimit: cardType === 'credit'
-        ? (creditLimit !== undefined && creditLimit !== null && creditLimit !== '' ? parseFloat(creditLimit) : (parsedTarget ? parsedTarget * 2 : 50000))
+        ? (creditLimit !== undefined && creditLimit !== null && creditLimit !== '' && !isNaN(parseFloat(creditLimit)) ? parseFloat(creditLimit) : null)
         : null,
       monthlyTarget: parsedTarget, // personal spending target / budget baseline
       cycleBudgets: cycleBudgets || {},
+      acknowledgedCycles: data.acknowledgedCycles || [],
       cycleStartDay: cardType === 'credit' ? parseInt(cycleStartDay, 10) : null,
       cycleEndDay: cardType === 'credit' ? parseInt(cycleEndDay, 10) : null,
       network: network || (cardType === 'prepaid' ? 'Meeza' : 'Visa'),
@@ -812,8 +813,11 @@ class WalletAppStore {
     if (data.linkedAccountId !== undefined) card.linkedAccountId = data.linkedAccountId;
     if (data.cardType) card.cardType = data.cardType;
     if (data.monthlyTarget !== undefined) card.monthlyTarget = parseFloat(data.monthlyTarget) || 0;
-    if (data.creditLimit !== undefined) card.creditLimit = parseFloat(data.creditLimit) || null;
+    if (data.creditLimit !== undefined) {
+      card.creditLimit = (data.creditLimit !== null && data.creditLimit !== '' && !isNaN(parseFloat(data.creditLimit))) ? parseFloat(data.creditLimit) : null;
+    }
     if (data.cycleBudgets) card.cycleBudgets = { ...(card.cycleBudgets || {}), ...data.cycleBudgets };
+    if (data.acknowledgedCycles) card.acknowledgedCycles = [...(card.acknowledgedCycles || []), ...data.acknowledgedCycles];
 
     if (card.cardType === 'credit') {
       if (data.cycleStartDay) card.cycleStartDay = parseInt(data.cycleStartDay, 10);
@@ -830,14 +834,77 @@ class WalletAppStore {
   setCardCycleBudget(cardId, statementKey, budget) {
     const card = this.getCard(cardId);
     if (!card) return false;
-    if (!card.cycleBudgets) card.cycleBudgets = {};
+    card.cycleBudgets = card.cycleBudgets || {};
+    card.acknowledgedCycles = card.acknowledgedCycles || [];
     const val = parseFloat(budget);
     if (!isNaN(val) && val >= 0) {
       card.cycleBudgets[statementKey] = val;
+      if (!card.acknowledgedCycles.includes(statementKey)) {
+        card.acknowledgedCycles.push(statementKey);
+      }
       this.saveState();
       return true;
     }
     return false;
+  }
+
+  getCardsWithPendingCycleBudgetPrompt() {
+    const todayIso = new Date().toISOString().split('T')[0];
+    const pending = [];
+
+    this.cards.forEach(card => {
+      if (card.cardType === 'credit' && card.cycleStartDay && card.cycleEndDay) {
+        const stmt = calculateBillingStatement(todayIso, card.cycleStartDay, card.cycleEndDay);
+        const cycleKey = stmt.statementKey;
+        card.acknowledgedCycles = card.acknowledgedCycles || [];
+        card.cycleBudgets = card.cycleBudgets || {};
+
+        // Prompt once only: if not acknowledged and no budget explicit for this cycle
+        if (!card.acknowledgedCycles.includes(cycleKey) && card.cycleBudgets[cycleKey] === undefined) {
+          let prevBudget = card.monthlyTarget || 0;
+          const pastKeys = Object.keys(card.cycleBudgets).filter(k => k < cycleKey).sort().reverse();
+          if (pastKeys.length > 0 && card.cycleBudgets[pastKeys[0]] !== undefined) {
+            prevBudget = card.cycleBudgets[pastKeys[0]];
+          }
+
+          const bank = this.getBank(card.bankId);
+          pending.push({
+            cardId: card.id,
+            cardName: card.name,
+            bankName: bank ? bank.name : 'Bank',
+            last4: card.last4,
+            cycleKey,
+            statementBadge: stmt.statementBadge,
+            cycleRange: stmt.cycleRange,
+            creditLimit: (card.creditLimit !== undefined && card.creditLimit !== null) ? card.creditLimit : null,
+            previousBudget: prevBudget
+          });
+        }
+      }
+    });
+
+    return pending;
+  }
+
+  confirmCycleBudget(cardId, cycleKey, budgetAmount) {
+    const card = this.getCard(cardId);
+    if (!card) return false;
+    card.cycleBudgets = card.cycleBudgets || {};
+    card.acknowledgedCycles = card.acknowledgedCycles || [];
+
+    const num = parseFloat(budgetAmount);
+    if (!isNaN(num) && num >= 0) {
+      card.cycleBudgets[cycleKey] = num;
+    } else {
+      card.cycleBudgets[cycleKey] = card.monthlyTarget || 0;
+    }
+
+    if (!card.acknowledgedCycles.includes(cycleKey)) {
+      card.acknowledgedCycles.push(cycleKey);
+    }
+
+    this.saveState();
+    return true;
   }
 
   updateCardColor(cardId, { colorPreset, customColor }) {
@@ -1059,8 +1126,10 @@ class WalletAppStore {
       ? card.cycleBudgets[activeStatementKey]
       : (card.monthlyTarget || 0);
 
-    // Bank Credit Limit
-    const creditLimit = card.creditLimit || (card.cardType === 'credit' ? (card.monthlyTarget ? card.monthlyTarget * 2 : 50000) : null);
+    // Bank Credit Limit: strictly user-defined, null if not entered, NEVER fabricated
+    const creditLimit = (card.creditLimit !== undefined && card.creditLimit !== null && card.creditLimit !== '' && !isNaN(parseFloat(card.creditLimit)))
+      ? parseFloat(card.creditLimit)
+      : null;
 
     const percentage = target > 0 ? (spent / target) * 100 : 0;
     const isExceeded = target > 0 && spent > target;

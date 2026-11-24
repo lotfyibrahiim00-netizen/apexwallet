@@ -375,6 +375,40 @@ async function testDualBudgetModel() {
   // Check other cycle maintains baseline target without zeroing history
   const otherStats = store.getCardSpendingStats(creditCard.id, '2025-01');
   assert.strictEqual(otherStats.target, creditCard.monthlyTarget, 'Other cycle without override uses default monthly target');
+
+  // Test Item 2: Zero fabrication of credit limit when field left blank
+  const bank = store.banks[0];
+  const cardWithoutLimit = store.addCard({
+    bankId: bank.id,
+    name: 'Zero Fabrication Test Card',
+    last4: '9988',
+    cardType: 'credit',
+    monthlyTarget: 15000,
+    creditLimit: '', // Empty input from user!
+    cycleStartDay: 10,
+    cycleEndDay: 9
+  });
+  assert.strictEqual(cardWithoutLimit.creditLimit, null, 'creditLimit MUST be null when input is empty (NEVER fabricated)');
+  const statsNoLimit = store.getCardSpendingStats(cardWithoutLimit.id);
+  assert.strictEqual(statsNoLimit.creditLimit, null, 'getCardSpendingStats must return null creditLimit when not configured');
+
+  // Test Item 1: Prompt choice at the start of each new billing cycle
+  // The newly added card has no acknowledged cycles and no cycleBudgets yet
+  const pendingPrompts = store.getCardsWithPendingCycleBudgetPrompt();
+  const foundPrompt = pendingPrompts.find(p => p.cardId === cardWithoutLimit.id);
+  assert.ok(foundPrompt, 'New card with active cycle must be flagged for budget prompt');
+  assert.strictEqual(foundPrompt.previousBudget, 15000, 'Previous budget baseline must match monthlyTarget');
+  assert.strictEqual(foundPrompt.creditLimit, null, 'Must report null credit limit without fabrication');
+
+  // User chooses option 1: Continue with previous budget
+  store.confirmCycleBudget(cardWithoutLimit.id, foundPrompt.cycleKey, foundPrompt.previousBudget);
+  assert.strictEqual(cardWithoutLimit.cycleBudgets[foundPrompt.cycleKey], 15000);
+  assert.ok(cardWithoutLimit.acknowledgedCycles.includes(foundPrompt.cycleKey));
+
+  // Verify prompt does NOT repeat for the same cycle
+  const remainingPrompts = store.getCardsWithPendingCycleBudgetPrompt();
+  const repeatPrompt = remainingPrompts.find(p => p.cardId === cardWithoutLimit.id);
+  assert.strictEqual(repeatPrompt, undefined, 'Prompt MUST NOT appear again for an acknowledged cycle');
 }
 
 (async function main() {
