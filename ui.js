@@ -378,17 +378,32 @@ function initApp() {
     select.innerHTML = '';
     store.banks.forEach(bank => {
       const bankCards = store.getCardsForBank(bank.id);
-      if (bankCards.length > 0) {
-        const optgroup = document.createElement('optgroup');
-        optgroup.label = `${bank.name} (${bankCards.length} cards)`;
-        
-        bankCards.forEach(c => {
-          const opt = document.createElement('option');
-          opt.value = c.id;
-          opt.textContent = `${c.name} (•••• ${c.last4}) - ${c.cardType.toUpperCase()}`;
-          optgroup.appendChild(opt);
-        });
-        select.appendChild(optgroup);
+      const bankAccounts = store.getAccountsForBank(bank.id);
+
+      if (bankCards.length > 0 || bankAccounts.length > 0) {
+        if (bankCards.length > 0) {
+          const optgroup = document.createElement('optgroup');
+          optgroup.label = `💳 ${bank.name} - Cards`;
+          bankCards.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = `${c.name} (•••• ${c.last4}) - ${c.cardType.toUpperCase()}`;
+            optgroup.appendChild(opt);
+          });
+          select.appendChild(optgroup);
+        }
+
+        if (bankAccounts.length > 0) {
+          const accGroup = document.createElement('optgroup');
+          accGroup.label = `🏛️ ${bank.name} - Accounts`;
+          bankAccounts.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = `acc:${a.id}`;
+            opt.textContent = `${a.name} (${a.accountNumberMasked || a.identifierDigits}) - رصيد: ${formatCurrency(a.balance || 0)}`;
+            accGroup.appendChild(opt);
+          });
+          select.appendChild(accGroup);
+        }
       }
     });
 
@@ -422,11 +437,20 @@ function initApp() {
     const merchant = document.getElementById('tx-merchant').value;
     const category = document.getElementById('tx-category').value;
     const date = document.getElementById('tx-date').value;
-    const cardId = document.getElementById('tx-card-select').value;
+    const rawCardVal = document.getElementById('tx-card-select').value;
     const notes = document.getElementById('tx-notes')?.value || '';
+    const transactionType = document.querySelector('input[name="tx-op-type"]:checked')?.value || 'purchase';
+
+    let cardId = null;
+    let accountId = null;
+    if (rawCardVal && rawCardVal.startsWith('acc:')) {
+      accountId = rawCardVal.replace('acc:', '');
+    } else {
+      cardId = rawCardVal;
+    }
 
     try {
-      store.addTransaction({ amount, merchant, category, date, cardId, notes });
+      store.addTransaction({ amount, merchant, category, date, cardId, accountId, transactionType, notes });
       closeModal('transaction');
       e.target.reset();
       showToast(`Transaction of ${formatCurrency(amount)} logged!`, 'success');
@@ -474,7 +498,7 @@ function initApp() {
           name,
           identifierDigits: last4,
           digitsPosition,
-          balance: 0,
+          balance: parseFloat(monthlyTarget) || 0,
           currency: currentCurrency
         });
         closeModal('card');
@@ -870,6 +894,15 @@ function initApp() {
             const isCredit = card.cardType === 'credit';
             const stmtName = (tx.statementInfo && tx.statementInfo.statementMonthName) ? tx.statementInfo.statementMonthName.substring(0, 3) : 'Dec';
             const isCurrentCycle = tx.statementInfo && tx.statementInfo.statementMonth === 12;
+            const txType = tx.transactionType || (tx.category === 'transfer' ? 'transfer' : 'purchase');
+            let typeBadge = '';
+            if (txType === 'withdrawal') {
+              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">سحب نقدي</span>';
+            } else if (txType === 'transfer') {
+              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-200">تحويل</span>';
+            } else {
+              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">شراء</span>';
+            }
 
             return `
               <div class="bg-white p-3.5 rounded-2xl flex justify-between items-center shadow-2xs border border-slate-100/80 hover:shadow-xs transition-all">
@@ -889,9 +922,12 @@ function initApp() {
                     <span class="text-[10px] text-slate-400 font-medium">${tx.date}</span>
                   </div>
                 </div>
-                <span class="text-xs font-bold ${tx.direction === 'income' ? 'text-emerald-600' : 'text-slate-900'} font-mono tracking-tight shrink-0 ml-2">
-                  ${tx.direction === 'income' ? '+' : '-'}${formatCurrency(tx.amount)}
-                </span>
+                <div class="flex items-center gap-1.5 shrink-0 ml-2">
+                  ${typeBadge}
+                  <span class="text-xs font-bold ${tx.direction === 'income' ? 'text-emerald-600' : 'text-slate-900'} font-mono tracking-tight">
+                    ${tx.direction === 'income' ? '+' : '-'}${formatCurrency(tx.amount)}
+                  </span>
+                </div>
               </div>
             `;
           }).join('')}
@@ -1412,10 +1448,56 @@ function initApp() {
                   </div>
                 </div>
 
+                <!-- Bank Accounts Section (Item 2: Live Balance) -->
+                ${(() => {
+                  const accounts = store.getAccountsForBank(bank.id);
+                  return `
+                    <div class="space-y-1.5 pt-0.5">
+                      <div class="flex items-center justify-between px-0.5">
+                        <span class="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                          <i data-lucide="landmark" class="w-3.5 h-3.5 text-slate-500"></i>
+                          <span>الحسابات البنكية (${accounts.length})</span>
+                        </span>
+                        <button onclick="window.openAddAccountForBank('${bank.id}')" class="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5">
+                          <i data-lucide="plus" class="w-3 h-3"></i>
+                          <span>إضافة حساب</span>
+                        </button>
+                      </div>
+                      ${accounts.length === 0 ? `
+                        <div class="p-2 rounded-2xl bg-slate-50/70 border border-dashed border-slate-200 text-center text-[10px] text-slate-400">
+                          لا توجد حسابات بنكية مسجلة لهذا البنك
+                        </div>
+                      ` : accounts.map(acc => `
+                        <div class="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 flex justify-between items-center">
+                          <div>
+                            <div class="flex items-center gap-1.5">
+                              <span class="text-xs font-bold text-slate-900">${acc.name}</span>
+                              <span class="text-[10px] text-slate-400 font-mono">${acc.accountNumberMasked || acc.identifierDigits}</span>
+                            </div>
+                          </div>
+                          <div class="flex items-center gap-2">
+                            <span class="text-xs font-black font-mono px-2 py-0.5 rounded-full ${acc.balance < 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">
+                              الرصيد: ${formatCurrency(acc.balance || 0, acc.currency || 'EGP')}
+                            </span>
+                            <button onclick="window.confirmDeleteAccount('${acc.id}')" class="text-slate-300 hover:text-rose-500 p-0.5 transition-colors" title="حذف الحساب">
+                              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                            </button>
+                          </div>
+                        </div>
+                      `).join('')}
+                    </div>
+                  `;
+                })()}
+
                 <!-- Cards List -->
-                <div class="space-y-2.5">
+                <div class="space-y-2.5 pt-1 border-t border-slate-100">
+                  <div class="px-0.5 text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                    <i data-lucide="credit-card" class="w-3.5 h-3.5 text-slate-500"></i>
+                    <span>الكروت المسجلة</span>
+                  </div>
                   ${cards.map(c => {
                     const cStat = store.getCardSpendingStats(c.id);
+                    const linkedAcc = c.linkedAccountId ? store.getAccount(c.linkedAccountId) : null;
                     return `
                       <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex justify-between items-center">
                         <div class="min-w-0 flex-1">
@@ -1424,7 +1506,7 @@ function initApp() {
                             <span class="text-[9px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-bold uppercase">${c.cardType}</span>
                           </div>
                           <p class="text-[10px] text-slate-400 font-mono mt-0.5">
-                            •••• ${c.last4} ${c.cycleStartDay ? `• Cycle ${c.cycleStartDay}th–${c.cycleEndDay}th` : ''}
+                            •••• ${c.last4} ${c.cycleStartDay ? `• Cycle ${c.cycleStartDay}th–${c.cycleEndDay}th` : ''} ${linkedAcc ? `• مرتبط بـ: ${linkedAcc.name}` : ''}
                           </p>
                           <div class="w-full bg-slate-200 rounded-full h-1 mt-2 overflow-hidden">
                             <div class="${cStat.isExceeded ? 'bg-rose-500' : 'bg-emerald-500'} h-full rounded-full" style="width: ${cStat.percentage}%;"></div>
@@ -1532,6 +1614,15 @@ function initApp() {
             const isCredit = tx.card && tx.card.cardType === 'credit';
             const stmtName = (tx.statementInfo && tx.statementInfo.statementMonthName) ? tx.statementInfo.statementMonthName.substring(0, 3) : 'Dec';
             const isCurrentCycle = tx.statementInfo && tx.statementInfo.statementMonth === 12;
+            const txType = tx.transactionType || (tx.category === 'transfer' ? 'transfer' : 'purchase');
+            let typeBadge = '';
+            if (txType === 'withdrawal') {
+              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">سحب نقدي</span>';
+            } else if (txType === 'transfer') {
+              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-200">تحويل</span>';
+            } else {
+              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">شراء</span>';
+            }
 
             return `
               <div class="bg-white p-3.5 rounded-2xl flex justify-between items-center shadow-2xs border border-slate-100/90 hover:shadow-xs transition-all">
@@ -1553,7 +1644,8 @@ function initApp() {
                   </div>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1.5">
+                  ${typeBadge}
                   <span class="text-xs font-bold ${tx.direction === 'income' ? 'text-emerald-600' : 'text-slate-900'} font-mono">${tx.direction === 'income' ? '+' : '-'}${formatCurrency(tx.amount)}</span>
                   <button onclick="window.confirmDeleteTx('${tx.id}')" class="text-slate-300 hover:text-rose-500 p-1">
                     <i data-lucide="trash" class="w-3 h-3"></i>
@@ -1956,7 +2048,7 @@ function initApp() {
 
         <div class="text-center pt-2 text-[10px] text-slate-400 space-y-0.5">
           <p class="font-bold text-slate-500">ApexWallet — Visual Card-First Tracker</p>
-          <p>Version 1.4.4 • Keystore Protected</p>
+          <p>Version 1.4.5 • Keystore Protected</p>
         </div>
 
       </div>
@@ -2125,26 +2217,52 @@ function initApp() {
     const cards = store.cards || [];
 
     listEl.innerHTML = candidates.map(c => {
-      const isCredit = c.type === 'income';
-      const typeBadge = isCredit
-        ? '<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">REFUND / INCOME</span>'
-        : '<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">EXPENSE</span>';
+      const isCredit = c.type === 'income' || c.direction === 'income';
+      let opTypeBadge = '';
+      if (c.transactionType === 'withdrawal') {
+        opTypeBadge = '<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">🏧 سحب نقدي (ATM)</span>';
+      } else if (c.transactionType === 'transfer') {
+        opTypeBadge = '<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-300">🔁 تحويل (Transfer)</span>';
+      } else {
+        opTypeBadge = isCredit
+          ? '<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">📥 وارد / استرداد</span>'
+          : '<span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-300">🛍️ شراء (Purchase)</span>';
+      }
 
       const needsCardSelection = c.requiresCardSelection || !c.matchedCardId;
 
       return `
         <div id="candidate-card-${c.id}" class="bg-slate-50 border ${needsCardSelection ? 'border-amber-300 ring-1 ring-amber-300/40' : 'border-slate-200'} rounded-2xl p-3.5 space-y-2.5 transition-all">
           <div class="flex items-center justify-between">
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 flex-wrap">
               <span class="text-[11px] font-black tracking-tight text-slate-900 bg-white px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">${c.bank}</span>
-              ${typeBadge}
+              ${opTypeBadge}
               ${c.isHistorical ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800">استيراد قديم</span>' : ''}
-              ${c.cardSuffix ? `<span class="text-[10px] font-mono text-slate-500 font-bold">•••• ${c.cardSuffix}</span>` : '<span class="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">Select Card</span>'}
+              ${c.cardSuffix ? `<span class="text-[10px] font-mono text-slate-500 font-bold">•••• ${c.cardSuffix}</span>` : '<span class="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">اختر الكارت</span>'}
             </div>
-            <span class="text-xs font-black font-mono ${isCredit ? 'text-emerald-600' : 'text-slate-900'}">
+            <span class="text-xs font-black font-mono ${isCredit ? 'text-emerald-600' : 'text-slate-900'} shrink-0 ml-2">
               ${isCredit ? '+' : '-'}${c.amount.toFixed(2)} ${c.currency}
             </span>
           </div>
+
+          ${needsCardSelection ? `
+            <div class="bg-amber-50/90 border border-amber-200 rounded-xl p-2.5 space-y-1.5 text-xs text-amber-900">
+              <div class="flex items-start gap-1.5 font-bold text-[11px] text-amber-900">
+                <i data-lucide="help-circle" class="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5"></i>
+                <span>سبب عدم المطابقة: ${c.nonMatchReason || 'لا يوجد كارت أو حساب مسجل بهذه الأرقام لدى هذا البنك'}</span>
+              </div>
+              ${c.matchSuggestion ? `
+                <div class="text-[10px] text-amber-800 flex items-center justify-between gap-2 pt-0.5 border-t border-amber-200/60">
+                  <span>💡 ${c.matchSuggestion}</span>
+                  ${c.suggestAddAccount ? `
+                    <button type="button" onclick="window.openAddAccountPrompt('${c.suggestAddAccount.bankId || ''}', '${c.suggestAddAccount.digits || ''}', '${c.suggestAddAccount.position || 'last'}')" class="shrink-0 px-2.5 py-1 bg-amber-200 hover:bg-amber-300 text-amber-950 rounded-lg text-[10px] font-bold active-press shadow-2xs">
+                      + إضافة الحساب
+                    </button>
+                  ` : ''}
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
 
           ${c.isPotentialDuplicate ? `
             <div class="bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-xs text-amber-900 space-y-1">
@@ -2169,11 +2287,21 @@ function initApp() {
               <div>
                 <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Assign Card</label>
                 <select id="candidate-card-select-${c.id}" class="w-full text-[11px] font-bold text-slate-800 bg-white border ${needsCardSelection ? 'border-amber-400 ring-2 ring-amber-400/20' : 'border-slate-200'} rounded-xl px-2 py-1.5 outline-none cursor-pointer">
-                  <option value="" ${!c.matchedCardId ? 'selected disabled' : ''}>-- اختر الكارت / الحساب --</option>
-                  ${cards.map(card => {
-                    const isSelected = card.id === c.matchedCardId;
-                    return `<option value="${card.id}" ${isSelected ? 'selected' : ''}>${card.name} (••• ${card.last4})</option>`;
-                  }).join('')}
+                  <option value="" ${!c.matchedCardId && !c.matchedAccountId ? 'selected disabled' : ''}>-- اختر الكارت / الحساب --</option>
+                  <optgroup label="💳 الكروت (Cards)">
+                    ${cards.map(card => {
+                      const isSelected = card.id === c.matchedCardId;
+                      return `<option value="${card.id}" ${isSelected ? 'selected' : ''}>${card.name} (•••• ${card.last4})</option>`;
+                    }).join('')}
+                  </optgroup>
+                  ${(store.accounts && store.accounts.length > 0) ? `
+                    <optgroup label="🏛️ الحسابات البنكية (Bank Accounts)">
+                      ${store.accounts.map(acc => {
+                        const isSelected = acc.id === c.matchedAccountId && !c.matchedCardId;
+                        return `<option value="acc:${acc.id}" ${isSelected ? 'selected' : ''}>${acc.name} (${acc.accountNumberMasked || acc.identifierDigits}) • رصيد: ${formatCurrency(acc.balance || 0)}</option>`;
+                      }).join('')}
+                    </optgroup>
+                  ` : ''}
                 </select>
               </div>
 
@@ -2229,39 +2357,54 @@ function initApp() {
     const merchInput = document.getElementById(`candidate-merchant-${candidateId}`);
     const catSelect = document.getElementById(`candidate-category-select-${candidateId}`);
 
-    const cardId = cardSelect ? cardSelect.value : null;
+    const rawVal = cardSelect ? cardSelect.value : null;
     const merchant = merchInput ? merchInput.value : '';
     const category = catSelect ? catSelect.value : 'other';
 
-    if (!cardId || cardId === '') {
+    if (!rawVal || rawVal === '') {
       showToast('يرجى اختيار الكارت أو الحساب أولاً لاعتماد العملية', 'error');
       if (cardSelect) cardSelect.focus();
       return;
     }
 
+    let cardId = null;
+    let accountId = null;
+    if (rawVal.startsWith('acc:')) {
+      accountId = rawVal.replace('acc:', '');
+    } else {
+      cardId = rawVal;
+      const storeRef = window.walletStore || window.store;
+      const card = storeRef ? storeRef.getCard(cardId) : null;
+      if (card && card.linkedAccountId) {
+        accountId = card.linkedAccountId;
+      }
+    }
+
     const candidate = window.BankSmsEngine.pendingCandidates.find(item => item.id === candidateId);
     const store = window.walletStore || window.store;
-    const selectedCard = store ? store.getCard(cardId) : null;
+    const selectedCard = cardId ? store.getCard(cardId) : null;
+    const selectedAccount = accountId ? store.getAccount(accountId) : null;
 
     let isManualAssignment = false;
-    if (candidate && selectedCard) {
+    if (candidate) {
       const candidateDigits = (candidate.identifierDigits || candidate.cardSuffix || '').trim();
-      const cardLast4 = (selectedCard.last4 || '').trim();
-      const hasDigitMismatch = candidateDigits && cardLast4 && candidateDigits !== cardLast4;
+      const targetDigits = selectedCard ? (selectedCard.last4 || '').trim() : (selectedAccount ? (selectedAccount.identifierDigits || '').trim() : '');
+      const hasDigitMismatch = candidateDigits && targetDigits && candidateDigits !== targetDigits;
 
       const candidateBank = (candidate.bank || '').toUpperCase().trim();
-      const cardBankObj = store ? store.getBank(selectedCard.bankId) : null;
-      const cardBankName = (cardBankObj ? cardBankObj.name : '').toUpperCase().trim();
-      const hasBankMismatch = candidateBank && cardBankName &&
-        !cardBankName.includes(candidateBank) && !candidateBank.includes(cardBankName) &&
+      const targetBankId = selectedCard ? selectedCard.bankId : (selectedAccount ? selectedAccount.bankId : null);
+      const targetBankObj = targetBankId ? store.getBank(targetBankId) : null;
+      const targetBankName = (targetBankObj ? targetBankObj.name : '').toUpperCase().trim();
+      const hasBankMismatch = candidateBank && targetBankName &&
+        !targetBankName.includes(candidateBank) && !candidateBank.includes(targetBankName) &&
         candidateBank !== 'BANK';
 
       if (hasDigitMismatch || hasBankMismatch) {
         const mismatchDetails = [];
-        if (hasBankMismatch) mismatchDetails.push(`البنك: ${candidate.bank} مقابل ${cardBankObj ? cardBankObj.name : 'الكارت'}`);
-        if (hasDigitMismatch) mismatchDetails.push(`الأرقام: ****${candidateDigits} مقابل ****${cardLast4}`);
+        if (hasBankMismatch) mismatchDetails.push(`البنك: ${candidate.bank} مقابل ${targetBankObj ? targetBankObj.name : 'الكارت/الحساب'}`);
+        if (hasDigitMismatch) mismatchDetails.push(`الأرقام: ****${candidateDigits} مقابل ****${targetDigits}`);
 
-        const confirmMsg = `تنبيه: بيانات الرسالة تختلف عن الكارت المختار!\n(${mismatchDetails.join(' | ')})\n\nهل تريد تعيين هذه العملية يدوياً لهذا الكارت؟`;
+        const confirmMsg = `تنبيه: بيانات الرسالة تختلف عن الكارت/الحساب المختار!\n(${mismatchDetails.join(' | ')})\n\nهل تريد تعيين هذه العملية يدوياً؟`;
         if (typeof confirm === 'function' && !confirm(confirmMsg)) {
           return;
         }
@@ -2269,7 +2412,14 @@ function initApp() {
       }
     }
 
-    const res = await window.BankSmsEngine.approveCandidate(candidateId, { cardId, merchant, category, isManualAssignment });
+    const res = await window.BankSmsEngine.approveCandidate(candidateId, {
+      cardId,
+      accountId,
+      merchant,
+      category,
+      transactionType: candidate ? candidate.transactionType : 'purchase',
+      isManualAssignment
+    });
     if (res.success) {
       showToast(`تم استيراد ${res.transaction.merchant} (${formatCurrency(res.transaction.amount)})`, 'success');
       renderSmsCandidatesList();
@@ -2277,6 +2427,51 @@ function initApp() {
     } else {
       showToast(res.error || 'Failed to approve transaction', 'error');
     }
+  };
+
+  window.openAddAccountPrompt = (bankId, digits, position) => {
+    closeModal('smsReview');
+    setTimeout(() => {
+      populateCardBankDropdown(bankId);
+      const accRadio = document.getElementById('type-account');
+      if (accRadio) {
+        accRadio.checked = true;
+        accRadio.dispatchEvent(new Event('change'));
+      }
+      const digitsInput = document.getElementById('card-last4');
+      if (digitsInput && digits) {
+        digitsInput.value = digits;
+      }
+      const nameInput = document.getElementById('card-name');
+      if (nameInput) {
+        nameInput.value = 'Bank Account';
+      }
+      if (position) {
+        const posRadio = document.querySelector(`input[name="card-digits-position"][value="${position}"]`);
+        if (posRadio) posRadio.checked = true;
+      }
+      openModal('card');
+    }, 200);
+  };
+
+  window.confirmDeleteAccount = (accId) => {
+    const acc = store.getAccount(accId);
+    if (!acc) return;
+    if (confirm(`هل أنت متأكد من حذف الحساب "${acc.name}" (${acc.accountNumberMasked})؟`)) {
+      store.deleteAccount(accId);
+      showToast(`تم حذف الحساب "${acc.name}"`, 'info');
+      renderBanksView();
+    }
+  };
+
+  window.openAddAccountForBank = (bankId) => {
+    populateCardBankDropdown(bankId);
+    const accRadio = document.getElementById('type-account');
+    if (accRadio) {
+      accRadio.checked = true;
+      accRadio.dispatchEvent(new Event('change'));
+    }
+    openModal('card');
   };
 
   window.rejectSmsCandidate = async (candidateId) => {
@@ -2773,7 +2968,7 @@ function initApp() {
 
     const backupPayload = {
       app: 'ApexWallet',
-      version: '1.4.4',
+      version: '1.4.5',
       exportedAt: new Date().toISOString(),
       encryptionNote: 'Master AES-GCM vault encrypted via PBKDF2 from 4-digit PIN.',
       securityVault: rawVault ? JSON.parse(rawVault) : null,

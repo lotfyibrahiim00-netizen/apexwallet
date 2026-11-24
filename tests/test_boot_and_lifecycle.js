@@ -411,6 +411,95 @@ async function testDualBudgetModel() {
   assert.strictEqual(repeatPrompt, undefined, 'Prompt MUST NOT appear again for an acknowledged cycle');
 }
 
+async function testLiveAccountBalanceAndWithdrawalRules() {
+  const sandbox = createHeadlessSandbox();
+  const store = sandbox.window.walletStore;
+  store.clearAllData();
+
+  // 1. Create a bank
+  const bank = store.addBank({ name: 'CIB Egypt', shortCode: 'CIB', accentColor: '#002D62' });
+
+  // 2. Create a bank account with initial balance 10,000 EGP
+  const account = store.addAccount({
+    bankId: bank.id,
+    name: 'Primary Current Account',
+    identifierDigits: '9055',
+    digitsPosition: 'last',
+    balance: 10000,
+    currency: 'EGP'
+  });
+  assert.strictEqual(account.balance, 10000, 'Initial account balance must be 10000');
+
+  // 3. Create a debit card linked to this account
+  const debitCard = store.addCard({
+    bankId: bank.id,
+    name: 'Titanium Debit',
+    last4: '9055',
+    cardType: 'debit',
+    linkedAccountId: account.id,
+    monthlyTarget: 15000
+  });
+
+  // 4. Log a normal purchase transaction of 1,500 EGP on the debit card
+  const txPurchase = store.addTransaction({
+    amount: 1500,
+    merchant: 'Carrefour Hypermarket',
+    category: 'groceries',
+    cardId: debitCard.id,
+    transactionType: 'purchase'
+  });
+
+  // Verify: Balance is deducted on the account (10,000 - 1,500 = 8,500)
+  assert.strictEqual(account.balance, 8500, 'Account balance must decrease by purchase amount to 8500');
+  // Verify: Spending is recorded on card budget
+  const cardStats1 = store.getCardSpendingStats(debitCard.id);
+  assert.strictEqual(cardStats1.spent, 1500, 'Card spent must reflect normal purchase');
+  assert.strictEqual(cardStats1.remaining, 13500, 'Remaining budget must decrease');
+
+  // 5. Log a cash withdrawal of 2,000 EGP on the debit card
+  const txWithdrawal = store.addTransaction({
+    amount: 2000,
+    merchant: 'ATM CIB Arkan',
+    category: 'other',
+    cardId: debitCard.id,
+    transactionType: 'withdrawal'
+  });
+
+  // Verify: Cash withdrawal deducts from live account balance (8,500 - 2,000 = 6,500)
+  assert.strictEqual(account.balance, 6500, 'Account balance must decrease by withdrawal amount to 6500');
+
+  // Verify Requirement 6: Cash withdrawal is NOT counted against personal card budget
+  const cardStats2 = store.getCardSpendingStats(debitCard.id);
+  assert.strictEqual(cardStats2.spent, 1500, 'Card spent MUST NOT include cash withdrawal (remains 1500)');
+  assert.strictEqual(cardStats2.remaining, 13500, 'Remaining budget MUST NOT be reduced by cash withdrawal');
+
+  // 6. Log an incoming transfer of 3,000 EGP to the account
+  const txIncome = store.addTransaction({
+    amount: 3000,
+    merchant: 'Salary Deposit',
+    category: 'services',
+    accountId: account.id,
+    direction: 'income',
+    transactionType: 'transfer'
+  });
+  // Balance increases (6,500 + 3,000 = 9,500)
+  assert.strictEqual(account.balance, 9500, 'Account balance must increase by income to 9500');
+
+  // 7. Delete purchase transaction -> Reverses 1,500 deduction (9,500 + 1,500 = 11,000)
+  store.deleteTransaction(txPurchase.id);
+  assert.strictEqual(account.balance, 11000, 'Deleting purchase transaction must reverse deduction on account balance');
+  const cardStats3 = store.getCardSpendingStats(debitCard.id);
+  assert.strictEqual(cardStats3.spent, 0, 'Card spent must reset to 0 after deleting purchase');
+
+  // 8. Delete cash withdrawal -> Reverses 2,000 deduction (11,000 + 2,000 = 13,000)
+  store.deleteTransaction(txWithdrawal.id);
+  assert.strictEqual(account.balance, 13000, 'Deleting withdrawal must reverse deduction on account balance');
+
+  // 9. Delete income transaction -> Reverses 3,000 income (13,000 - 3,000 = 10,000 initial balance!)
+  store.deleteTransaction(txIncome.id);
+  assert.strictEqual(account.balance, 10000, 'Deleting income must reverse addition returning balance to 10000 initial');
+}
+
 (async function main() {
   await runStepAsync('New user boot: Setup PIN and configure master vault', async () => {
     await testRuntimeLifecycle();
@@ -426,6 +515,10 @@ async function testDualBudgetModel() {
 
   await runStepAsync('Dual Budget Model: Bank Credit Limit vs Personal Budget per billing cycle', async () => {
     await testDualBudgetModel();
+  });
+
+  await runStepAsync('Live Account Balance & Zero-Budget Cash Withdrawal Rules', async () => {
+    await testLiveAccountBalanceAndWithdrawalRules();
   });
 
   console.log('\n----------------------------------------------------');

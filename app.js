@@ -249,6 +249,7 @@ function getInitialSampleData() {
       name: 'Plus Salary Debit',
       last4: '1044',
       cardType: 'debit',
+      linkedAccountId: 'acc_cib_current',
       creditLimit: null,
       monthlyTarget: 15000,
       cycleBudgets: {},
@@ -560,7 +561,21 @@ function getInitialSampleData() {
     }
   ];
 
-  return { banks, cards, transactions };
+  const accounts = [
+    {
+      id: 'acc_cib_current',
+      bankId: 'bank_cib',
+      name: 'CIB Current Account',
+      identifierDigits: '1044',
+      digitsPosition: 'last',
+      accountNumberMasked: '•••• 1044',
+      balance: 45000,
+      currency: 'EGP',
+      createdAt: '2026-01-01'
+    }
+  ];
+
+  return { banks, cards, accounts, transactions };
 }
 
 // --- App State ---
@@ -715,7 +730,7 @@ class WalletAppStore {
     if (!identifierDigits || !/^\d{4}$/.test(identifierDigits)) {
       throw new Error('Please enter exactly 4 digits identifying the account.');
     }
-    const id = 'acc_' + Date.now();
+    const id = 'acc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
     const pos = digitsPosition === 'first' ? 'first' : 'last';
     const digits = identifierDigits.trim();
     const newAcc = {
@@ -934,7 +949,7 @@ class WalletAppStore {
     return this.transactions.find(t => t.id === txId);
   }
 
-  addTransaction({ amount, merchant, category, date, bankId, cardId, accountId, direction, type, notes }) {
+  addTransaction({ amount, merchant, category, date, bankId, cardId, accountId, direction, type, transactionType, isManualAssignment, detectedBank, detectedDigits, notes }) {
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
       throw new Error('Please enter a valid positive amount.');
     }
@@ -943,22 +958,42 @@ class WalletAppStore {
     }
 
     const card = cardId ? this.getCard(cardId) : null;
-    const account = accountId ? this.getAccount(accountId) : null;
-    const bId = bankId || (card ? card.bankId : (account ? account.bankId : null));
+    let targetAccount = accountId ? this.getAccount(accountId) : null;
+    if (!targetAccount && card && card.cardType === 'debit' && card.linkedAccountId) {
+      targetAccount = this.getAccount(card.linkedAccountId);
+    }
+    const bId = bankId || (card ? card.bankId : (targetAccount ? targetAccount.bankId : null));
 
     const txDirection = (direction === 'income' || type === 'income') ? 'income' : 'expense';
-    const id = 'tx_' + Date.now();
+    const txAmount = parseFloat(amount);
+    const txOpType = transactionType || (category === 'transfer' ? 'transfer' : 'purchase');
+
+    // Live Account Balance Update (Item 2)
+    // No double-deduction: single deduction directly on the linked account!
+    if (targetAccount) {
+      if (txDirection === 'income') {
+        targetAccount.balance = (targetAccount.balance || 0) + txAmount;
+      } else {
+        targetAccount.balance = (targetAccount.balance || 0) - txAmount;
+      }
+    }
+
+    const id = 'tx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
     const newTx = {
       id,
-      amount: parseFloat(amount),
+      amount: txAmount,
       direction: txDirection,
       type: txDirection,
+      transactionType: txOpType,
       merchant: merchant.trim(),
       category: category || 'other',
       date: date || new Date().toISOString().split('T')[0],
       bankId: bId,
       cardId: card ? card.id : null,
-      accountId: account ? account.id : (card && card.linkedAccountId ? card.linkedAccountId : null),
+      accountId: targetAccount ? targetAccount.id : null,
+      isManualAssignment: !!isManualAssignment,
+      detectedBank: detectedBank || null,
+      detectedDigits: detectedDigits || null,
       notes: (notes || '').trim(),
       createdAt: new Date().toISOString()
     };
@@ -969,6 +1004,18 @@ class WalletAppStore {
   }
 
   deleteTransaction(txId) {
+    const tx = this.getTransaction(txId);
+    if (tx && tx.accountId) {
+      const targetAccount = this.getAccount(tx.accountId);
+      if (targetAccount) {
+        // Reverse effect on linked account balance
+        if (tx.direction === 'income' || tx.type === 'income') {
+          targetAccount.balance = (targetAccount.balance || 0) - tx.amount;
+        } else {
+          targetAccount.balance = (targetAccount.balance || 0) + tx.amount;
+        }
+      }
+    }
     this.transactions = this.transactions.filter(t => t.id !== txId);
     this.saveState();
     return true;
@@ -1117,7 +1164,8 @@ class WalletAppStore {
       }
     }
 
-    const cardExpenses = cardTxs.filter(t => t.direction !== 'income' && t.type !== 'income').reduce((sum, t) => sum + t.amount, 0);
+    // Item 2: Cash withdrawal is excluded from personal card spending budget and does not reduce remaining budget
+    const cardExpenses = cardTxs.filter(t => t.direction !== 'income' && t.type !== 'income' && t.transactionType !== 'withdrawal').reduce((sum, t) => sum + t.amount, 0);
     const cardIncome = cardTxs.filter(t => t.direction === 'income' || t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const spent = Math.max(0, cardExpenses - cardIncome);
 
@@ -1163,7 +1211,7 @@ class WalletAppStore {
   // --- Overall Dashboard Target Stats ---
   getOverallStats() {
     const filteredTxs = this.getFilteredTransactions();
-    const totalExpenses = filteredTxs.filter(t => t.direction !== 'income' && t.type !== 'income').reduce((sum, t) => sum + t.amount, 0);
+    const totalExpenses = filteredTxs.filter(t => t.direction !== 'income' && t.type !== 'income' && t.transactionType !== 'withdrawal').reduce((sum, t) => sum + t.amount, 0);
     const totalIncome = filteredTxs.filter(t => t.direction === 'income' || t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const totalSpent = Math.max(0, totalExpenses - totalIncome);
     const totalCount = filteredTxs.length;

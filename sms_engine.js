@@ -369,7 +369,7 @@
      * and performs Level B Potential Duplicate Detection against existing manual/ledger transactions.
      */
     enrichCandidates() {
-      const store = typeof window !== 'undefined' ? (window.walletStore || window.store) : null;
+      const store = typeof window !== 'undefined' ? (window.walletStore || window.store) : (typeof global !== 'undefined' ? (global.walletStore || global.store) : null);
       if (!store) return;
       const allCards = store.cards || [];
       const allBanks = store.banks || [];
@@ -425,6 +425,10 @@
           }
         }
 
+        c.nonMatchReason = null;
+        c.matchSuggestion = null;
+        c.suggestAddAccount = null;
+
         // Strict Matching: Automatic match ONLY when exactly 1 match on all 4 dimensions
         if (matchingCards.length === 1 && matchingAccounts.length <= 1) {
           c.matchedCardId = matchingCards[0].id;
@@ -443,6 +447,8 @@
           } else {
             c.confidence = 'account_only';
             c.requiresCardSelection = true;
+            c.nonMatchReason = `تمت مطابقة الحساب البنكي (${matchingAccounts[0].name})، ولكن لا يوجد كارت خصم مرتبط به.`;
+            c.matchSuggestion = `يمكنك اعتماد العملية على الحساب مباشرة، أو ربط الحساب بكارت خصم من شاشة الكروت.`;
           }
         } else if (matchingCards.length > 1 || matchingAccounts.length > 1) {
           // Ambiguous / Multiple: MUST require user confirmation without guessing
@@ -451,12 +457,42 @@
           c.confidence = 'multiple';
           c.requiresCardSelection = true;
           c.candidateCards = matchingCards.map(mc => mc.id);
+          const totalMatches = matchingCards.length + matchingAccounts.length;
+          c.nonMatchReason = `يوجد أكثر من تطابق محتمل (${totalMatches} كروت أو حسابات تنتهي بنفس الأرقام لدى ${candidateBank ? candidateBank.name : (c.bank || 'هذا البنك')}).`;
+          c.matchSuggestion = `يرجى اختيار الكارت المقصود يدوياً لمنع أي التباس في تسجيل المصروف.`;
         } else {
           // Zero match: Never fallback to first card
           c.matchedCardId = null;
           c.matchedAccountId = null;
           c.confidence = 'unknown';
           c.requiresCardSelection = true;
+
+          if (!candidateBank) {
+            c.nonMatchReason = `البنك الوارد في الرسالة (${c.bank || 'غير محدد'}) غير مسجل في محفظتك.`;
+            c.matchSuggestion = `أضف البنك أولاً من شاشة البنوك لتتمكن من إضافة كروته ومطابقة عملياته تلقائياً.`;
+          } else if (!candidateDigits || candidateDigits.length !== 4) {
+            c.nonMatchReason = `الرسالة لا تحتوي على أرقام تعريفية للكارت أو الحساب (4 أرقام).`;
+            c.matchSuggestion = `يرجى اختيار الكارت أو الحساب يدوياً من القائمة.`;
+          } else {
+            const bankName = candidateBank ? candidateBank.name : (c.bank || 'هذا البنك');
+            if (candidateEntity === 'account') {
+              c.nonMatchReason = `لا يوجد حساب بنكي أو كارت خصم مسجل بهذه الأرقام (${candidateDigits}) لدى ${bankName}.`;
+              c.matchSuggestion = `يمكنك إضافة هذا الحساب من شاشة البنوك أو ربطه بكارت خصم موجود لتفعيل المطابقة التلقائية.`;
+              c.suggestAddAccount = {
+                bankId: candidateBank.id,
+                digits: candidateDigits,
+                position: candidatePos
+              };
+            } else {
+              c.nonMatchReason = `لا يوجد كارت أو حساب مسجل بهذه الأرقام (${candidateDigits}) لدى ${bankName}.`;
+              c.matchSuggestion = `يمكنك إضافة هذا الكارت من شاشة البنوك والكروت لتفعيل المطابقة التلقائية مستقبلاً.`;
+              c.suggestAddAccount = {
+                bankId: candidateBank.id,
+                digits: candidateDigits,
+                position: candidatePos
+              };
+            }
+          }
         }
 
         // --- LEVEL B: Potential Duplicate Check against manual/existing wallet transactions ---
@@ -563,7 +599,7 @@
       const idx = this.pendingCandidates.findIndex(c => c.id === candidateId);
       if (idx === -1) return { success: false, error: 'Candidate not found' };
 
-      const store = typeof window !== 'undefined' ? (window.walletStore || window.store) : null;
+      const store = typeof window !== 'undefined' ? (window.walletStore || window.store) : (typeof global !== 'undefined' ? (global.walletStore || global.store) : null);
       if (!store) {
         return { success: false, error: 'Wallet storage is not initialized.' };
       }
@@ -601,6 +637,7 @@
           accountId: accountId,
           direction: txDirection,
           type: txDirection,
+          transactionType: overrides.transactionType || c.transactionType || 'purchase',
           isManualAssignment: isManual,
           detectedBank: c.bank,
           detectedDigits: c.identifierDigits || c.cardSuffix,
@@ -1012,6 +1049,16 @@
         fingerprint = 'fp_' + Math.abs(rawKey.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0));
       }
 
+      // Transaction Operation Type (purchase | transfer | withdrawal)
+      let transactionType = 'purchase';
+      if (/\b(atm|cash\s*withdrawal|withdrawn|withdraw|cash\s*out)\b|سحب\s*نقدي|سحب|صراف\s*آلي|من\s*ماكينة/i.test(normalized)) {
+        transactionType = 'withdrawal';
+      } else if (isTransferOrInsta) {
+        transactionType = 'transfer';
+      } else {
+        transactionType = 'purchase';
+      }
+
       return {
         id: 'c_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
         bank,
@@ -1022,6 +1069,7 @@
         refNumber,
         type,
         direction: type,
+        transactionType,
         amount,
         currency,
         merchant,

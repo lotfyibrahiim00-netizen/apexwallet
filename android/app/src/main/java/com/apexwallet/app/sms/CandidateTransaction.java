@@ -18,6 +18,7 @@ public class CandidateTransaction {
     private String digitsPosition;       // "last" | "first"
     private String referenceNumber;      // e.g. "REF123456" or ""
     private String type;                 // "expense" | "income"
+    private String transactionType;      // "purchase" | "transfer" | "withdrawal"
     private double amount;
     private String currency;             // e.g. "EGP", "USD"
     private String merchant;             // merchant, ATM or reference; empty string if none
@@ -34,11 +35,19 @@ public class CandidateTransaction {
         this.entityType = "card";
         this.digitsPosition = "last";
         this.referenceNumber = "";
+        this.transactionType = "purchase";
     }
 
     public CandidateTransaction(String bank, String cardSuffix, String entityType,
                                 String identifierDigits, String digitsPosition, String referenceNumber,
                                 String type, double amount, String currency, String merchant,
+                                String transactionTime, String fingerprint, boolean requiresCardSelection) {
+        this(bank, cardSuffix, entityType, identifierDigits, digitsPosition, referenceNumber, type, "purchase", amount, currency, merchant, transactionTime, fingerprint, requiresCardSelection);
+    }
+
+    public CandidateTransaction(String bank, String cardSuffix, String entityType,
+                                String identifierDigits, String digitsPosition, String referenceNumber,
+                                String type, String transactionType, double amount, String currency, String merchant,
                                 String transactionTime, String fingerprint, boolean requiresCardSelection) {
         this.id = UUID.randomUUID().toString();
         this.bank = bank != null ? bank : "Bank";
@@ -48,6 +57,7 @@ public class CandidateTransaction {
         this.digitsPosition = digitsPosition != null ? digitsPosition : "last";
         this.referenceNumber = referenceNumber != null ? referenceNumber : "";
         this.type = type != null ? type : "expense";
+        this.transactionType = transactionType != null ? transactionType : "purchase";
         this.amount = amount;
         this.currency = currency != null ? currency : "EGP";
         this.merchant = merchant != null ? merchant : "";
@@ -70,6 +80,7 @@ public class CandidateTransaction {
             obj.put("referenceNumber", referenceNumber);
             obj.put("type", type);
             obj.put("direction", type); // alias for consistency
+            obj.put("transactionType", transactionType != null ? transactionType : "purchase");
             obj.put("amount", amount);
             obj.put("currency", currency);
             obj.put("merchant", merchant);
@@ -93,6 +104,7 @@ public class CandidateTransaction {
         candidate.digitsPosition = obj.optString("digitsPosition", "last");
         candidate.referenceNumber = obj.optString("referenceNumber", "");
         candidate.type = obj.optString("direction", obj.optString("type", "expense"));
+        candidate.transactionType = obj.optString("transactionType", "purchase");
         candidate.amount = obj.optDouble("amount", 0.0);
         candidate.currency = obj.optString("currency", "EGP");
         candidate.merchant = obj.optString("merchant", "");
@@ -116,6 +128,8 @@ public class CandidateTransaction {
     public String getDigitsPosition() { return digitsPosition; }
     public String getReferenceNumber() { return referenceNumber; }
     public String getType() { return type; }
+    public String getTransactionType() { return transactionType != null ? transactionType : "purchase"; }
+    public void setTransactionType(String t) { this.transactionType = t; }
     public double getAmount() { return amount; }
     public String getCurrency() { return currency; }
     public String getMerchant() { return merchant; }

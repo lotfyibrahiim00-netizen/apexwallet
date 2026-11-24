@@ -300,6 +300,31 @@
             </div>
           </div>
 
+          <!-- Transaction Operation Type -->
+          <div>
+            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">نوع العملية (Operation Type)</label>
+            <div class="grid grid-cols-3 gap-1.5">
+              <div>
+                <input type="radio" id="tx-op-purchase" name="tx-op-type" value="purchase" checked class="hidden peer">
+                <label for="tx-op-purchase" class="flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-slate-50 peer-checked:bg-[#111827] peer-checked:border-[#111827] peer-checked:text-white cursor-pointer transition-all text-[11px] font-bold text-center">
+                  🛍️ شراء
+                </label>
+              </div>
+              <div>
+                <input type="radio" id="tx-op-transfer" name="tx-op-type" value="transfer" class="hidden peer">
+                <label for="tx-op-transfer" class="flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-slate-50 peer-checked:bg-[#111827] peer-checked:border-[#111827] peer-checked:text-white cursor-pointer transition-all text-[11px] font-bold text-center">
+                  🔁 تحويل
+                </label>
+              </div>
+              <div>
+                <input type="radio" id="tx-op-withdrawal" name="tx-op-type" value="withdrawal" class="hidden peer">
+                <label for="tx-op-withdrawal" class="flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-slate-50 peer-checked:bg-[#111827] peer-checked:border-[#111827] peer-checked:text-white cursor-pointer transition-all text-[11px] font-bold text-center">
+                  🏧 سحب نقدي
+                </label>
+              </div>
+            </div>
+          </div>
+
           <!-- Category -->
           <div>
             <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Category</label>

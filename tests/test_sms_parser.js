@@ -963,6 +963,118 @@ runTest('Manual assignment tag is recorded in transaction when overridden', asyn
   assert.strictEqual(recordedTx.detectedDigits, '9999');
 });
 
+// Test 34: Transaction Operation Types (Item 2)
+runTest('Distinguishes transaction operation types: withdrawal, transfer, purchase in English and Arabic', () => {
+  // Cash Withdrawal (English ATM)
+  const atmEn = parseBankSms('CIB', 'Cash withdrawal of EGP 2,000.00 from ATM Arkan Plaza with card ending in 8492 on 24/11/2026.');
+  assert.ok(atmEn);
+  assert.strictEqual(atmEn.transactionType, 'withdrawal');
+  assert.strictEqual(atmEn.amount, 2000.00);
+
+  // Cash Withdrawal (Arabic)
+  const atmAr = parseBankSms('NBE', 'تم سحب نقدي بمبلغ 1,500.00 جم من ماكينة صراف آلي باستخدام بطاقة 9011 بتاريخ 2026/11/24.');
+  assert.ok(atmAr);
+  assert.strictEqual(atmAr.transactionType, 'withdrawal');
+  assert.strictEqual(atmAr.amount, 1500.00);
+
+  // Transfer (InstaPay / IPN)
+  const xfer1 = parseBankSms('InstaPay', 'تم تحويل مبلغ 850.00 جم إلى أحمد محمد بنجاح عبر إنستاباي من حساب 4120.');
+  assert.ok(xfer1);
+  assert.strictEqual(xfer1.transactionType, 'transfer');
+
+  // Purchase (English POS)
+  const purchEn = parseBankSms('HSBC', 'Purchase of EGP 450.00 at Starbucks with card **5521 on 24/11/2026.');
+  assert.ok(purchEn);
+  assert.strictEqual(purchEn.transactionType, 'purchase');
+
+  // Purchase (Arabic)
+  const purchAr = parseBankSms('Banque Misr', 'عملية شراء بمبلغ 320.00 جنيه لدى كارفور المعادي باستخدام بطاقة 4120.');
+  assert.ok(purchAr);
+  assert.strictEqual(purchAr.transactionType, 'purchase');
+});
+
+// Test 35: Clear Non-Matching Reasons (Item 1)
+runTest('Generates clear nonMatchReason and matchSuggestion for unmatched or unregistered cards/accounts', () => {
+  const { BankSmsEngine } = require('../sms_engine.js');
+  const engine = new BankSmsEngine();
+
+  // Mock wallet store with 1 CIB card (last4: 8492)
+  const mockStore = {
+    banks: [{ id: 'bank_cib', name: 'Commercial International Bank', shortCode: 'CIB' }],
+    cards: [{ id: 'card_1', bankId: 'bank_cib', name: 'CIB Miles', last4: '8492', cardType: 'credit' }],
+    accounts: [],
+    transactions: []
+  };
+
+  // 1. Candidate with different digits (9999) on registered bank (CIB)
+  const cUnmatched = {
+    id: 'c_unmatched_1',
+    bank: 'CIB',
+    identifierDigits: '9999',
+    digitsPosition: 'last',
+    entityType: 'card',
+    amount: 500,
+    currency: 'EGP'
+  };
+
+  engine.pendingCandidates = [cUnmatched];
+
+  // Run enrichCandidates with mockStore injected into global
+  const origStore = global.walletStore;
+  global.walletStore = mockStore;
+  try {
+    engine.enrichCandidates();
+    const enriched = engine.pendingCandidates[0];
+    assert.strictEqual(enriched.matchedCardId, null);
+    assert.strictEqual(enriched.requiresCardSelection, true);
+    assert.ok(enriched.nonMatchReason, 'Must provide clear non-matching reason');
+    assert.ok(enriched.nonMatchReason.includes('لا يوجد كارت أو حساب مسجل بهذه الأرقام (9999)'));
+    assert.ok(enriched.matchSuggestion, 'Must provide helpful suggestion');
+    assert.ok(enriched.suggestAddAccount, 'Must provide suggestAddAccount data');
+    assert.strictEqual(enriched.suggestAddAccount.digits, '9999');
+  } finally {
+    global.walletStore = origStore;
+  }
+});
+
+// Test 36: Unregistered Bank Reason (Item 1)
+runTest('Provides clear nonMatchReason when bank is unregistered in user wallet', () => {
+  const { BankSmsEngine } = require('../sms_engine.js');
+  const engine = new BankSmsEngine();
+
+  const mockStore = {
+    banks: [{ id: 'bank_cib', name: 'Commercial International Bank', shortCode: 'CIB' }],
+    cards: [],
+    accounts: [],
+    transactions: []
+  };
+
+  // Candidate from QNB, which is not in mockStore
+  const cUnknownBank = {
+    id: 'c_qnb_1',
+    bank: 'QNB',
+    identifierDigits: '1234',
+    digitsPosition: 'last',
+    entityType: 'card',
+    amount: 700,
+    currency: 'EGP'
+  };
+
+  engine.pendingCandidates = [cUnknownBank];
+
+  const origStore = global.walletStore;
+  global.walletStore = mockStore;
+  try {
+    engine.enrichCandidates();
+    const enriched = engine.pendingCandidates[0];
+    assert.strictEqual(enriched.matchedCardId, null);
+    assert.ok(enriched.nonMatchReason.includes('غير مسجل في محفظتك'));
+    assert.ok(enriched.matchSuggestion.includes('أضف البنك أولاً'));
+  } finally {
+    global.walletStore = origStore;
+  }
+});
+
 (async () => {
   await Promise.all(pendingTestPromises);
 

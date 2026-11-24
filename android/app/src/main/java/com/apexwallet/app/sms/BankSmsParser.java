@@ -232,6 +232,16 @@ public class BankSmsParser {
         String bank = resolveBankName(sender);
         String fingerprint = generateCompoundFingerprint(bank, entityType, digits, position, type, amount, currency, dateTime, refNumber);
 
+        // 9. Transaction Operation Type (purchase | transfer | withdrawal)
+        String transactionType = "purchase";
+        if (Pattern.compile("(?i)\\b(atm|cash\\s*withdrawal|withdrawn|withdraw|cash\\s*out)\\b|سحب\\s*نقدي|سحب|صراف\\s*آلي|من\\s*ماكينة").matcher(normalized).find()) {
+            transactionType = "withdrawal";
+        } else if (isTransferOrInsta) {
+            transactionType = "transfer";
+        } else {
+            transactionType = "purchase";
+        }
+
         return new CandidateTransaction(
                 bank,
                 digits,
@@ -240,6 +250,7 @@ public class BankSmsParser {
                 position,
                 refNumber,
                 type,
+                transactionType,
                 amount,
                 currency,
                 merchant,
