@@ -1075,6 +1075,88 @@ runTest('Provides clear nonMatchReason when bank is unregistered in user wallet'
   }
 });
 
+// Test 37: Block unlinked debit withdrawal approval (v1.4.6 Item 4)
+runTest('approveCandidate blocks cash withdrawal for unlinked debit card preventing zero financial effect', async () => {
+  const { BankSmsEngine } = require('../sms_engine.js');
+  const engine = new BankSmsEngine();
+
+  const mockStore = {
+    banks: [{ id: 'bank_cib', name: 'CIB', shortCode: 'CIB' }],
+    cards: [{ id: 'card_debit_unlinked', bankId: 'bank_cib', name: 'Unlinked Debit', last4: '8811', cardType: 'debit', linkedAccountId: null }],
+    accounts: [],
+    transactions: [],
+    getCard: (id) => mockStore.cards.find(c => c.id === id),
+    getAccount: (id) => mockStore.accounts.find(a => a.id === id),
+    addTransaction: (tx) => { mockStore.transactions.push(tx); return tx; }
+  };
+
+  engine.pendingCandidates = [{
+    id: 'cand_atm_unlinked',
+    bank: 'CIB',
+    identifierDigits: '8811',
+    amount: 1500,
+    currency: 'EGP',
+    transactionType: 'withdrawal',
+    matchedCardId: 'card_debit_unlinked'
+  }];
+
+  const origStore = global.walletStore;
+  global.walletStore = mockStore;
+  try {
+    const res = await engine.approveCandidate('cand_atm_unlinked', {
+      cardId: 'card_debit_unlinked',
+      transactionType: 'withdrawal'
+    });
+    assert.strictEqual(res.success, false, 'Approval must fail for unlinked debit withdrawal');
+    assert.ok(res.error.includes('لا يمكن اعتماد عملية سحب نقدي لكارت خصم غير مرتبط بحساب بنكي'));
+  } finally {
+    global.walletStore = origStore;
+  }
+});
+
+// Test 38: User changes transaction type before approval (v1.4.6 Item 6)
+runTest('User override of transaction type before approval applies chosen type and financial rules', async () => {
+  const { BankSmsEngine } = require('../sms_engine.js');
+  const engine = new BankSmsEngine();
+
+  let capturedTx = null;
+  const mockStore = {
+    banks: [{ id: 'bank_cib', name: 'CIB', shortCode: 'CIB' }],
+    cards: [{ id: 'card_cib_1', bankId: 'bank_cib', name: 'CIB Card', last4: '5566', cardType: 'credit' }],
+    accounts: [],
+    transactions: [],
+    getCard: (id) => mockStore.cards.find(c => c.id === id),
+    getAccount: (id) => mockStore.accounts.find(a => a.id === id),
+    addTransaction: (tx) => { capturedTx = tx; mockStore.transactions.push(tx); return tx; }
+  };
+
+  // Originally candidate was parsed as 'withdrawal'
+  engine.pendingCandidates = [{
+    id: 'cand_type_override',
+    bank: 'CIB',
+    identifierDigits: '5566',
+    amount: 800,
+    currency: 'EGP',
+    transactionType: 'withdrawal',
+    matchedCardId: 'card_cib_1'
+  }];
+
+  const origStore = global.walletStore;
+  global.walletStore = mockStore;
+  try {
+    // User changes type to 'purchase' in modal before approving
+    const res = await engine.approveCandidate('cand_type_override', {
+      cardId: 'card_cib_1',
+      transactionType: 'purchase'
+    });
+    assert.strictEqual(res.success, true);
+    assert.ok(capturedTx);
+    assert.strictEqual(capturedTx.transactionType, 'purchase', 'Approved transaction must have overridden type: purchase');
+  } finally {
+    global.walletStore = origStore;
+  }
+});
+
 (async () => {
   await Promise.all(pendingTestPromises);
 

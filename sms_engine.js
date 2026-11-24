@@ -612,6 +612,17 @@
 
       const card = cardId ? store.getCard(cardId) : null;
       const accountId = overrides.accountId || c.matchedAccountId || (card ? card.linkedAccountId : null);
+      const candidateOpType = overrides.transactionType || c.transactionType || 'purchase';
+
+      // Item 4: Debit cash withdrawal without linked account CANNOT be approved with zero financial effect!
+      if (candidateOpType === 'withdrawal') {
+        if (card && card.cardType === 'debit' && !accountId) {
+          return {
+            success: false,
+            error: 'لا يمكن اعتماد عملية سحب نقدي لكارت خصم غير مرتبط بحساب بنكي. يرجى اختيار حساب بنكي أو ربط الكارت بحساب أولاً لمنع ضياع الأثر المالي.'
+          };
+        }
+      }
 
       const amount = parseFloat(overrides.amount !== undefined ? overrides.amount : c.amount);
       const merchant = (overrides.merchant || c.merchant || (c.bank + ' SMS Transaction')).trim();

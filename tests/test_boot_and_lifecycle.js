@@ -500,6 +500,146 @@ async function testLiveAccountBalanceAndWithdrawalRules() {
   assert.strictEqual(account.balance, 10000, 'Deleting income must reverse addition returning balance to 10000 initial');
 }
 
+async function testV146ReviewerFeatures() {
+  const sandbox = createHeadlessSandbox();
+  const store = sandbox.window.walletStore;
+  store.clearAllData();
+
+  // Bank setup
+  const bank = store.addBank({ name: 'Commercial International Bank', shortCode: 'CIB' });
+  const account = store.addAccount({
+    bankId: bank.id,
+    name: 'Salary Current Account',
+    identifierDigits: '7022',
+    balance: 50000
+  });
+
+  // 1. Test Account Balance Adjustment (Item 1)
+  const initialBalance = account.balance;
+  assert.strictEqual(initialBalance, 50000);
+
+  // User edits account balance to 52,500 with note
+  store.updateAccount(account.id, {
+    name: 'Primary Salary Account',
+    newBalance: 52500,
+    notes: 'Reconciled with CIB Statement Nov 2026'
+  });
+  assert.strictEqual(account.name, 'Primary Salary Account');
+  assert.strictEqual(account.balance, 52500);
+
+  // Verify adjustment transaction was logged
+  const adjTx = store.transactions.find(t => t.isBalanceAdjustment);
+  assert.ok(adjTx, 'Balance adjustment transaction must be created in ledger');
+  assert.strictEqual(adjTx.transactionType, 'balance_adjustment');
+  assert.strictEqual(adjTx.balanceBefore, 50000);
+  assert.strictEqual(adjTx.balanceAfter, 52500);
+  assert.strictEqual(adjTx.amount, 2500);
+  assert.strictEqual(adjTx.direction, 'income');
+
+  // Verify deleting the adjustment transaction restores balanceBefore
+  store.deleteTransaction(adjTx.id);
+  assert.strictEqual(account.balance, 50000, 'Deleting adjustment transaction must restore balanceBefore (50,000)');
+
+  // Re-adjust downward to 40,000
+  store.updateAccount(account.id, { newBalance: 40000 });
+  assert.strictEqual(account.balance, 40000);
+  const downAdjTx = store.transactions.find(t => t.isBalanceAdjustment);
+  assert.strictEqual(downAdjTx.direction, 'expense');
+  assert.strictEqual(downAdjTx.amount, 10000);
+  store.deleteTransaction(downAdjTx.id);
+  assert.strictEqual(account.balance, 50000);
+
+  // 2. Test Linking Existing Debit Card to Account Without Deleting (Item 3)
+  const debitCard = store.addCard({
+    bankId: bank.id,
+    name: 'Gold Debit',
+    last4: '1122',
+    cardType: 'debit',
+    monthlyTarget: 10000,
+    linkedAccountId: null // initially unlinked
+  });
+
+  // Log unlinked purchase
+  store.addTransaction({
+    amount: 1000,
+    merchant: 'Zara',
+    cardId: debitCard.id,
+    transactionType: 'purchase'
+  });
+  // Balance unchanged because debit was unlinked
+  assert.strictEqual(account.balance, 50000, 'Unlinked debit purchase should not affect account balance');
+
+  // Link debit card to account via updateCard
+  store.updateCard(debitCard.id, {
+    linkedAccountId: account.id,
+    monthlyTarget: 12000
+  });
+  assert.strictEqual(debitCard.linkedAccountId, account.id);
+  assert.strictEqual(debitCard.monthlyTarget, 12000);
+
+  // New purchase after linking
+  store.addTransaction({
+    amount: 3000,
+    merchant: 'Spinneys',
+    cardId: debitCard.id,
+    transactionType: 'purchase'
+  });
+  // Now account balance is deducted for new transaction
+  assert.strictEqual(account.balance, 47000, 'Linked debit purchase must deduct from account balance');
+
+  // 3. Test Unlinked Debit Withdrawal Blocked (Item 4)
+  const unlinkedDebit = store.addCard({
+    bankId: bank.id,
+    name: 'Independent Debit',
+    last4: '3344',
+    cardType: 'debit',
+    linkedAccountId: null
+  });
+
+  let threwError = false;
+  try {
+    store.addTransaction({
+      amount: 1000,
+      merchant: 'ATM',
+      cardId: unlinkedDebit.id,
+      transactionType: 'withdrawal'
+    });
+  } catch (e) {
+    threwError = true;
+    assert.ok(e.message.includes('لا يمكن تسجيل عملية سحب نقدي لكارت خصم غير مرتبط بحساب بنكي'));
+  }
+  assert.strictEqual(threwError, true, 'Unlinked debit withdrawal must throw an error preventing zero financial effect');
+
+  // 4. Test Credit Card Cash Advance (Item 5)
+  const creditCard = store.addCard({
+    bankId: bank.id,
+    name: 'Platinum Credit',
+    last4: '9988',
+    cardType: 'credit',
+    cycleStartDay: 1,
+    cycleEndDay: 30,
+    monthlyTarget: 20000
+  });
+
+  // Log a cash advance / withdrawal on the credit card
+  store.addTransaction({
+    amount: 4000,
+    merchant: 'ATM Cash Advance',
+    cardId: creditCard.id,
+    transactionType: 'withdrawal',
+    date: new Date().toISOString().split('T')[0]
+  });
+
+  // Check card spending stats: cash advance MUST count towards credit card spent / statement obligations!
+  const creditStats = store.getCardSpendingStats(creditCard.id);
+  assert.strictEqual(creditStats.spent, 4000, 'Credit card cash withdrawal MUST be counted in credit card spending obligations');
+  assert.strictEqual(creditStats.remaining, 16000, 'Remaining budget on credit card must be reduced by cash advance');
+
+  // Check overall stats: credit card cash withdrawal is included in overall expenses
+  const overallStats = store.getOverallStats();
+  assert.ok(overallStats.totalSpent >= 4000, 'Overall spent must include credit card cash advance');
+}
+
 (async function main() {
   await runStepAsync('New user boot: Setup PIN and configure master vault', async () => {
     await testRuntimeLifecycle();
@@ -519,6 +659,10 @@ async function testLiveAccountBalanceAndWithdrawalRules() {
 
   await runStepAsync('Live Account Balance & Zero-Budget Cash Withdrawal Rules', async () => {
     await testLiveAccountBalanceAndWithdrawalRules();
+  });
+
+  await runStepAsync('Reviewer v1.4.6 Rules: Account Balance Adjustment, Card Editing, Blocked Unlinked Debit Withdrawal, Credit Cash Advance', async () => {
+    await testV146ReviewerFeatures();
   });
 
   console.log('\n----------------------------------------------------');

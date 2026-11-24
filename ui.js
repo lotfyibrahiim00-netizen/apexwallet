@@ -37,7 +37,11 @@ function initApp() {
     smsHistorical: document.getElementById('modal-sms-historical'),
     'sms-historical': document.getElementById('modal-sms-historical'),
     cycleBudgetPrompt: document.getElementById('modal-cycle-budget-prompt'),
-    'cycle-budget-prompt': document.getElementById('modal-cycle-budget-prompt')
+    'cycle-budget-prompt': document.getElementById('modal-cycle-budget-prompt'),
+    editAccount: document.getElementById('modal-edit-account'),
+    'edit-account': document.getElementById('modal-edit-account'),
+    editCard: document.getElementById('modal-edit-card'),
+    'edit-card': document.getElementById('modal-edit-card')
   };
 
   // --- Toast System ---
@@ -340,13 +344,27 @@ function initApp() {
       }
     }
 
+    const targetHelp = document.getElementById('card-target-help');
+
     if (targetLabel && targetInput) {
-      if (cardType === 'credit') {
+      if (cardType === 'account') {
+        targetLabel.textContent = 'الرصيد الحالي للحساب (Current Balance)';
+        targetInput.placeholder = 'مثال: 25000';
+        targetInput.required = false;
+        if (targetHelp) {
+          targetHelp.textContent = 'الرصيد يتم حسابه وتحديثه داخل التطبيق فقط وليس متزامناً مع البنك';
+          targetHelp.classList.remove('hidden');
+        }
+      } else if (cardType === 'credit') {
         targetLabel.textContent = 'Personal Spending Budget (ميزانية الصرف للدورة)';
+        targetInput.placeholder = '15000';
         targetInput.required = true;
+        if (targetHelp) targetHelp.classList.add('hidden');
       } else {
         targetLabel.textContent = 'Personal Spending Budget (اختياري)';
+        targetInput.placeholder = '15000';
         targetInput.required = false;
+        if (targetHelp) targetHelp.classList.add('hidden');
       }
     }
 
@@ -527,6 +545,67 @@ function initApp() {
       }
     } catch (err) {
       showToast(err.message, 'error');
+    }
+  });
+
+  // Handle Edit Account & Balance Adjustment Form (Item 1)
+  document.getElementById('form-edit-account')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const accId = document.getElementById('edit-account-id')?.value;
+    if (!accId) return;
+    const name = document.getElementById('edit-account-name')?.value;
+    const balanceVal = parseFloat(document.getElementById('edit-account-balance')?.value);
+    const notes = document.getElementById('edit-account-notes')?.value;
+
+    if (isNaN(balanceVal)) {
+      showToast('يرجى إدخال رصيد صحيح', 'error');
+      return;
+    }
+
+    try {
+      store.updateAccount(accId, {
+        name,
+        newBalance: balanceVal,
+        notes
+      });
+      closeModal('editAccount');
+      showToast('تم تحديث الحساب وتسجيل حركة تسوية الرصيد بنجاح', 'success');
+      renderBanksView();
+      renderCurrentView();
+    } catch (err) {
+      showToast(err.message || 'حدث خطأ أثناء تعديل الحساب', 'error');
+    }
+  });
+
+  // Handle Edit Card Form (Item 3)
+  document.getElementById('form-edit-card')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const cardId = document.getElementById('edit-card-id')?.value;
+    if (!cardId) return;
+    const card = store.getCard(cardId);
+    if (!card) return;
+
+    const name = document.getElementById('edit-card-name')?.value;
+    const linkedAccountId = document.getElementById('edit-card-linked-account')?.value || null;
+    const targetVal = parseFloat(document.getElementById('edit-card-target')?.value) || 0;
+    const creditLimitRaw = document.getElementById('edit-card-credit-limit')?.value;
+    const creditLimit = (creditLimitRaw !== undefined && creditLimitRaw !== '' && !isNaN(parseFloat(creditLimitRaw)))
+      ? parseFloat(creditLimitRaw)
+      : null;
+
+    try {
+      store.updateCard(cardId, {
+        name,
+        linkedAccountId: card.cardType === 'debit' ? (linkedAccountId || null) : card.linkedAccountId,
+        monthlyTarget: targetVal,
+        creditLimit: card.cardType === 'credit' ? creditLimit : card.creditLimit
+      });
+      closeModal('editCard');
+      showToast('تم تحديث بيانات الكارت بنجاح', 'success');
+      renderBanksView();
+      renderCurrentView();
+    } catch (err) {
+      showToast(err.message || 'حدث خطأ أثناء تعديل الكارت', 'error');
     }
   });
 
@@ -896,8 +975,14 @@ function initApp() {
             const isCurrentCycle = tx.statementInfo && tx.statementInfo.statementMonth === 12;
             const txType = tx.transactionType || (tx.category === 'transfer' ? 'transfer' : 'purchase');
             let typeBadge = '';
-            if (txType === 'withdrawal') {
-              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">سحب نقدي</span>';
+            if (tx.isBalanceAdjustment || tx.transactionType === 'balance_adjustment') {
+              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">تسوية رصيد</span>';
+            } else if (txType === 'withdrawal') {
+              if (tx.card && tx.card.cardType === 'credit') {
+                typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">سحب كاش كريدت</span>';
+              } else {
+                typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">سحب نقدي</span>';
+              }
             } else if (txType === 'transfer') {
               typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-200">تحويل</span>';
             } else {
@@ -1479,6 +1564,9 @@ function initApp() {
                             <span class="text-xs font-black font-mono px-2 py-0.5 rounded-full ${acc.balance < 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">
                               الرصيد: ${formatCurrency(acc.balance || 0, acc.currency || 'EGP')}
                             </span>
+                            <button onclick="window.openEditAccountModal('${acc.id}')" class="text-slate-400 hover:text-indigo-600 p-0.5 transition-colors" title="تعديل الحساب والرصيد">
+                              <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                            </button>
                             <button onclick="window.confirmDeleteAccount('${acc.id}')" class="text-slate-300 hover:text-rose-500 p-0.5 transition-colors" title="حذف الحساب">
                               <i data-lucide="x" class="w-3.5 h-3.5"></i>
                             </button>
@@ -1519,6 +1607,9 @@ function initApp() {
                           </span>
                           <span class="text-[10px] text-slate-400 font-mono">/ ${formatCurrency(cStat.target)}</span>
                           <div class="flex items-center justify-end gap-1.5 mt-1">
+                            <button onclick="window.openEditCardModal('${c.id}')" class="p-0.5 text-slate-400 hover:text-indigo-600 transition-colors" title="تعديل الكارت">
+                              <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                            </button>
                             <button onclick="window.openCustomizeCardModal('${c.id}', event)" class="p-0.5 text-slate-400 hover:text-indigo-600 transition-colors" title="Customize Card Color">
                               <span class="text-xs">🎨</span>
                             </button>
@@ -1616,8 +1707,14 @@ function initApp() {
             const isCurrentCycle = tx.statementInfo && tx.statementInfo.statementMonth === 12;
             const txType = tx.transactionType || (tx.category === 'transfer' ? 'transfer' : 'purchase');
             let typeBadge = '';
-            if (txType === 'withdrawal') {
-              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">سحب نقدي</span>';
+            if (tx.isBalanceAdjustment || tx.transactionType === 'balance_adjustment') {
+              typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">تسوية رصيد</span>';
+            } else if (txType === 'withdrawal') {
+              if (tx.card && tx.card.cardType === 'credit') {
+                typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">سحب كاش كريدت</span>';
+              } else {
+                typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">سحب نقدي</span>';
+              }
             } else if (txType === 'transfer') {
               typeBadge = '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-200">تحويل</span>';
             } else {
@@ -2048,7 +2145,7 @@ function initApp() {
 
         <div class="text-center pt-2 text-[10px] text-slate-400 space-y-0.5">
           <p class="font-bold text-slate-500">ApexWallet — Visual Card-First Tracker</p>
-          <p>Version 1.4.5 • Keystore Protected</p>
+          <p>Version 1.4.6 • Keystore Protected</p>
         </div>
 
       </div>
@@ -2286,7 +2383,7 @@ function initApp() {
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Assign Card</label>
-                <select id="candidate-card-select-${c.id}" class="w-full text-[11px] font-bold text-slate-800 bg-white border ${needsCardSelection ? 'border-amber-400 ring-2 ring-amber-400/20' : 'border-slate-200'} rounded-xl px-2 py-1.5 outline-none cursor-pointer">
+                <select id="candidate-card-select-${c.id}" onchange="window.onCandidateTypeChanged('${c.id}')" class="w-full text-[11px] font-bold text-slate-800 bg-white border ${needsCardSelection ? 'border-amber-400 ring-2 ring-amber-400/20' : 'border-slate-200'} rounded-xl px-2 py-1.5 outline-none cursor-pointer">
                   <option value="" ${!c.matchedCardId && !c.matchedAccountId ? 'selected disabled' : ''}>-- اختر الكارت / الحساب --</option>
                   <optgroup label="💳 الكروت (Cards)">
                     ${cards.map(card => {
@@ -2321,6 +2418,33 @@ function initApp() {
               </div>
             </div>
 
+            <!-- Transaction Type Selector (Item 6) -->
+            <div class="space-y-1">
+              <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-500">نوع العملية (Transaction Type)</label>
+              <div class="grid grid-cols-3 gap-1.5 p-1 bg-white rounded-xl border border-slate-200 text-center">
+                <label class="flex items-center justify-center gap-1 cursor-pointer py-1 px-1.5 rounded-lg hover:bg-slate-50 text-[10px] font-bold text-slate-700">
+                  <input type="radio" name="candidate-type-${c.id}" value="purchase" class="hidden peer" ${(!c.transactionType || c.transactionType === 'purchase') ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
+                  <span class="w-full py-0.5 rounded-md peer-checked:bg-indigo-600 peer-checked:text-white transition-all">🛍️ شراء</span>
+                </label>
+                <label class="flex items-center justify-center gap-1 cursor-pointer py-1 px-1.5 rounded-lg hover:bg-slate-50 text-[10px] font-bold text-slate-700">
+                  <input type="radio" name="candidate-type-${c.id}" value="transfer" class="hidden peer" ${c.transactionType === 'transfer' ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
+                  <span class="w-full py-0.5 rounded-md peer-checked:bg-sky-600 peer-checked:text-white transition-all">🔁 تحويل</span>
+                </label>
+                <label class="flex items-center justify-center gap-1 cursor-pointer py-1 px-1.5 rounded-lg hover:bg-slate-50 text-[10px] font-bold text-slate-700">
+                  <input type="radio" name="candidate-type-${c.id}" value="withdrawal" class="hidden peer" ${c.transactionType === 'withdrawal' ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
+                  <span class="w-full py-0.5 rounded-md peer-checked:bg-amber-600 peer-checked:text-white transition-all">🏧 سحب نقدي</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Warning for unlinked debit withdrawal (Item 4) -->
+            <div id="candidate-debit-warn-${c.id}" class="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2 ${(() => {
+              const matchedCard = c.matchedCardId ? store.getCard(c.matchedCardId) : null;
+              return (c.transactionType === 'withdrawal' && matchedCard && matchedCard.cardType === 'debit' && !matchedCard.linkedAccountId && !c.matchedAccountId) ? '' : 'hidden';
+            })()}">
+              ⚠️ تنبيه: كارت الديبت المختار غير مرتبط بحساب بنكي. سحب الكاش يتطلب اختيار حساب بنكي أو ربط الكارت بحساب أولاً لمنع ضياع الأثر المالي.
+            </div>
+
             <div class="text-[9px] text-slate-400 flex items-center justify-between px-0.5 pt-0.5">
               <span>Date: ${c.transactionTime || new Date(c.receiptTime).toLocaleString()}</span>
               <span>Ref: ${(c.fingerprint || '').slice(0, 10)}</span>
@@ -2349,6 +2473,30 @@ function initApp() {
   window.openSmsReviewInbox = () => {
     openModal('smsReview');
     renderSmsCandidatesList();
+  };
+
+  window.onCandidateTypeChanged = (candidateId) => {
+    const cardSelect = document.getElementById(`candidate-card-select-${candidateId}`);
+    const typeRadio = document.querySelector(`input[name="candidate-type-${candidateId}"]:checked`);
+    const warnEl = document.getElementById(`candidate-debit-warn-${candidateId}`);
+    if (!typeRadio || !warnEl) return;
+
+    const chosenType = typeRadio.value;
+    const rawVal = cardSelect ? cardSelect.value : '';
+    let isDebitUnlinked = false;
+
+    if (rawVal && !rawVal.startsWith('acc:')) {
+      const card = store.getCard(rawVal);
+      if (card && card.cardType === 'debit' && !card.linkedAccountId) {
+        isDebitUnlinked = true;
+      }
+    }
+
+    if (chosenType === 'withdrawal' && isDebitUnlinked) {
+      warnEl.classList.remove('hidden');
+    } else {
+      warnEl.classList.add('hidden');
+    }
   };
 
   window.approveSmsCandidate = async (candidateId) => {
@@ -2385,6 +2533,18 @@ function initApp() {
     const selectedCard = cardId ? store.getCard(cardId) : null;
     const selectedAccount = accountId ? store.getAccount(accountId) : null;
 
+    // Item 6: Read user-selected transaction type
+    const typeRadio = document.querySelector(`input[name="candidate-type-${candidateId}"]:checked`);
+    const chosenType = typeRadio ? typeRadio.value : (candidate ? candidate.transactionType : 'purchase');
+
+    // Item 4: Block debit cash withdrawal without a linked account
+    if (chosenType === 'withdrawal' && selectedCard && selectedCard.cardType === 'debit' && !accountId) {
+      showToast('لا يمكن اعتماد عملية سحب نقدي لكارت خصم غير مرتبط بحساب بنكي. يرجى اختيار حساب بنكي أو ربط الكارت بحساب أولاً.', 'error');
+      const warn = document.getElementById(`candidate-debit-warn-${candidateId}`);
+      if (warn) warn.classList.remove('hidden');
+      return;
+    }
+
     let isManualAssignment = false;
     if (candidate) {
       const candidateDigits = (candidate.identifierDigits || candidate.cardSuffix || '').trim();
@@ -2417,7 +2577,7 @@ function initApp() {
       accountId,
       merchant,
       category,
-      transactionType: candidate ? candidate.transactionType : 'purchase',
+      transactionType: chosenType,
       isManualAssignment
     });
     if (res.success) {
@@ -2462,6 +2622,66 @@ function initApp() {
       showToast(`تم حذف الحساب "${acc.name}"`, 'info');
       renderBanksView();
     }
+  };
+
+  window.openEditAccountModal = (accId) => {
+    const acc = store.getAccount(accId);
+    if (!acc) return;
+    const bank = store.getBank(acc.bankId);
+
+    const idInput = document.getElementById('edit-account-id');
+    const nameInput = document.getElementById('edit-account-name');
+    const balanceInput = document.getElementById('edit-account-balance');
+    const notesInput = document.getElementById('edit-account-notes');
+    const headerEl = document.getElementById('edit-account-bank-header');
+
+    if (idInput) idInput.value = acc.id;
+    if (nameInput) nameInput.value = acc.name || '';
+    if (balanceInput) balanceInput.value = (acc.balance !== undefined && acc.balance !== null) ? acc.balance : 0;
+    if (notesInput) notesInput.value = '';
+    if (headerEl) headerEl.textContent = `${bank ? bank.name : 'بنك'} • ${acc.accountNumberMasked || acc.identifierDigits}`;
+
+    openModal('editAccount');
+  };
+
+  window.openEditCardModal = (cardId) => {
+    const card = store.getCard(cardId);
+    if (!card) return;
+    const bank = store.getBank(card.bankId);
+
+    const idInput = document.getElementById('edit-card-id');
+    const nameInput = document.getElementById('edit-card-name');
+    const linkedSelect = document.getElementById('edit-card-linked-account');
+    const linkedSection = document.getElementById('edit-card-linked-section');
+    const targetInput = document.getElementById('edit-card-target');
+    const creditLimitInput = document.getElementById('edit-card-credit-limit');
+    const creditLimitSection = document.getElementById('edit-card-credit-limit-section');
+    const headerEl = document.getElementById('edit-card-bank-header');
+
+    if (idInput) idInput.value = card.id;
+    if (nameInput) nameInput.value = card.name || '';
+    if (targetInput) targetInput.value = (card.monthlyTarget !== undefined && card.monthlyTarget !== null) ? card.monthlyTarget : '';
+    if (headerEl) headerEl.textContent = `${bank ? bank.name : 'بنك'} • ${card.cardType.toUpperCase()} (•••• ${card.last4})`;
+
+    if (card.cardType === 'debit') {
+      if (linkedSection) linkedSection.classList.remove('hidden');
+      if (linkedSelect) {
+        const accs = card.bankId ? store.getAccountsForBank(card.bankId) : store.accounts;
+        linkedSelect.innerHTML = '<option value="">-- بدون حساب مرتبط (كارت مستقل) --</option>' +
+          accs.map(a => `<option value="${a.id}" ${a.id === card.linkedAccountId ? 'selected' : ''}>${a.name} (${a.accountNumberMasked || a.identifierDigits})</option>`).join('');
+      }
+    } else {
+      if (linkedSection) linkedSection.classList.add('hidden');
+    }
+
+    if (card.cardType === 'credit') {
+      if (creditLimitSection) creditLimitSection.classList.remove('hidden');
+      if (creditLimitInput) creditLimitInput.value = (card.creditLimit !== undefined && card.creditLimit !== null) ? card.creditLimit : '';
+    } else {
+      if (creditLimitSection) creditLimitSection.classList.add('hidden');
+    }
+
+    openModal('editCard');
   };
 
   window.openAddAccountForBank = (bankId) => {
@@ -2968,7 +3188,7 @@ function initApp() {
 
     const backupPayload = {
       app: 'ApexWallet',
-      version: '1.4.5',
+      version: '1.4.6',
       exportedAt: new Date().toISOString(),
       encryptionNote: 'Master AES-GCM vault encrypted via PBKDF2 from 4-digit PIN.',
       securityVault: rawVault ? JSON.parse(rawVault) : null,

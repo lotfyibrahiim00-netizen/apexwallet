@@ -682,7 +682,7 @@ class WalletAppStore {
   }
 
   addBank({ name, shortCode, accentColor }) {
-    const id = 'bank_' + Date.now();
+    const id = 'bank_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
     const newBank = {
       id,
       name: name.trim(),
@@ -759,6 +759,49 @@ class WalletAppStore {
     return true;
   }
 
+  updateAccount(accId, { name, newBalance, notes }) {
+    const acc = this.getAccount(accId);
+    if (!acc) return false;
+
+    if (name && name.trim()) {
+      acc.name = name.trim();
+    }
+
+    if (newBalance !== undefined && newBalance !== null && newBalance !== '' && !isNaN(parseFloat(newBalance))) {
+      const targetBalance = parseFloat(newBalance);
+      const oldBalance = acc.balance || 0;
+      const diff = targetBalance - oldBalance;
+      acc.balance = targetBalance;
+
+      // If balance changed, log a visible balance adjustment transaction (Item 1)
+      if (Math.abs(diff) > 0.001) {
+        const isPositive = diff > 0;
+        const adjTx = {
+          id: 'tx_adj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+          amount: Math.abs(diff),
+          direction: isPositive ? 'income' : 'expense',
+          type: isPositive ? 'income' : 'expense',
+          transactionType: 'balance_adjustment',
+          merchant: `تسوية رصيد: ${acc.name}`,
+          category: 'other',
+          date: new Date().toISOString().split('T')[0],
+          bankId: acc.bankId,
+          cardId: null,
+          accountId: acc.id,
+          isBalanceAdjustment: true,
+          balanceBefore: oldBalance,
+          balanceAfter: targetBalance,
+          notes: (notes || '').trim() || `تسوية رصيد حساب من ${oldBalance.toFixed(2)} إلى ${targetBalance.toFixed(2)} ${acc.currency || 'EGP'}`,
+          createdAt: new Date().toISOString()
+        };
+        this.transactions.unshift(adjTx);
+      }
+    }
+
+    this.saveState();
+    return true;
+  }
+
   // --- Card Methods ---
   getCard(cardId) {
     return this.cards.find(c => c.id === cardId);
@@ -783,7 +826,7 @@ class WalletAppStore {
       }
     }
 
-    const id = 'card_' + Date.now();
+    const id = 'card_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
     const pos = digitsPosition === 'first' ? 'first' : 'last';
     const digits = last4.trim();
     const parsedTarget = parseFloat(monthlyTarget) || 0;
@@ -968,6 +1011,16 @@ class WalletAppStore {
     const txAmount = parseFloat(amount);
     const txOpType = transactionType || (category === 'transfer' ? 'transfer' : 'purchase');
 
+    // Item 4: Debit cash withdrawal without a linked account CANNOT be approved/added with zero financial effect!
+    if (txOpType === 'withdrawal') {
+      if (card && card.cardType === 'debit' && !targetAccount) {
+        throw new Error('لا يمكن تسجيل عملية سحب نقدي لكارت خصم غير مرتبط بحساب بنكي. يرجى ربط الكارت بحساب أو اختيار حساب بنكي أولاً لمنع ضياع الأثر المالي.');
+      }
+      if (!card && !targetAccount) {
+        throw new Error('لا يمكن تسجيل عملية سحب نقدي بدون تحديد حساب بنكي أو كارت.');
+      }
+    }
+
     // Live Account Balance Update (Item 2)
     // No double-deduction: single deduction directly on the linked account!
     if (targetAccount) {
@@ -1008,11 +1061,18 @@ class WalletAppStore {
     if (tx && tx.accountId) {
       const targetAccount = this.getAccount(tx.accountId);
       if (targetAccount) {
-        // Reverse effect on linked account balance
-        if (tx.direction === 'income' || tx.type === 'income') {
-          targetAccount.balance = (targetAccount.balance || 0) - tx.amount;
+        if (tx.isBalanceAdjustment) {
+          // Reversing balance adjustment restores balanceBefore (Item 1)
+          if (tx.balanceBefore !== undefined) {
+            targetAccount.balance = tx.balanceBefore;
+          }
         } else {
-          targetAccount.balance = (targetAccount.balance || 0) + tx.amount;
+          // Reverse effect on linked account balance
+          if (tx.direction === 'income' || tx.type === 'income') {
+            targetAccount.balance = (targetAccount.balance || 0) - tx.amount;
+          } else {
+            targetAccount.balance = (targetAccount.balance || 0) + tx.amount;
+          }
         }
       }
     }
@@ -1164,8 +1224,13 @@ class WalletAppStore {
       }
     }
 
-    // Item 2: Cash withdrawal is excluded from personal card spending budget and does not reduce remaining budget
-    const cardExpenses = cardTxs.filter(t => t.direction !== 'income' && t.type !== 'income' && t.transactionType !== 'withdrawal').reduce((sum, t) => sum + t.amount, 0);
+    // Item 2 & Item 5: Cash withdrawal is excluded from personal card spending budget ONLY for debit cards.
+    // For credit cards (Cash Advance), cash withdrawal is a debt/spending obligation on the credit card statement!
+    const cardExpenses = cardTxs.filter(t => {
+      if (t.direction === 'income' || t.type === 'income') return false;
+      if (t.transactionType === 'withdrawal' && card.cardType === 'debit') return false;
+      return true;
+    }).reduce((sum, t) => sum + t.amount, 0);
     const cardIncome = cardTxs.filter(t => t.direction === 'income' || t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const spent = Math.max(0, cardExpenses - cardIncome);
 
@@ -1211,7 +1276,15 @@ class WalletAppStore {
   // --- Overall Dashboard Target Stats ---
   getOverallStats() {
     const filteredTxs = this.getFilteredTransactions();
-    const totalExpenses = filteredTxs.filter(t => t.direction !== 'income' && t.type !== 'income' && t.transactionType !== 'withdrawal').reduce((sum, t) => sum + t.amount, 0);
+    const totalExpenses = filteredTxs.filter(t => {
+      if (t.direction === 'income' || t.type === 'income') return false;
+      if (t.transactionType === 'withdrawal') {
+        const c = this.getCard(t.cardId);
+        // Exclude withdrawal from general spending only if it's from a debit card
+        if (c && c.cardType === 'debit') return false;
+      }
+      return true;
+    }).reduce((sum, t) => sum + t.amount, 0);
     const totalIncome = filteredTxs.filter(t => t.direction === 'income' || t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const totalSpent = Math.max(0, totalExpenses - totalIncome);
     const totalCount = filteredTxs.length;
