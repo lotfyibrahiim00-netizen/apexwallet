@@ -864,11 +864,16 @@ function initApp() {
                         : `${formatCurrency(cardStat.remaining)} <span class="text-xs font-normal opacity-90">متبقي من الميزانية</span>`}
                     </p>
                     <div class="flex items-center justify-between text-[10.5px] opacity-90 mt-1 font-medium">
-                      <span>مصروف الدورة: ${formatCurrency(cardStat.spent)} من ميزانية ${formatCurrency(cardStat.target)}</span>
+                      <span>مصروف الدورة: ${formatCurrency(cardStat.spent)} من ميزانية ${formatCurrency(cardStat.target)}${cardStat.cashAdvance > 0 ? ` • سحب كاش: ${formatCurrency(cardStat.cashAdvance)}` : ''}</span>
                       <button type="button" onclick="window.promptSetCycleBudget('${card.id}', event)" class="px-1.5 py-0.5 rounded-full bg-white/20 hover:bg-white/30 text-[9px] font-bold backdrop-blur-xs transition-all active:scale-95 shadow-2xs" title="تعديل ميزانية هذه الدورة">
                         تعديل
                       </button>
                     </div>
+                    ${cardStat.cashAdvance > 0 ? `
+                      <p class="text-[10px] text-amber-200/90 font-medium mt-0.5">
+                        إجمالي الالتزام للدورة: ${formatCurrency(cardStat.totalObligations)} (مشتريات + سحب نقدي)
+                      </p>
+                    ` : ''}
                   </div>
                 ` : `
                   <div class="mt-2.5 relative z-10">

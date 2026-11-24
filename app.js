@@ -1252,15 +1252,23 @@ class WalletAppStore {
       }
     }
 
-    // Item 2 & Item 5: Cash withdrawal is excluded from personal card spending budget ONLY for debit cards.
-    // For credit cards (Cash Advance), cash withdrawal is a debt/spending obligation on the credit card statement!
+    // Item 2 & Item 5: Cash withdrawal is excluded from personal card spending budget for both debit & credit cards.
+    // User Decision ("الزام"): Cash advance from a credit card is an obligation / statement debt (التزام سداد),
+    // and does NOT reduce the monthly personal discretionary spending budget for consumer purchases.
     const cardExpenses = cardTxs.filter(t => {
       if (t.direction === 'income' || t.type === 'income') return false;
-      if (t.transactionType === 'withdrawal' && card.cardType === 'debit') return false;
+      if (t.transactionType === 'withdrawal') return false;
       return true;
     }).reduce((sum, t) => sum + t.amount, 0);
+
+    const cardCashAdvance = cardTxs.filter(t => {
+      if (t.direction === 'income' || t.type === 'income') return false;
+      return t.transactionType === 'withdrawal';
+    }).reduce((sum, t) => sum + t.amount, 0);
+
     const cardIncome = cardTxs.filter(t => t.direction === 'income' || t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const spent = Math.max(0, cardExpenses - cardIncome);
+    const totalObligations = Math.max(0, (cardExpenses + cardCashAdvance) - cardIncome);
 
     // Personal Spending Budget for this cycle (cycleBudgets[key] or card.monthlyTarget)
     const target = (card.cycleBudgets && activeStatementKey && card.cycleBudgets[activeStatementKey] !== undefined)
@@ -1286,6 +1294,8 @@ class WalletAppStore {
       card,
       spent,
       income: cardIncome,
+      cashAdvance: cardCashAdvance,
+      totalObligations,
       target, // Personal budget for the cycle
       creditLimit, // Bank Credit Limit
       cycleBudget: target,
@@ -1306,11 +1316,7 @@ class WalletAppStore {
     const filteredTxs = this.getFilteredTransactions();
     const totalExpenses = filteredTxs.filter(t => {
       if (t.direction === 'income' || t.type === 'income') return false;
-      if (t.transactionType === 'withdrawal') {
-        const c = this.getCard(t.cardId);
-        // Exclude withdrawal from general spending only if it's from a debit card
-        if (c && c.cardType === 'debit') return false;
-      }
+      if (t.transactionType === 'withdrawal') return false; // cash withdrawal is excluded from personal consumer spending
       return true;
     }).reduce((sum, t) => sum + t.amount, 0);
     const totalIncome = filteredTxs.filter(t => t.direction === 'income' || t.type === 'income').reduce((sum, t) => sum + t.amount, 0);

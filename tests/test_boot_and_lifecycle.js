@@ -636,14 +636,12 @@ async function testV146ReviewerFeatures() {
     date: new Date().toISOString().split('T')[0]
   });
 
-  // Check card spending stats: cash advance MUST count towards credit card spent / statement obligations!
+  // Check card spending stats: cash advance MUST count towards credit card statement obligations per user decision (الزام)
   const creditStats = store.getCardSpendingStats(creditCard.id);
-  assert.strictEqual(creditStats.spent, 4000, 'Credit card cash withdrawal MUST be counted in credit card spending obligations');
-  assert.strictEqual(creditStats.remaining, 16000, 'Remaining budget on credit card must be reduced by cash advance');
-
-  // Check overall stats: credit card cash withdrawal is included in overall expenses
-  const overallStats = store.getOverallStats();
-  assert.ok(overallStats.totalSpent >= 4000, 'Overall spent must include credit card cash advance');
+  assert.strictEqual(creditStats.totalObligations, 4000, 'Credit card cash withdrawal MUST be counted in credit card statement obligations');
+  assert.strictEqual(creditStats.cashAdvance, 4000, 'Cash advance amount recorded');
+  assert.strictEqual(creditStats.spent, 0, 'Personal consumer budget is NOT reduced by cash advance per user decision');
+  assert.strictEqual(creditStats.remaining, 20000, 'Remaining budget on credit card stays untouched');
 }
 
 /**
@@ -748,7 +746,7 @@ async function testV147AcceptanceCriteria() {
   const afterStats = store.getCardSpendingStats(linkedDebitA.id);
   assert.strictEqual(afterStats.spent, beforeStats.spent, 'Debit cash withdrawal must not reduce card personal spending budget');
 
-  // Criteria (هـ): Credit card cash advance recorded as credit debt
+  // Criteria (هـ): Credit card cash advance recorded as credit obligation/debt (user decision: الزام)
   const creditAdvTx = store.addTransaction({
     amount: 800,
     merchant: 'ATM Credit Cash Advance',
@@ -757,7 +755,9 @@ async function testV147AcceptanceCriteria() {
   });
   assert.strictEqual(creditAdvTx.amount, 800);
   const creditSpending = store.getCardSpendingStats(creditCard.id);
-  assert.ok(creditSpending.spent >= 800, 'Credit cash advance must be recorded as card debt');
+  assert.strictEqual(creditSpending.cashAdvance, 800, 'Cash advance recorded in stats');
+  assert.strictEqual(creditSpending.totalObligations, 2300, 'Total statement obligation is 1500 purchases + 800 cash advance');
+  assert.strictEqual(creditSpending.spent, 1500, 'Personal consumer spending budget remains at 1500 purchases only (unaffected by cash advance)');
 
   // Criteria (و): Negative balance warning calculation (preview before and after)
   const initialAccBal = accA.balance; // 3800
