@@ -28,7 +28,8 @@ const ASSETS = [
   'manifest.json',
   'sw.js',
   'icon-192.png',
-  'icon-512.png'
+  'icon-512.png',
+  'vendor'
 ];
 
 console.log('Building web assets for Capacitor in:', WWW);
@@ -42,8 +43,13 @@ for (const file of ASSETS) {
   const src = path.join(ROOT, file);
   const dest = path.join(WWW, file);
   if (fs.existsSync(src)) {
-    fs.copyFileSync(src, dest);
-    console.log(`Copied ${file} -> www/${file}`);
+    if (fs.lstatSync(src).isDirectory()) {
+      fs.cpSync(src, dest, { recursive: true });
+      console.log(`Copied directory ${file} -> www/${file}`);
+    } else {
+      fs.copyFileSync(src, dest);
+      console.log(`Copied ${file} -> www/${file}`);
+    }
   } else {
     console.warn(`Warning: asset not found: ${file}`);
   }

@@ -209,8 +209,14 @@ function createHeadlessSandbox() {
 
   vm.createContext(sandbox);
 
+  const securityCode = fs.readFileSync(path.join(__dirname, '..', 'security.js'), 'utf8');
+  vm.runInContext(securityCode, sandbox, { filename: 'security.js' });
+
   const appCode = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
   vm.runInContext(appCode, sandbox, { filename: 'app.js' });
+
+  const smsCode = fs.readFileSync(path.join(__dirname, '..', 'sms_engine.js'), 'utf8');
+  vm.runInContext(smsCode, sandbox, { filename: 'sms_engine.js' });
 
   return sandbox;
 }
@@ -640,6 +646,195 @@ async function testV146ReviewerFeatures() {
   assert.ok(overallStats.totalSpent >= 4000, 'Overall spent must include credit card cash advance');
 }
 
+/**
+ * Acceptance Tests for v1.4.7 (Build 13) Review Items
+ */
+async function testV147AcceptanceCriteria() {
+  const sandbox = createHeadlessSandbox();
+  const security = sandbox.window.WalletSecurity;
+  const store = sandbox.window.walletStore;
+  const engine = sandbox.window.BankSmsEngine;
+  const WebFallbackParser = sandbox.window.WebFallbackParser;
+  const localStorage = sandbox.window.localStorage;
+
+  const bank = store.addBank({ name: 'Emirates NBD', code: 'ENBD' });
+  const accA = store.addAccount({ bankId: bank.id, name: 'Main Account A', identifierDigits: '1111', balance: 5000 });
+  const accB = store.addAccount({ bankId: bank.id, name: 'Secondary Account B', identifierDigits: '2222', balance: 10000 });
+
+  const unlinkedDebit = store.addCard({
+    bankId: bank.id,
+    name: 'Unlinked Debit',
+    last4: '0001',
+    cardType: 'debit',
+    linkedAccountId: null
+  });
+
+  const linkedDebitA = store.addCard({
+    bankId: bank.id,
+    name: 'Debit A',
+    last4: '0002',
+    cardType: 'debit',
+    linkedAccountId: accA.id,
+    monthlyTarget: 5000
+  });
+
+  const creditCard = store.addCard({
+    bankId: bank.id,
+    name: 'Reward Credit',
+    last4: '0003',
+    cardType: 'credit',
+    cycleStartDay: 1,
+    cycleEndDay: 30,
+    monthlyTarget: 15000
+  });
+
+  // Criteria (أ): Linking an account transaction to an unlinked debit card is REJECTED, 0 balance mutation
+  let threwA = false;
+  try {
+    store.addTransaction({
+      amount: 1000,
+      merchant: 'Shopping Mall',
+      cardId: unlinkedDebit.id,
+      accountId: accA.id,
+      transactionType: 'purchase'
+    });
+  } catch (err) {
+    threwA = true;
+    assert.ok(err.message.includes('كارت دبت غير مرتبط بأي حساب بنكي'), 'Error message must explain unlinked debit');
+  }
+  assert.strictEqual(threwA, true, 'Criteria (أ): Operation must be rejected');
+  assert.strictEqual(accA.balance, 5000, 'Criteria (أ): Account balance must not mutate');
+
+  // Criteria (ب): Linking transaction for Account B to a debit card linked to Account A is REJECTED
+  let threwB = false;
+  try {
+    store.addTransaction({
+      amount: 500,
+      merchant: 'Grocery',
+      cardId: linkedDebitA.id,
+      accountId: accB.id,
+      transactionType: 'purchase'
+    });
+  } catch (err) {
+    threwB = true;
+    assert.ok(err.message.includes('تناقض في الحساب'), 'Error message must explain contradiction');
+  }
+  assert.strictEqual(threwB, true, 'Criteria (ب): Contradictory account operation must be rejected');
+  assert.strictEqual(accA.balance, 5000, 'Criteria (ب): Acc A balance unchanged');
+  assert.strictEqual(accB.balance, 10000, 'Criteria (ب): Acc B balance unchanged');
+
+  // Criteria (ج): Credit card purchases work without an account, and historical import is not blocked
+  const creditTx = store.addTransaction({
+    amount: 1500,
+    merchant: 'Air Ticket',
+    cardId: creditCard.id,
+    accountId: null,
+    transactionType: 'purchase'
+  });
+  assert.strictEqual(creditTx.cardId, creditCard.id);
+  assert.strictEqual(creditTx.accountId, null, 'Credit card purchase does not require account');
+  assert.strictEqual(accA.balance, 5000);
+  assert.strictEqual(accB.balance, 10000);
+
+  // Criteria (د): Debit cash withdrawal affects linked account only, zero double deduction, does not alter debit personal budget
+  const beforeStats = store.getCardSpendingStats(linkedDebitA.id);
+  const withdrawalTx = store.addTransaction({
+    amount: 1200,
+    merchant: 'ATM Cash Withdrawal',
+    cardId: linkedDebitA.id,
+    transactionType: 'withdrawal'
+  });
+  assert.strictEqual(accA.balance, 3800, 'Account A balance must be reduced by 1200');
+  const afterStats = store.getCardSpendingStats(linkedDebitA.id);
+  assert.strictEqual(afterStats.spent, beforeStats.spent, 'Debit cash withdrawal must not reduce card personal spending budget');
+
+  // Criteria (هـ): Credit card cash advance recorded as credit debt
+  const creditAdvTx = store.addTransaction({
+    amount: 800,
+    merchant: 'ATM Credit Cash Advance',
+    cardId: creditCard.id,
+    transactionType: 'withdrawal'
+  });
+  assert.strictEqual(creditAdvTx.amount, 800);
+  const creditSpending = store.getCardSpendingStats(creditCard.id);
+  assert.ok(creditSpending.spent >= 800, 'Credit cash advance must be recorded as card debt');
+
+  // Criteria (و): Negative balance warning calculation (preview before and after)
+  const initialAccBal = accA.balance; // 3800
+  const largeExpense = 5000;
+  const projectedBal = initialAccBal - largeExpense; // -1200
+  assert.ok(projectedBal < 0, 'Projected balance is negative');
+  // Explicitly accepted by user:
+  store.addTransaction({
+    amount: largeExpense,
+    merchant: 'Emergency Hospital Bill',
+    accountId: accA.id,
+    transactionType: 'purchase'
+  });
+  assert.strictEqual(accA.balance, -1200, 'Negative balance recorded when user confirms');
+
+  // Criteria (ز): PBKDF2 + AES-256-GCM Passphrase Backup & Restore
+  const sampleData = {
+    test: 'secret_data',
+    accounts: [{ id: '1', balance: 500 }]
+  };
+  const passphrase = 'MySuperSecurePassphrase2026!';
+  const encryptedEnvelope = await security.encryptBackup(sampleData, passphrase);
+  assert.strictEqual(encryptedEnvelope.format, 'apexwallet_encrypted_backup_v2');
+  assert.strictEqual(encryptedEnvelope.kdf.iterations, 100000);
+  assert.strictEqual(encryptedEnvelope.cipher.algorithm, 'AES-GCM');
+  assert.ok(encryptedEnvelope.cipher.ciphertext.length > 20);
+
+  // Wrong passphrase decryption must fail
+  let decryptFailed = false;
+  try {
+    await security.decryptBackup(encryptedEnvelope, 'wrong_password');
+  } catch (err) {
+    decryptFailed = true;
+  }
+  assert.strictEqual(decryptFailed, true, 'Decryption with wrong passphrase must fail');
+
+  // Correct passphrase decryption must restore data faithfully
+  const restored = await security.decryptBackup(encryptedEnvelope, passphrase);
+  assert.strictEqual(restored.test, 'secret_data');
+  assert.strictEqual(restored.accounts[0].balance, 500);
+
+  // Criteria (ح): Backward-compatible legacy v1 backup restoration
+  const legacyBackup = {
+    app: 'ApexWallet',
+    version: '1.4.0',
+    securityVault: { encryptedPin: 'mock_enc_pin' },
+    userStore: { banks: [{ id: 'b1', name: 'Legacy Bank' }] }
+  };
+  const legacyRestored = await security.decryptBackup(legacyBackup, '');
+  assert.strictEqual(legacyRestored.userStore.banks[0].name, 'Legacy Bank');
+
+  // Criteria (ط): Legacy Insecure Biometric Migration - bioKey purged from localStorage
+  localStorage.setItem('apexwallet_biometrics_v1', JSON.stringify({ bioKey: 'insecure_raw_key_123', encryptedPin: 'xyz' }));
+  assert.ok(localStorage.getItem('apexwallet_biometrics_v1'), 'Legacy biometric key set');
+  const migratedSec = new security.constructor();
+  assert.strictEqual(localStorage.getItem('apexwallet_biometrics_v1'), null, 'Constructor must purge legacy insecure bioKey');
+
+  // Criteria (ي): Merchant reference parsing and cleaning
+  const parsedCandidate = WebFallbackParser.parse('CIB', 'تمت عملية شراء بمبلغ 1500 جم لدى Carrefour ref# 98765432 باستخدام بطاقة 1234');
+  assert.strictEqual(parsedCandidate.merchant, 'Carrefour', 'Merchant name must be cleaned of ref# suffix');
+  assert.strictEqual(parsedCandidate.refNumber, '98765432', 'Reference number must be cleanly extracted into refNumber');
+  assert.ok(parsedCandidate.rawMessage.includes('Carrefour ref# 98765432'), 'Original message must be preserved intact');
+
+  // Criteria (ك): Local Bundled Assets (no runtime CDN reliance)
+  const fs = require('fs');
+  const path = require('path');
+  const tailwindPath = path.join(__dirname, '..', 'vendor', 'tailwind.js');
+  const lucidePath = path.join(__dirname, '..', 'vendor', 'lucide.min.js');
+  assert.ok(fs.existsSync(tailwindPath), 'vendor/tailwind.js must exist locally');
+  assert.ok(fs.existsSync(lucidePath), 'vendor/lucide.min.js must exist locally');
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  assert.ok(indexHtml.includes('vendor/tailwind.js'), 'index.html must reference local vendor/tailwind.js');
+  assert.ok(indexHtml.includes('vendor/lucide.min.js'), 'index.html must reference local vendor/lucide.min.js');
+  assert.ok(!indexHtml.includes('https://cdn.tailwindcss.com'), 'index.html must not reference CDN tailwind');
+  assert.ok(!indexHtml.includes('https://unpkg.com/lucide@latest'), 'index.html must not reference CDN lucide');
+}
+
 (async function main() {
   await runStepAsync('New user boot: Setup PIN and configure master vault', async () => {
     await testRuntimeLifecycle();
@@ -663,6 +858,10 @@ async function testV146ReviewerFeatures() {
 
   await runStepAsync('Reviewer v1.4.6 Rules: Account Balance Adjustment, Card Editing, Blocked Unlinked Debit Withdrawal, Credit Cash Advance', async () => {
     await testV146ReviewerFeatures();
+  });
+
+  await runStepAsync('v1.4.7 Acceptance Criteria (أ through ك): Strict Linking, Passphrase KDF, Web Biometrics Migration, Clean Ref, Local Assets', async () => {
+    await testV147AcceptanceCriteria();
   });
 
   console.log('\n----------------------------------------------------');

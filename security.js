@@ -77,7 +77,28 @@
       this.lastActiveTime = Date.now();
       const savedTimeout = localStorage.getItem(AUTOLOCK_KEY);
       this.autoLockTimeoutMs = savedTimeout !== null ? parseInt(savedTimeout, 10) : 3 * 60 * 1000;
+      this._migrateLegacyInsecureBiometrics();
       this._initAutoLock();
+    }
+
+    /**
+     * Item 5: Migrate and purge legacy insecure web biometrics storing bioKey in localStorage
+     */
+    _migrateLegacyInsecureBiometrics() {
+      try {
+        if (typeof localStorage === 'undefined') return;
+        const bioRaw = localStorage.getItem(BIOMETRIC_KEY);
+        if (bioRaw) {
+          const bioData = JSON.parse(bioRaw);
+          // If record has stored bioKey or is not backed by Keystore or WebAuthn PRF:
+          if (bioData && (bioData.bioKey || (!bioData.isKeystoreBound && !bioData.isWebAuthnPrf))) {
+            localStorage.removeItem(BIOMETRIC_KEY);
+            console.warn('Security migration: Purged legacy insecure biometric record from localStorage.');
+          }
+        }
+      } catch (e) {
+        console.warn('Biometric migration notice:', e);
+      }
     }
 
     getAutoLockTimeout() {
@@ -351,33 +372,8 @@
               negativeButtonText: 'إلغاء'
             });
           } else {
-            const bioRaw = localStorage.getItem(BIOMETRIC_KEY);
-            if (bioRaw) {
-              const bioData = JSON.parse(bioRaw);
-              if (bioData.bioKey) {
-                const bioKeyBytes = b64ToBuf(bioData.bioKey);
-                const enc = new TextEncoder();
-                const bioCryptoKey = await crypto.subtle.importKey(
-                  'raw',
-                  bioKeyBytes,
-                  { name: 'AES-GCM' },
-                  false,
-                  ['encrypt']
-                );
-                const iv = crypto.getRandomValues(new Uint8Array(12));
-                const encryptedPinBuffer = await crypto.subtle.encrypt(
-                  { name: 'AES-GCM', iv: iv },
-                  bioCryptoKey,
-                  enc.encode(newPin)
-                );
-                const packed = new Uint8Array(iv.length + encryptedPinBuffer.byteLength);
-                packed.set(iv);
-                packed.set(new Uint8Array(encryptedPinBuffer), iv.length);
-                bioData.encryptedPin = bufToB64(packed);
-                bioData.updatedAt = new Date().toISOString();
-                localStorage.setItem(BIOMETRIC_KEY, JSON.stringify(bioData));
-              }
-            }
+            // In web mode, updating PIN clears biometric cache; user re-enables with their biometric sensor
+            localStorage.removeItem(BIOMETRIC_KEY);
           }
         } catch (bioErr) {
           console.warn('Note: Could not refresh biometric pin record:', bioErr);
@@ -515,6 +511,7 @@
         const challenge = crypto.getRandomValues(new Uint8Array(32));
         const userId = crypto.getRandomValues(new Uint8Array(16));
 
+        const prfSalt = crypto.getRandomValues(new Uint8Array(32));
         const credential = await navigator.credentials.create({
           publicKey: {
             challenge: challenge,
@@ -537,7 +534,14 @@
               residentKey: 'preferred'
             },
             timeout: 60000,
-            attestation: 'none'
+            attestation: 'none',
+            extensions: {
+              prf: {
+                eval: {
+                  first: prfSalt
+                }
+              }
+            }
           }
         });
 
@@ -545,18 +549,28 @@
           return { success: false, error: 'Biometric registration was cancelled' };
         }
 
-        // Web mode: Generate 256-bit local secret to encrypt PIN
-        const bioKeyBytes = crypto.getRandomValues(new Uint8Array(32));
-        const enc = new TextEncoder();
+        const extResults = credential.getClientExtensionResults ? credential.getClientExtensionResults() : {};
+        const prfKeyBytes = extResults.prf && extResults.prf.results && extResults.prf.results.first;
+
+        // If authenticator hardware does not support PRF key derivation:
+        if (!prfKeyBytes) {
+          return {
+            success: false,
+            error: 'عتاد البصمة أو المتصفح الحالي لا يدعم مفاتيح WebAuthn PRF المشفرة. لحماية أمان بياناتك، يرجى استخدام رمز الـ PIN للدخول.'
+          };
+        }
+
+        // Import PRF hardware-derived key (NEVER stored on disk / in localStorage)
         const bioCryptoKey = await crypto.subtle.importKey(
           'raw',
-          bioKeyBytes,
+          prfKeyBytes,
           { name: 'AES-GCM' },
           false,
           ['encrypt', 'decrypt']
         );
 
         const iv = crypto.getRandomValues(new Uint8Array(12));
+        const enc = new TextEncoder();
         const encryptedPinBuffer = await crypto.subtle.encrypt(
           { name: 'AES-GCM', iv: iv },
           bioCryptoKey,
@@ -568,11 +582,12 @@
         packed.set(iv);
         packed.set(new Uint8Array(encryptedPinBuffer), iv.length);
 
+        // NOTICE: ZERO bioKey is stored in localStorage!
         const bioRecord = {
           credId: bufToB64(credential.rawId),
+          prfSalt: bufToB64(prfSalt),
           encryptedPin: bufToB64(packed),
-          bioKey: bufToB64(bioKeyBytes),
-          isWebAuthn: true,
+          isWebAuthnPrf: true,
           enabledAt: new Date().toISOString()
         };
 
@@ -652,14 +667,23 @@
         }
       }
 
-      // WebAuthn Browser Fallback
+      // WebAuthn Browser Fallback with PRF (Item 5)
       if (typeof navigator === 'undefined' || !navigator.credentials || !navigator.credentials.get) {
         return { success: false, error: 'WebAuthn not supported' };
+      }
+
+      if (!bioData.isWebAuthnPrf || !bioData.prfSalt) {
+        localStorage.removeItem(BIOMETRIC_KEY);
+        return {
+          success: false,
+          error: 'تم تحديث نظام حماية البصمة لنسخة الويب. يرجى الدخول برمز الـ PIN وإعادة تفعيل البصمة.'
+        };
       }
 
       try {
         const challenge = crypto.getRandomValues(new Uint8Array(32));
         const credIdBytes = b64ToBuf(bioData.credId);
+        const prfSalt = b64ToBuf(bioData.prfSalt);
 
         const assertion = await navigator.credentials.get({
           publicKey: {
@@ -671,7 +695,14 @@
               transports: ['internal']
             }],
             userVerification: 'required',
-            timeout: 60000
+            timeout: 60000,
+            extensions: {
+              prf: {
+                eval: {
+                  first: prfSalt
+                }
+              }
+            }
           }
         });
 
@@ -679,11 +710,16 @@
           return { success: false, error: 'Biometric verification cancelled' };
         }
 
-        // Decrypt PIN using stored bioKey
-        const bioKeyBytes = b64ToBuf(bioData.bioKey);
+        const extResults = assertion.getClientExtensionResults ? assertion.getClientExtensionResults() : {};
+        const prfKeyBytes = extResults.prf && extResults.prf.results && extResults.prf.results.first;
+
+        if (!prfKeyBytes) {
+          return { success: false, error: 'لم يتمكن مستشعر البصمة من استرجاع مفتاح فك التشفير الآمن' };
+        }
+
         const bioCryptoKey = await crypto.subtle.importKey(
           'raw',
-          bioKeyBytes,
+          prfKeyBytes,
           { name: 'AES-GCM' },
           false,
           ['decrypt']
@@ -708,6 +744,140 @@
         console.error('WebAuthn unlock error:', err);
         return { success: false, error: err.message || 'Biometric authentication failed' };
       }
+    }
+
+    /**
+     * Item 4: Encrypt backup file with strong PBKDF2 + AES-256-GCM using user passphrase
+     */
+    async encryptBackup(dataObject, passphrase) {
+      if (!passphrase || !passphrase.trim()) {
+        return {
+          app: 'ApexWallet',
+          version: '1.4.7',
+          encrypted: false,
+          format: 'apexwallet_plaintext_backup_v2',
+          exportedAt: new Date().toISOString(),
+          data: dataObject
+        };
+      }
+
+      const enc = new TextEncoder();
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        enc.encode(passphrase.trim()),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveKey']
+      );
+
+      const aesKey = await crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: salt,
+          iterations: 100000,
+          hash: 'SHA-256'
+        },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt']
+      );
+
+      const plaintext = enc.encode(JSON.stringify(dataObject));
+      const ciphertext = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: iv },
+        aesKey,
+        plaintext
+      );
+
+      return {
+        app: 'ApexWallet',
+        version: '1.4.7',
+        encrypted: true,
+        format: 'apexwallet_encrypted_backup_v2',
+        exportedAt: new Date().toISOString(),
+        kdf: {
+          algorithm: 'PBKDF2',
+          hash: 'SHA-256',
+          iterations: 100000,
+          salt: bufToB64(salt)
+        },
+        cipher: {
+          algorithm: 'AES-GCM',
+          iv: bufToB64(iv),
+          ciphertext: bufToB64(ciphertext)
+        }
+      };
+    }
+
+    /**
+     * Item 4: Decrypt backup file using passphrase (or return plaintext / legacy v1)
+     */
+    async decryptBackup(backupEnvelope, passphrase) {
+      if (!backupEnvelope) {
+        throw new Error('ملف النسخة الاحتياطية فارغ أو غير صالح.');
+      }
+
+      // Plaintext v2 format
+      if (backupEnvelope.format === 'apexwallet_plaintext_backup_v2' || backupEnvelope.encrypted === false) {
+        return backupEnvelope.data || backupEnvelope;
+      }
+
+      // Encrypted v2 format
+      if (backupEnvelope.format === 'apexwallet_encrypted_backup_v2' || (backupEnvelope.encrypted === true && backupEnvelope.cipher)) {
+        if (!passphrase || !passphrase.trim()) {
+          throw new Error('هذه النسخة الاحتياطية مشفرة بعبارة مرور. يرجى إدخال عبارة المرور لفك التشفير.');
+        }
+
+        const salt = b64ToBuf(backupEnvelope.kdf.salt);
+        const iv = b64ToBuf(backupEnvelope.cipher.iv);
+        const iterations = (backupEnvelope.kdf && backupEnvelope.kdf.iterations) || 100000;
+        const ciphertext = b64ToBuf(backupEnvelope.cipher.ciphertext);
+
+        const enc = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey(
+          'raw',
+          enc.encode(passphrase.trim()),
+          { name: 'PBKDF2' },
+          false,
+          ['deriveKey']
+        );
+
+        const aesKey = await crypto.subtle.deriveKey(
+          {
+            name: 'PBKDF2',
+            salt: salt,
+            iterations: iterations,
+            hash: 'SHA-256'
+          },
+          keyMaterial,
+          { name: 'AES-GCM', length: 256 },
+          false,
+          ['decrypt']
+        );
+
+        try {
+          const decrypted = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: iv },
+            aesKey,
+            ciphertext
+          );
+          const dec = new TextDecoder();
+          return JSON.parse(dec.decode(decrypted));
+        } catch (e) {
+          throw new Error('عبارة المرور غير صحيحة أو تم التلاعب بملف النسخة الاحتياطية.');
+        }
+      }
+
+      // Legacy v1 backup format
+      if (backupEnvelope.securityVault || backupEnvelope.userStore) {
+        return backupEnvelope;
+      }
+
+      throw new Error('تنسيق ملف النسخة الاحتياطية غير مدعوم أو تالف.');
     }
 
     /**

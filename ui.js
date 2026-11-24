@@ -289,8 +289,60 @@ function initApp() {
     }
   }
 
-  document.getElementById('tx-card-select')?.addEventListener('change', updateTxCyclePreview);
+  document.getElementById('tx-card-select')?.addEventListener('change', () => {
+    updateTxCyclePreview();
+    updateTxBalancePreview();
+  });
   document.getElementById('tx-date')?.addEventListener('input', updateTxCyclePreview);
+  document.getElementById('tx-amount')?.addEventListener('input', updateTxBalancePreview);
+  document.querySelectorAll('input[name="tx-op-type"]').forEach(r => {
+    r.addEventListener('change', updateTxBalancePreview);
+  });
+
+  // --- Dynamic Transaction Modal Account Balance Preview (Item 3) ---
+  function updateTxBalancePreview() {
+    const cardSelect = document.getElementById('tx-card-select');
+    const amountInput = document.getElementById('tx-amount');
+    const balanceBox = document.getElementById('tx-balance-preview-box');
+    const beforeEl = document.getElementById('tx-balance-before');
+    const afterEl = document.getElementById('tx-balance-after');
+    const warnEl = document.getElementById('tx-balance-negative-warn');
+
+    if (!cardSelect || !balanceBox || !beforeEl || !afterEl || !warnEl) return;
+
+    const rawVal = cardSelect.value;
+    const amountVal = parseFloat(amountInput?.value) || 0;
+
+    let targetAccount = null;
+    if (rawVal && rawVal.startsWith('acc:')) {
+      targetAccount = store.getAccount(rawVal.replace('acc:', ''));
+    } else if (rawVal) {
+      const card = store.getCard(rawVal);
+      if (card && card.cardType === 'debit' && card.linkedAccountId) {
+        targetAccount = store.getAccount(card.linkedAccountId);
+      }
+    }
+
+    if (!targetAccount) {
+      balanceBox.classList.add('hidden');
+      return;
+    }
+
+    balanceBox.classList.remove('hidden');
+    const currentBalance = targetAccount.balance || 0;
+    const expectedAfter = currentBalance - amountVal;
+
+    beforeEl.textContent = `الرصيد الحالي (${targetAccount.name}): ${formatCurrency(currentBalance)}`;
+    afterEl.textContent = `الرصيد بعد العملية: ${formatCurrency(expectedAfter)}`;
+    afterEl.className = expectedAfter < 0 ? 'font-mono text-rose-600 font-bold' : 'font-mono text-slate-800 font-bold';
+
+    if (amountVal > 0 && expectedAfter < 0) {
+      warnEl.classList.remove('hidden');
+      warnEl.textContent = `⚠️ تحذير: هذه العملية ستجعل رصيد الحساب بالسالب (${formatCurrency(expectedAfter)})!`;
+    } else {
+      warnEl.classList.add('hidden');
+    }
+  }
 
   // Quick Merchant Chips
   document.querySelectorAll('.quick-merchant-chip').forEach(chip => {
@@ -465,6 +517,28 @@ function initApp() {
       accountId = rawCardVal.replace('acc:', '');
     } else {
       cardId = rawCardVal;
+    }
+
+    // Negative Balance Check & Confirmation (Item 3)
+    let targetAccount = null;
+    if (accountId) {
+      targetAccount = store.getAccount(accountId);
+    } else if (cardId) {
+      const card = store.getCard(cardId);
+      if (card && card.cardType === 'debit' && card.linkedAccountId) {
+        targetAccount = store.getAccount(card.linkedAccountId);
+      }
+    }
+
+    if (targetAccount) {
+      const currentBalance = targetAccount.balance || 0;
+      const expectedAfter = currentBalance - parseFloat(amount);
+      if (expectedAfter < 0) {
+        const confirmMsg = `تحذير: هذه العملية ستجعل رصيد الحساب "${targetAccount.name}" بالسالب!\n\n- الرصيد الحالي: ${formatCurrency(currentBalance)}\n- الرصيد المتوقع: ${formatCurrency(expectedAfter)}\n\nهل تريد بالتأكيد تسجيل هذه العملية؟`;
+        if (typeof confirm === 'function' && !confirm(confirmMsg)) {
+          return;
+        }
+      }
     }
 
     try {
@@ -2145,7 +2219,7 @@ function initApp() {
 
         <div class="text-center pt-2 text-[10px] text-slate-400 space-y-0.5">
           <p class="font-bold text-slate-500">ApexWallet — Visual Card-First Tracker</p>
-          <p>Version 1.4.6 • Keystore Protected</p>
+          <p>Version 1.4.7 • Keystore Protected</p>
         </div>
 
       </div>
@@ -2445,6 +2519,37 @@ function initApp() {
               ⚠️ تنبيه: كارت الديبت المختار غير مرتبط بحساب بنكي. سحب الكاش يتطلب اختيار حساب بنكي أو ربط الكارت بحساب أولاً لمنع ضياع الأثر المالي.
             </div>
 
+            <!-- Dynamic Balance Preview & Negative Warning (Item 3) -->
+            ${(() => {
+              let candAcc = null;
+              if (c.matchedAccountId) {
+                candAcc = store.getAccount(c.matchedAccountId);
+              } else if (c.matchedCardId) {
+                const mc = store.getCard(c.matchedCardId);
+                if (mc && mc.cardType === 'debit' && mc.linkedAccountId) {
+                  candAcc = store.getAccount(mc.linkedAccountId);
+                }
+              }
+              if (!candAcc) return '';
+              const curBal = candAcc.balance || 0;
+              const isInc = c.direction === 'income' || c.type === 'income';
+              const expAfter = isInc ? curBal + c.amount : curBal - c.amount;
+              const isNeg = expAfter < 0;
+              return `
+                <div id="candidate-balance-box-${c.id}" class="p-2 rounded-xl ${isNeg ? 'bg-rose-50 border border-rose-200 text-rose-900' : 'bg-slate-100/70 text-slate-700'} space-y-0.5">
+                  <div class="flex items-center justify-between text-[10px] font-bold">
+                    <span>الرصيد قبل (${candAcc.name}): ${formatCurrency(curBal)}</span>
+                    <span class="font-mono ${isNeg ? 'text-rose-700 font-black' : ''}">بعد العملية: ${formatCurrency(expAfter)}</span>
+                  </div>
+                  ${isNeg ? `
+                    <div class="text-[10px] font-bold text-rose-700 flex items-center gap-1">
+                      <span>⚠️ تحذير: اعتماد هذه العملية سيجعل رصيد الحساب بالسالب!</span>
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+            })()}
+
             <div class="text-[9px] text-slate-400 flex items-center justify-between px-0.5 pt-0.5">
               <span>Date: ${c.transactionTime || new Date(c.receiptTime).toLocaleString()}</span>
               <span>Ref: ${(c.fingerprint || '').slice(0, 10)}</span>
@@ -2569,6 +2674,21 @@ function initApp() {
           return;
         }
         isManualAssignment = true;
+      }
+    }
+
+    // Negative Balance Confirmation (Item 3)
+    if (selectedAccount && candidate) {
+      const isIncome = candidate.direction === 'income' || candidate.type === 'income';
+      if (!isIncome) {
+        const currentBal = selectedAccount.balance || 0;
+        const expectedAfter = currentBal - candidate.amount;
+        if (expectedAfter < 0) {
+          const confirmMsg = `تحذير: اعتماد هذه العملية سيجعل رصيد الحساب "${selectedAccount.name}" بالسالب!\n\n- الرصيد الحالي: ${formatCurrency(currentBal)}\n- الرصيد المتوقع بعد الاعتماد: ${formatCurrency(expectedAfter)}\n\nهل تريد بالتأكيد اعتماد هذه العملية؟`;
+          if (typeof confirm === 'function' && !confirm(confirmMsg)) {
+            return;
+          }
+        }
       }
     }
 
@@ -3181,31 +3301,68 @@ function initApp() {
   }
 
   // --- Vault Backup & Restore Migration ---
-  window.exportEncryptedVaultBackup = () => {
+  window.exportEncryptedVaultBackup = async () => {
     const rawVault = localStorage.getItem('apexwallet_security_vault_v1');
     const userStore = localStorage.getItem('apexwallet_user_vault_v1');
     const currency = localStorage.getItem('wallet_currency') || 'EGP';
 
-    const backupPayload = {
+    const rawData = {
       app: 'ApexWallet',
-      version: '1.4.6',
-      exportedAt: new Date().toISOString(),
-      encryptionNote: 'Master AES-GCM vault encrypted via PBKDF2 from 4-digit PIN.',
+      version: '1.4.7',
       securityVault: rawVault ? JSON.parse(rawVault) : null,
       userStore: userStore ? JSON.parse(userStore) : null,
       currency: currency
     };
 
-    const blob = new Blob([JSON.stringify(backupPayload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `apexwallet_vault_backup_v1.4_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast('Vault backup exported successfully! (Protected by your PIN)', 'success');
+    const passphrase = prompt(
+      'أدخل عبارة مرور قوية (Passphrase) مخصصة لتشفير النسخة الاحتياطية (AES-256-GCM مع 100,000 دورة PBKDF2).\n\nلحماية بياناتك، لا تستخدم رمز الـ PIN. إذا تركت الحقل فارغاً وضغطت حسناً، سيتم تصدير النسخة كنص غير مشفر:'
+    );
+
+    if (passphrase === null) {
+      // User cancelled prompt
+      return;
+    }
+
+    try {
+      let backupPayload;
+      let filename;
+      let isEncrypted = false;
+
+      if (window.walletSecurity && typeof window.walletSecurity.encryptBackup === 'function') {
+        backupPayload = await window.walletSecurity.encryptBackup(rawData, passphrase);
+        isEncrypted = backupPayload.encrypted !== false;
+      } else {
+        backupPayload = {
+          app: 'ApexWallet',
+          version: '1.4.7',
+          exportedAt: new Date().toISOString(),
+          ...rawData
+        };
+      }
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      filename = isEncrypted
+        ? `apexwallet_backup_encrypted_${dateStr}.json`
+        : `apexwallet_backup_plaintext_${dateStr}.json`;
+
+      const blob = new Blob([JSON.stringify(backupPayload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      if (isEncrypted) {
+        showToast('تم تصدير النسخة الاحتياطية بنجاح مشفرة بعبارة المرور الخاصة بك (AES-256).', 'success');
+      } else {
+        showToast('تنبيه: تم تصدير النسخة الاحتياطية كنص غير مشفر بعبارة مرور.', 'warning');
+      }
+    } catch (err) {
+      showToast('فشل تصدير النسخة الاحتياطية: ' + err.message, 'error');
+    }
   };
 
   window.importEncryptedVaultBackup = (event) => {
@@ -3218,22 +3375,52 @@ function initApp() {
     }
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
-        const data = JSON.parse(e.target.result);
-        if (!data || data.app !== 'ApexWallet' || (!data.securityVault && !data.userStore)) {
-          showToast('ملف النسخة الاحتياطية غير صالح أو تالف.', 'error');
+        const envelope = JSON.parse(e.target.result);
+        if (!envelope || envelope.app !== 'ApexWallet') {
+          showToast('ملف النسخة الاحتياطية غير صالح أو ليس خاصاً بتطبيق ApexWallet.', 'error');
           return;
         }
 
-        if (data.securityVault) {
-          localStorage.setItem('apexwallet_security_vault_v1', JSON.stringify(data.securityVault));
+        let restoredData = null;
+
+        // Check if file is encrypted v2
+        if (envelope.format === 'apexwallet_encrypted_backup_v2' || (envelope.encrypted === true && envelope.cipher)) {
+          const passphrase = prompt('هذه النسخة الاحتياطية مشفرة بعبارة مرور (AES-256).\nيرجى إدخال عبارة المرور لفك تشفيرها:');
+          if (passphrase === null) {
+            event.target.value = '';
+            return;
+          }
+          if (!window.walletSecurity || typeof window.walletSecurity.decryptBackup !== 'function') {
+            throw new Error('وحدة فك التشفير غير متاحة.');
+          }
+          restoredData = await window.walletSecurity.decryptBackup(envelope, passphrase);
+        } else if (envelope.format === 'apexwallet_plaintext_backup_v2' || envelope.encrypted === false) {
+          // Plaintext v2
+          if (window.walletSecurity && typeof window.walletSecurity.decryptBackup === 'function') {
+            restoredData = await window.walletSecurity.decryptBackup(envelope, '');
+          } else {
+            restoredData = envelope.data || envelope;
+          }
+        } else {
+          // Legacy v1 backup format
+          restoredData = envelope;
         }
-        if (data.userStore) {
-          localStorage.setItem('apexwallet_user_vault_v1', JSON.stringify(data.userStore));
+
+        if (!restoredData || (!restoredData.securityVault && !restoredData.userStore)) {
+          showToast('ملف النسخة الاحتياطية لا يحتوي على بيانات صالحة للمحفظة.', 'error');
+          return;
         }
-        if (data.currency) {
-          localStorage.setItem('wallet_currency', data.currency);
+
+        if (restoredData.securityVault) {
+          localStorage.setItem('apexwallet_security_vault_v1', JSON.stringify(restoredData.securityVault));
+        }
+        if (restoredData.userStore) {
+          localStorage.setItem('apexwallet_user_vault_v1', JSON.stringify(restoredData.userStore));
+        }
+        if (restoredData.currency) {
+          localStorage.setItem('wallet_currency', restoredData.currency);
         }
 
         showToast('تم استيراد البيانات بنجاح! جاري إعادة التحميل...', 'success');
@@ -3241,7 +3428,9 @@ function initApp() {
           window.location.reload();
         }, 1200);
       } catch (err) {
-        showToast('خطأ أثناء قراءة ملف النسخة الاحتياطية: ' + err.message, 'error');
+        showToast('خطأ أثناء قراءة أو فك تشفير النسخة الاحتياطية: ' + err.message, 'error');
+      } finally {
+        event.target.value = '';
       }
     };
     reader.readAsText(file);

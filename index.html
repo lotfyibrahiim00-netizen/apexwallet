@@ -14,8 +14,8 @@
   <meta name="apple-mobile-web-app-title" content="ApexWallet">
   <link rel="apple-touch-icon" href="icon-192.png">
 
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind CSS Local Bundled -->
+  <script src="vendor/tailwind.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -49,8 +49,8 @@
     }
   </script>
 
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Lucide Icons Local Bundled -->
+  <script src="vendor/lucide.min.js"></script>
   <script>
     window.__ERRORS__ = [];
     window.addEventListener('error', function(e) {
@@ -360,6 +360,17 @@
           <div id="tx-cycle-preview-box" class="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200/70">
             <div id="tx-cycle-preview-badge"></div>
             <div id="tx-cycle-preview-range"></div>
+          </div>
+
+          <!-- DYNAMIC ACCOUNT BALANCE PREVIEW & NEGATIVE WARNING BOX (Item 3) -->
+          <div id="tx-balance-preview-box" class="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs hidden space-y-1">
+            <div class="flex items-center justify-between font-bold text-[11px] text-slate-700">
+              <span id="tx-balance-before">الرصيد الحالي: -</span>
+              <span id="tx-balance-after" class="font-mono">الرصيد بعد: -</span>
+            </div>
+            <div id="tx-balance-negative-warn" class="hidden text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2 mt-1">
+              ⚠️ تحذير: هذه العملية ستجعل رصيد الحساب بالسالب!
+            </div>
           </div>
 
           <!-- Notes -->

@@ -992,7 +992,7 @@ class WalletAppStore {
     return this.transactions.find(t => t.id === txId);
   }
 
-  addTransaction({ amount, merchant, category, date, bankId, cardId, accountId, direction, type, transactionType, isManualAssignment, detectedBank, detectedDigits, notes }) {
+  addTransaction({ amount, merchant, category, date, bankId, cardId, accountId, direction, type, transactionType, isManualAssignment, detectedBank, detectedDigits, notes, expectedAccountId, refNumber, rawMessage }) {
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
       throw new Error('Please enter a valid positive amount.');
     }
@@ -1001,17 +1001,41 @@ class WalletAppStore {
     }
 
     const card = cardId ? this.getCard(cardId) : null;
-    let targetAccount = accountId ? this.getAccount(accountId) : null;
-    if (!targetAccount && card && card.cardType === 'debit' && card.linkedAccountId) {
-      targetAccount = this.getAccount(card.linkedAccountId);
-    }
-    const bId = bankId || (card ? card.bankId : (targetAccount ? targetAccount.bankId : null));
-
+    let targetAccount = null;
     const txDirection = (direction === 'income' || type === 'income') ? 'income' : 'expense';
     const txAmount = parseFloat(amount);
     const txOpType = transactionType || (category === 'transfer' ? 'transfer' : 'purchase');
 
-    // Item 4: Debit cash withdrawal without a linked account CANNOT be approved/added with zero financial effect!
+    // Engine-Level Account Linking & Contradiction Enforcement (Item 1 & Item 2)
+    const incomingAccountId = accountId || expectedAccountId || null;
+
+    if (card && card.cardType === 'debit') {
+      const cardLinkedAccId = card.linkedAccountId || null;
+
+      if (incomingAccountId) {
+        if (!cardLinkedAccId) {
+          throw new Error('الكارت المختار كارت دبت غير مرتبط بأي حساب بنكي، بينما العملية مخصصة لحساب بنكي. يرجى ربط الكارت بالحساب أولاً.');
+        }
+        if (cardLinkedAccId !== incomingAccountId) {
+          throw new Error('تناقض في الحساب: العملية موجهة لحساب بنكي مختلف عن الحساب المرتبط بهذا الكارت.');
+        }
+        targetAccount = this.getAccount(cardLinkedAccId);
+      } else if (cardLinkedAccId) {
+        targetAccount = this.getAccount(cardLinkedAccId);
+      } else {
+        // Unlinked debit card without incoming account
+        if (txOpType === 'withdrawal') {
+          throw new Error('لا يمكن تسجيل عملية سحب نقدي لكارت خصم غير مرتبط بحساب بنكي. يرجى ربط الكارت بحساب أولاً لمنع ضياع الأثر المالي.');
+        }
+      }
+    } else if (accountId) {
+      targetAccount = this.getAccount(accountId);
+      if (!targetAccount) {
+        throw new Error('الحساب البنكي المحدد غير موجود.');
+      }
+    }
+
+    // Debit cash withdrawal without a linked account CANNOT be added with zero financial effect!
     if (txOpType === 'withdrawal') {
       if (card && card.cardType === 'debit' && !targetAccount) {
         throw new Error('لا يمكن تسجيل عملية سحب نقدي لكارت خصم غير مرتبط بحساب بنكي. يرجى ربط الكارت بحساب أو اختيار حساب بنكي أولاً لمنع ضياع الأثر المالي.');
@@ -1020,6 +1044,8 @@ class WalletAppStore {
         throw new Error('لا يمكن تسجيل عملية سحب نقدي بدون تحديد حساب بنكي أو كارت.');
       }
     }
+
+    const bId = bankId || (card ? card.bankId : (targetAccount ? targetAccount.bankId : null));
 
     // Live Account Balance Update (Item 2)
     // No double-deduction: single deduction directly on the linked account!
@@ -1047,6 +1073,8 @@ class WalletAppStore {
       isManualAssignment: !!isManualAssignment,
       detectedBank: detectedBank || null,
       detectedDigits: detectedDigits || null,
+      refNumber: refNumber || null,
+      rawMessage: rawMessage || null,
       notes: (notes || '').trim(),
       createdAt: new Date().toISOString()
     };

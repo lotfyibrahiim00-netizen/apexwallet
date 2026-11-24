@@ -1157,6 +1157,32 @@ runTest('User override of transaction type before approval applies chosen type a
   }
 });
 
+// Test 39: Merchant reference number stripping and raw message retention (Item 8)
+runTest('Strips reference number markers from merchant name, saves refNumber and preserves rawMessage', () => {
+  const smsText = 'تمت عملية شراء بمبلغ 1,250.00 جم لدى Hyper One ref# 98765432 باستخدام بطاقة 4433 بتاريخ 24/11/2026';
+  const c = parseBankSms('CIB', smsText);
+  assert.ok(c, 'Candidate should be parsed');
+  assert.strictEqual(c.merchant, 'Hyper One', 'Merchant name should be stripped of ref# suffix');
+  assert.strictEqual(c.refNumber, '98765432', 'refNumber should be cleanly extracted');
+  assert.strictEqual(c.rawMessage, smsText, 'Original message should be preserved intact');
+
+  // Arabic reference with "كود مرجعي"
+  const smsTextAr = 'خصم بمبلغ 450.00 جم لدى كارفور المعادي كود مرجعي 776655 من بطاقة 1122';
+  const cAr = parseBankSms('QNB', smsTextAr);
+  assert.ok(cAr);
+  assert.strictEqual(cAr.merchant, 'كارفور المعادي', 'Arabic merchant should be stripped of كود مرجعي suffix');
+  assert.strictEqual(cAr.refNumber, '776655', 'Arabic refNumber should be cleanly extracted');
+});
+
+// Test 40: Transfer counterparty reference stripping
+runTest('Strips reference suffixes from transfer recipient counterparty', () => {
+  const xferSms = 'تم تحويل مبلغ 500.00 جم إلى محمود إبراهيم ref# 443322 عبر إنستاباي بنجاح من حساب 9081';
+  const c = parseBankSms('InstaPay', xferSms);
+  assert.ok(c);
+  assert.strictEqual(c.merchant, 'InstaPay: محمود إبراهيم', 'Counterparty must be clean of ref#');
+  assert.strictEqual(c.refNumber, '443322', 'refNumber extracted correctly');
+});
+
 (async () => {
   await Promise.all(pendingTestPromises);
 

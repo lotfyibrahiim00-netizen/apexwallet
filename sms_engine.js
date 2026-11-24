@@ -605,16 +605,60 @@
       }
 
       const c = this.pendingCandidates[idx];
-      const cardId = overrides.cardId || c.matchedCardId;
-      if (!cardId && !overrides.accountId && !c.matchedAccountId) {
-        return { success: false, error: 'Please select a card or account to assign this transaction.' };
+      const cardId = overrides.cardId !== undefined ? overrides.cardId : c.matchedCardId;
+      const explicitAccountId = overrides.accountId !== undefined ? overrides.accountId : null;
+      const candidateAccountId = c.matchedAccountId || null;
+
+      if (!cardId && !explicitAccountId && !candidateAccountId) {
+        return { success: false, error: 'يرجى اختيار كارت أو حساب لتعيين هذه العملية. (Please select a card or account to assign this transaction)' };
       }
 
       const card = cardId ? store.getCard(cardId) : null;
-      const accountId = overrides.accountId || c.matchedAccountId || (card ? card.linkedAccountId : null);
+      let accountId = explicitAccountId;
       const candidateOpType = overrides.transactionType || c.transactionType || 'purchase';
 
-      // Item 4: Debit cash withdrawal without linked account CANNOT be approved with zero financial effect!
+      // Engine-Level Account Linking & Contradiction Enforcement (Item 1 & Item 2)
+      if (card && card.cardType === 'debit') {
+        const cardLinkedAccId = card.linkedAccountId || null;
+        const targetAccId = explicitAccountId || candidateAccountId;
+
+        if (targetAccId) {
+          // If transaction or candidate was associated with an account:
+          if (!cardLinkedAccId) {
+            return {
+              success: false,
+              error: 'كارت الخصم (Debit) المختار غير مرتبط بأي حساب بنكي، بينما العملية موجهة لحساب بنكي. يرجى ربط الكارت بالحساب أولاً.'
+            };
+          }
+          if (cardLinkedAccId !== targetAccId) {
+            return {
+              success: false,
+              error: 'تناقض في ربط الحساب: العملية موجهة لحساب بنكي مختلف عن الحساب المرتبط بهذا الكارت.'
+            };
+          }
+          accountId = cardLinkedAccId;
+        } else if (cardLinkedAccId) {
+          accountId = cardLinkedAccId;
+        } else {
+          // Unlinked debit card
+          accountId = null;
+          if (candidateOpType === 'withdrawal') {
+            return {
+              success: false,
+              error: 'لا يمكن اعتماد عملية سحب نقدي لكارت خصم غير مرتبط بحساب بنكي. يرجى اختيار حساب بنكي أو ربط الكارت بحساب أولاً لمنع ضياع الأثر المالي.'
+            };
+          }
+        }
+      } else if (card && card.cardType === 'credit') {
+        // Credit card does not deduct from account
+        accountId = null;
+      } else if (explicitAccountId) {
+        accountId = explicitAccountId;
+      } else if (candidateAccountId && !cardId) {
+        accountId = candidateAccountId;
+      }
+
+      // Cash withdrawal validation
       if (candidateOpType === 'withdrawal') {
         if (card && card.cardType === 'debit' && !accountId) {
           return {
@@ -646,12 +690,15 @@
           bankId: card ? card.bankId : null,
           cardId: card ? card.id : null,
           accountId: accountId,
+          expectedAccountId: candidateAccountId,
           direction: txDirection,
           type: txDirection,
           transactionType: overrides.transactionType || c.transactionType || 'purchase',
           isManualAssignment: isManual,
           detectedBank: c.bank,
           detectedDigits: c.identifierDigits || c.cardSuffix,
+          refNumber: c.refNumber || null,
+          rawMessage: c.rawMessage || c.body || null,
           notes
         });
 
@@ -988,10 +1035,23 @@
 
       // Reference number - with word boundary so it won't match inside "Carrefour"
       let refNumber = '';
-      const refMatch = normalized.match(/(?:برقم\s*مرجعي|رقم\s*(?:المرجع|العملية)|مرجع|\bref(?:erence)?\s*(?:no|num|number)?|\btxn\s*id|\brrn)\s*[:#]?\s*([a-zA-Z0-9]+)/i);
+      const refMatch = normalized.match(/(?:برقم\s*مرجعي|كود\s*مرجعي|رقم\s*(?:المرجع|العملية)|مرجع|\bref(?:erence)?\s*(?:no|num|number)?|\btxn\s*id|\brrn)\s*[:#]?\s*([a-zA-Z0-9]+)/i);
       if (refMatch && refMatch[1]) {
         refNumber = refMatch[1].trim();
       }
+
+      const cleanMerchantString = (str) => {
+        if (!str) return '';
+        let m = str.trim();
+        // Remove trailing reference tags like "ref# 123456", "كود مرجعي: 88712", etc.
+        m = m.replace(/\s+(?:برقم\s*مرجعي|كود\s*مرجعي|رقم\s*(?:المرجع|العملية)|مرجع|\bref(?:erence)?(?:\s*(?:no|num|number))?|\btxn\s*id|\brrn)(?:[\s:#\-].*)?$/i, '').trim();
+        if (refNumber) {
+          const esc = refNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          m = m.replace(new RegExp(`(?:\\s+|[:#\\-])*${esc}\\s*$`, 'i'), '').trim();
+        }
+        m = m.replace(/[\s\-:#.,;]+$/, '').trim();
+        return m.replace(/\s+/g, ' ');
+      };
 
       // Merchant & Counterparty extraction
       let merchant = '';
@@ -1003,6 +1063,7 @@
           const inMatch = normalized.match(/(?:من\s+المحول|من\s+العميل|من(?!(?:\s+بطاقة|\s+كارت|\s+حسابك|\s+حساب|\s+ماكينة|\s+atm|\s+card|\s+account))|\bfrom\b|\breceived\s+from\b)\s*[:\-]?\s*([^\r\n,;]+?)(?=\s+(?:عبر|من\s+خلال|باستخدام|\bvia\b|\busing\b|\bon\b|بتاريخ|في|\bref\b|برقم|\bto\b|\d{1,2}[/-])|$)/i);
           if (inMatch && inMatch[1]) {
             let party = inMatch[1].trim().replace(/\s+(?:بنجاح|ناجح|ناجحة|تمت|successful|successfully)$/i, '').replace(/\s+/g, ' ');
+            party = cleanMerchantString(party);
             if (party.length > 40) party = party.substring(0, 40).trim();
             if (party) {
               merchant = hasInstaPay ? ('InstaPay: ' + party) : ('تحويل من: ' + party);
@@ -1012,6 +1073,7 @@
           const outMatch = normalized.match(/(?:إلى|الى|لحساب|للمستفيد|\bto\b|\bsent\s+to\b)\s*[:\-]?\s*([^\r\n,;]+?)(?=\s+(?:عبر|من\s+خلال|باستخدام|\bvia\b|\busing\b|\bon\b|بتاريخ|في|\bref\b|برقم|\bfrom\b|\d{1,2}[/-])|$)/i);
           if (outMatch && outMatch[1]) {
             let party = outMatch[1].trim().replace(/\s+(?:بنجاح|ناجح|ناجحة|تمت|successful|successfully)$/i, '').replace(/\s+/g, ' ');
+            party = cleanMerchantString(party);
             if (party.length > 40) party = party.substring(0, 40).trim();
             if (party) {
               merchant = hasInstaPay ? ('InstaPay: ' + party) : ('تحويل إلى: ' + party);
@@ -1028,6 +1090,7 @@
         if (merchMatch && merchMatch[1]) {
           let m = merchMatch[1].trim();
           m = m.split(/\s+(?:with\s+card|from\s+card|with\s+credit|with\s+debit|using|on\s+\d|باستخدام|من\s+بطاقة|من\s+حساب|بتاريخ|في\s+\d)/i)[0].trim();
+          m = cleanMerchantString(m);
           if (m.length > 50) m = m.substring(0, 50).trim();
           merchant = m.replace(/\s+/g, ' ');
         }
@@ -1077,13 +1140,15 @@
         identifierDigits,
         entityType,
         digitsPosition,
-        refNumber,
+        refNumber: refNumber || null,
         type,
         direction: type,
         transactionType,
         amount,
         currency,
         merchant,
+        rawMessage: body,
+        body: body,
         transactionTime,
         receiptTime: Date.now(),
         fingerprint,
