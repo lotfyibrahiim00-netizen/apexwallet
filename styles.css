@@ -8,8 +8,70 @@
   - Single Accent: #F5B700 (Amber Gold)
   - On-Accent: #111111
   - Destructive: #E6A8A8 (Muted red for delete/erase/error)
-  - 100% Offline: system UI font stack without external network calls
+  - 100% Offline: locally bundled woff2 fonts under vendor/fonts/
 */
+
+/* ============================================== */
+/* LOCAL OFFLINE BUNDLED FONTS                    */
+/* ============================================== */
+@font-face {
+  font-family: 'Noto Kufi Arabic';
+  src: url('vendor/fonts/noto-kufi-arabic-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Kufi Arabic';
+  src: url('vendor/fonts/noto-kufi-arabic-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Kufi Arabic';
+  src: url('vendor/fonts/noto-kufi-arabic-800.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Noto Sans';
+  src: url('vendor/fonts/noto-sans-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans';
+  src: url('vendor/fonts/noto-sans-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans';
+  src: url('vendor/fonts/noto-sans-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('vendor/fonts/jetbrains-mono-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('vendor/fonts/jetbrains-mono-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   --bg-dark: #16171A;
@@ -23,7 +85,7 @@
   --accent-amber: #F5B700;
   --on-accent: #111111;
   --destructive: #E6A8A8;
-  --card-radius: 22px;
+  --card-radius: 20px;
   --sheet-radius: 28px;
 }
 
@@ -116,19 +178,20 @@ html[lang="ar"] body {
   }
 }
 
-/* Tilted Hero Card Object */
+/* Tilted Hero Card Object (~91% viewport width, ~1.82:1 aspect ratio, ~23% height) */
 .tilted-hero-wrapper {
   perspective: 1000px;
-  padding: 12px 4px 16px 4px;
+  padding: 6px 0 8px 0;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
 .tilted-card-container {
-  width: 100%;
-  max-width: 350px;
-  transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.42s ease;
+  width: 99%;
+  max-width: 355px;
+  margin: 0 auto;
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.38s ease;
   transform-origin: center center;
   will-change: transform;
 }
@@ -141,36 +204,46 @@ html[dir="ltr"] .tilted-card-container {
   transform: rotate(4deg);
 }
 
-.tilted-card-container:hover,
-.tilted-card-container.straightened {
-  transform: rotate(0deg) translateY(-2px) !important;
+.tilted-card-container:hover {
+  transform: rotate(0deg) translateY(-2px);
 }
 
-/* Bank Card Face */
+.tilted-card-container.straightened {
+  transform: rotate(0deg) translateY(-4px) !important;
+}
+
+/* Bank Card Face (Compact ~1.82:1 aspect ratio) */
 .bank-card-face {
   position: relative;
   width: 100%;
-  min-height: 196px;
+  aspect-ratio: 1.82 / 1;
+  min-height: 175px;
+  max-height: 196px;
   border-radius: var(--card-radius);
   border: 1.5px solid var(--accent-amber);
-  background: linear-gradient(135deg, #1F2024 0%, #17181B 65%, #131416 100%);
+  background: linear-gradient(135deg, #212227 0%, #17181B 65%, #121316 100%);
   color: var(--text-main);
-  padding: 18px 20px;
-  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(245, 183, 0, 0.12);
+  padding: 14px 18px;
+  box-shadow: 0 14px 32px -8px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(245, 183, 0, 0.12);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   overflow: hidden;
   user-select: none;
+  direction: ltr;
+}
+
+.tilted-card-container.straightened .bank-card-face {
+  box-shadow: 0 18px 38px -6px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(245, 183, 0, 0.25);
 }
 
 /* Golden Chip on Card */
 .bank-card-chip {
-  width: 38px;
-  height: 28px;
+  width: 36px;
+  height: 26px;
   border-radius: 6px;
   background: linear-gradient(135deg, #F5B700 0%, #D49700 50%, #B88000 100%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.3), 0 2px 4px rgba(0, 0, 0, 0.4);
   position: relative;
   overflow: hidden;
@@ -194,6 +267,33 @@ html[dir="ltr"] .tilted-card-container {
   background: rgba(0, 0, 0, 0.25);
 }
 
+/* Hero Expandable Details Drawer */
+.hero-details-drawer {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin-top: 0;
+  transition: grid-template-rows 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, margin-top 0.32s ease;
+}
+.hero-details-drawer.expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: 6px;
+}
+.hero-details-inner {
+  overflow: hidden;
+}
+
+/* Compact Responsive Amounts inside Tiles & Rows */
+.tile-amount-num {
+  font-size: clamp(10.5px, 2.95vw, 13px);
+  line-height: 1.2;
+}
+.tile-amount-curr {
+  font-size: clamp(8px, 2.2vw, 9.5px);
+  line-height: 1.2;
+}
+
 /* Carousel Control */
 #cards-carousel {
   scroll-snap-type: x mandatory;
@@ -206,7 +306,7 @@ html[dir="ltr"] .tilted-card-container {
   scroll-snap-stop: always !important;
 }
 
-/* Floating Navigation Bar (Dark Charcoal & Amber Pill Dock) */
+/* Floating Navigation Bar (Dark Charcoal & Sliding Amber Pill Dock) */
 .floating-bottom-nav {
   position: absolute;
   bottom: max(env(safe-area-inset-bottom, 0px) + 12px, 14px);
@@ -223,6 +323,21 @@ html[dir="ltr"] .tilted-card-container {
   z-index: 30;
 }
 
+.nav-sliding-pill {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  width: 0;
+  border-radius: 9999px;
+  background-color: var(--accent-amber);
+  box-shadow: 0 4px 12px rgba(245, 183, 0, 0.35);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), width 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
 .floating-nav-tab {
   display: flex;
   align-items: center;
@@ -236,14 +351,19 @@ html[dir="ltr"] .tilted-card-container {
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.22s ease, background-color 0.22s ease;
   white-space: nowrap;
   position: relative;
+  z-index: 1;
+  overflow: visible;
 }
 
 .floating-nav-tab.active {
-  background-color: var(--accent-amber);
   color: var(--on-accent);
+}
+
+.floating-nav-tab.active.no-pill-fallback {
+  background-color: var(--accent-amber);
   box-shadow: 0 4px 12px rgba(245, 183, 0, 0.35);
 }
 
@@ -275,6 +395,34 @@ html[dir="ltr"] .tilted-card-container {
   color: var(--accent-amber);
 }
 
+/* Soft Circular Tap Ripple */
+@keyframes softRipple {
+  0% {
+    transform: translate(-50%, -50%) scale(0.15);
+    opacity: 0.42;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.4);
+    opacity: 0;
+  }
+}
+
+.ripple-host {
+  position: relative;
+  overflow: hidden;
+}
+
+.touch-ripple {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(245, 183, 0, 0.45) 0%, rgba(245, 183, 0, 0) 70%);
+  pointer-events: none;
+  animation: softRipple 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  z-index: 5;
+}
+
 /* Slide-Up Bottom Sheet Modal Transitions */
 .modal-container {
   transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -301,20 +449,21 @@ html[dir="ltr"] .tilted-card-container {
 
 /* Active tactile scale */
 .active-press:active {
-  transform: scale(0.96);
+  transform: scale(0.97);
   transition: transform 0.1s ease;
 }
 
 /* Monospace font utility for numbers and currencies */
 .font-mono {
-  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace !important;
   font-variant-numeric: tabular-nums;
 }
 
 .amount-ltr {
   direction: ltr !important;
   unicode-bidi: isolate;
-  display: inline-block;
+  display: inline-flex;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace !important;
   font-variant-numeric: tabular-nums;
 }
 
@@ -423,21 +572,27 @@ html[dir="ltr"] .tilted-card-container {
   box-shadow: 0 0 0 2px rgba(245, 183, 0, 0.2);
 }
 
-/* Reduced Motion Mode for Accessibility */
+/* Reduced Motion Mode for Accessibility: instant state transitions + short fade */
 @media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
   .tilted-card-container {
-    transform: none !important;
-    transition: none !important;
+    transition: opacity 0.12s ease !important;
+  }
+  .hero-details-drawer {
+    transition: opacity 0.14s ease !important;
+  }
+  .nav-sliding-pill {
+    transition: opacity 0.12s ease !important;
+  }
+  .modal-container {
+    transition: opacity 0.12s ease !important;
   }
   .modal-sheet {
-    transition: none !important;
+    transition: opacity 0.12s ease !important;
+  }
+  .touch-ripple {
+    display: none !important;
+  }
+  .active-press:active {
+    transform: none !important;
   }
 }
-
-
