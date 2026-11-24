@@ -2,6 +2,7 @@ package com.apexwallet.app.sms;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
@@ -37,6 +38,10 @@ import java.util.concurrent.Executor;
                 @Permission(
                         strings = { Manifest.permission.RECEIVE_SMS },
                         alias = "receiveSms"
+                ),
+                @Permission(
+                        strings = { Manifest.permission.READ_SMS },
+                        alias = "readSms"
                 )
         }
 )
@@ -62,14 +67,21 @@ public class BankSmsPlugin extends Plugin {
 
     @PluginMethod
     public void checkPermission(PluginCall call) {
-        boolean granted = ContextCompat.checkSelfPermission(
+        boolean receiveGranted = ContextCompat.checkSelfPermission(
                 getContext(),
                 Manifest.permission.RECEIVE_SMS
         ) == PackageManager.PERMISSION_GRANTED;
 
+        boolean readGranted = ContextCompat.checkSelfPermission(
+                getContext(),
+                Manifest.permission.READ_SMS
+        ) == PackageManager.PERMISSION_GRANTED;
+
         JSObject ret = new JSObject();
-        ret.put("status", granted ? "granted" : "prompt");
-        ret.put("granted", granted);
+        ret.put("status", receiveGranted ? "granted" : "prompt");
+        ret.put("granted", receiveGranted);
+        ret.put("receiveSms", receiveGranted);
+        ret.put("readSms", readGranted);
         call.resolve(ret);
     }
 
@@ -97,6 +109,173 @@ public class BankSmsPlugin extends Plugin {
         ret.put("status", granted ? "granted" : "denied");
         ret.put("granted", granted);
         call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void requestReadSmsPermission(PluginCall call) {
+        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED) {
+            JSObject ret = new JSObject();
+            ret.put("status", "granted");
+            ret.put("granted", true);
+            call.resolve(ret);
+            return;
+        }
+
+        requestPermissionForAlias("readSms", call, "readSmsPermissionCallback");
+    }
+
+    @PermissionCallback
+    private void readSmsPermissionCallback(PluginCall call) {
+        boolean granted = ContextCompat.checkSelfPermission(
+                getContext(),
+                Manifest.permission.READ_SMS
+        ) == PackageManager.PERMISSION_GRANTED;
+
+        JSObject ret = new JSObject();
+        ret.put("status", granted ? "granted" : "denied");
+        ret.put("granted", granted);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        try {
+            android.content.Intent intent = new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(android.net.Uri.fromParts("package", getContext().getPackageName(), null));
+            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Could not open settings: " + e.getMessage(), e);
+        }
+    }
+
+    @PluginMethod
+    public void openBatterySettings(PluginCall call) {
+        try {
+            android.content.Intent intent = new android.content.Intent();
+            intent.setAction(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            openAppSettings(call);
+        }
+    }
+
+    /**
+     * Queries past SMS from device inbox with strict bank allowlist filtering,
+     * in-memory OTP/promo rejection, SHA-256 deduplication, and safe batching.
+     * Raw message text is NEVER retained or logged.
+     */
+    @PluginMethod
+    public void queryHistoricalSms(PluginCall call) {
+        boolean hasReadPermission = ContextCompat.checkSelfPermission(
+                getContext(),
+                Manifest.permission.READ_SMS
+        ) == PackageManager.PERMISSION_GRANTED;
+
+        if (!hasReadPermission) {
+            JSObject ret = new JSObject();
+            ret.put("success", false);
+            ret.put("error", "PERMISSION_DENIED");
+            ret.put("message", "صلاحية قراءة الرسائل (READ_SMS) غير ممنوحة.");
+            call.resolve(ret);
+            return;
+        }
+
+        int days = call.getInt("days", 30);
+        int batchOffset = call.getInt("offset", 0);
+        int batchLimit = call.getInt("limit", 20);
+
+        long cutoffTimestamp = System.currentTimeMillis() - (days * 24L * 60L * 60L * 1000L);
+        Set<String> allowlist = mQueue.getBankAllowlist();
+
+        List<JSObject> candidates = new ArrayList<>();
+        int totalMatchedInWindow = 0;
+        int rejectedOtpOrPromo = 0;
+        int duplicateCount = 0;
+        int matchIndex = 0;
+
+        android.content.ContentResolver cr = getContext().getContentResolver();
+        android.net.Uri inboxUri = android.net.Uri.parse("content://sms/inbox");
+
+        String[] projection = new String[] { "_id", "address", "body", "date" };
+        String selection = "date >= ?";
+        String[] selectionArgs = new String[] { String.valueOf(cutoffTimestamp) };
+        String sortOrder = "date DESC";
+
+        try (android.database.Cursor cursor = cr.query(inboxUri, projection, selection, selectionArgs, sortOrder)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int addressIdx = cursor.getColumnIndex("address");
+                int bodyIdx = cursor.getColumnIndex("body");
+                int dateIdx = cursor.getColumnIndex("date");
+
+                do {
+                    String sender = cursor.getString(addressIdx);
+                    if (sender == null || sender.trim().isEmpty()) continue;
+
+                    // 1. Strict Allowlist Filter
+                    if (!BankSmsParser.isSenderAllowed(sender, allowlist)) {
+                        continue;
+                    }
+
+                    String body = cursor.getString(bodyIdx);
+                    if (body == null || body.trim().isEmpty()) continue;
+
+                    // 2. Parse strictly in memory
+                    CandidateTransaction candidate = BankSmsParser.parse(sender, body);
+                    if (candidate == null) {
+                        rejectedOtpOrPromo++;
+                        continue;
+                    }
+
+                    // 3. Level A Deduplication: check against processed fingerprints
+                    if (mQueue.isDuplicate(candidate.getFingerprint())) {
+                        duplicateCount++;
+                        continue;
+                    }
+
+                    totalMatchedInWindow++;
+
+                    // 4. Bounded batch window
+                    if (matchIndex >= batchOffset && matchIndex < (batchOffset + batchLimit)) {
+                        try {
+                            candidates.add(JSObject.fromJSONObject(candidate.toJsonObject()));
+                        } catch (JSONException ignored) {}
+                    }
+                    matchIndex++;
+
+                } while (cursor.moveToNext());
+            }
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            JSArray arr = new JSArray();
+            for (JSObject obj : candidates) {
+                arr.put(obj);
+            }
+            ret.put("candidates", arr);
+            ret.put("batchCount", arr.length());
+            ret.put("totalMatched", totalMatchedInWindow);
+            ret.put("offset", batchOffset);
+            ret.put("hasMore", (batchOffset + batchLimit) < matchIndex);
+            ret.put("nextOffset", batchOffset + batchLimit);
+            ret.put("rejectedCount", rejectedOtpOrPromo);
+            ret.put("duplicateCount", duplicateCount);
+            call.resolve(ret);
+
+        } catch (Exception e) {
+            Log.e("BankSmsPlugin", "Error scanning historical SMS inbox", e);
+            JSObject ret = new JSObject();
+            ret.put("success", false);
+            ret.put("error", e.getMessage());
+            call.resolve(ret);
+        }
     }
 
     @PluginMethod

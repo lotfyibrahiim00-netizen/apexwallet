@@ -664,6 +664,74 @@
       </div>
     </div>
 
+    <!-- ============================================== -->
+    <!-- SLIDE-UP MODAL 7: SMS DIAGNOSTICS & STATUS LOG -->
+    <!-- ============================================== -->
+    <div id="modal-sms-diagnostics" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
+      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      
+      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] flex flex-col">
+        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3 shrink-0"></div>
+
+        <div class="flex items-center justify-between mb-3 shrink-0">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <i data-lucide="activity" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-extrabold text-slate-900">تشخيص واستقبال رسائل البنوك</h3>
+              <p class="text-[10px] text-slate-400">سجل وحالة استقبال الـ SMS لحظياً</p>
+            </div>
+          </div>
+          <button data-close-modal="smsDiagnostics" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div id="sms-diagnostics-content" class="flex-1 overflow-y-auto space-y-3 pr-0.5 pb-2 text-xs">
+          <!-- Dynamically populated via ui.js -->
+        </div>
+
+        <button data-close-modal="smsDiagnostics" class="mt-3 w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition-all shrink-0">
+          إغلاق
+        </button>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- SLIDE-UP MODAL 8: HISTORICAL BANK SMS IMPORT   -->
+    <!-- ============================================== -->
+    <div id="modal-sms-historical" class="modal-container fixed inset-0 z-50 flex flex-col justify-end opacity-0 pointer-events-none transition-opacity">
+      <div class="modal-backdrop absolute inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      
+      <div class="modal-sheet relative bg-white rounded-t-3xl p-5 pb-8 shadow-2xl border-t border-slate-100 transform translate-y-full transition-transform max-w-[390px] mx-auto w-full max-h-[90vh] flex flex-col">
+        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3 shrink-0"></div>
+
+        <div class="flex items-center justify-between mb-3 shrink-0">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <i data-lucide="history" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-extrabold text-slate-900">استيراد الرسائل البنكية السابقة</h3>
+              <p class="text-[10px] text-slate-400">فحص آمن لصندوق الرسائل القديم بدفعات صغيرة</p>
+            </div>
+          </div>
+          <button data-close-modal="smsHistorical" class="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div id="sms-historical-content" class="flex-1 overflow-y-auto space-y-3.5 pr-0.5 pb-2 text-xs">
+          <!-- Dynamically populated via ui.js -->
+        </div>
+
+        <button data-close-modal="smsHistorical" class="mt-3 w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition-all shrink-0">
+          إغلاق
+        </button>
+      </div>
+    </div>
+
   </main>
 
   <!-- Application Logic Scripts -->

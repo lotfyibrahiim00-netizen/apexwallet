@@ -67,7 +67,11 @@
         pendingCount: 0,
         totalReceived: 0,
         lastReceivedAt: 0,
-        permissionStatus: 'unavailable'
+        lastBroadcastAt: 0,
+        lastBroadcastSender: '',
+        permissionStatus: 'unavailable',
+        receiveSmsGranted: false,
+        readSmsGranted: false
       };
       this.allowlist = [...DEFAULT_ALLOWLIST];
       this.initialized = false;
@@ -117,7 +121,9 @@
       }
       try {
         const res = await plugin.checkPermission();
-        this.stats.permissionStatus = res.status || (res.granted ? 'granted' : 'prompt');
+        this.stats.receiveSmsGranted = !!(res && (res.receiveSms || res.granted));
+        this.stats.readSmsGranted = !!(res && res.readSms);
+        this.stats.permissionStatus = this.stats.receiveSmsGranted ? 'granted' : (res.status || 'denied');
         return this.stats.permissionStatus;
       } catch (e) {
         this.stats.permissionStatus = 'error';
@@ -132,12 +138,51 @@
       }
       try {
         const res = await plugin.requestPermission();
-        this.stats.permissionStatus = res.status || (res.granted ? 'granted' : 'denied');
+        this.stats.receiveSmsGranted = !!(res && (res.receiveSms || res.granted));
+        this.stats.permissionStatus = this.stats.receiveSmsGranted ? 'granted' : (res.status || 'denied');
         this.notifyChange();
         return res;
       } catch (e) {
         console.error('Error requesting SMS permission:', e);
         return { granted: false, status: 'denied', error: e.message };
+      }
+    }
+
+    async requestReadSmsPermission() {
+      const plugin = getNativePlugin();
+      if (!plugin) {
+        return { granted: false, status: 'unavailable' };
+      }
+      try {
+        const res = await plugin.requestReadSmsPermission();
+        this.stats.readSmsGranted = !!(res && (res.readSms || res.granted));
+        this.notifyChange();
+        return res;
+      } catch (e) {
+        console.error('Error requesting READ_SMS permission:', e);
+        return { granted: false, status: 'denied', error: e.message };
+      }
+    }
+
+    async openAppSettings() {
+      const plugin = getNativePlugin();
+      if (plugin && typeof plugin.openAppSettings === 'function') {
+        try {
+          return await plugin.openAppSettings();
+        } catch (e) {
+          console.warn('Could not open app settings:', e);
+        }
+      }
+    }
+
+    async openBatterySettings() {
+      const plugin = getNativePlugin();
+      if (plugin && typeof plugin.openBatterySettings === 'function') {
+        try {
+          return await plugin.openBatterySettings();
+        } catch (e) {
+          console.warn('Could not open battery settings:', e);
+        }
       }
     }
 
@@ -168,6 +213,8 @@
           this.stats.pendingCount = statsRes.pendingCount || 0;
           this.stats.totalReceived = statsRes.totalReceived || 0;
           this.stats.lastReceivedAt = statsRes.lastReceivedAt || 0;
+          this.stats.lastBroadcastAt = statsRes.lastBroadcastAt || 0;
+          this.stats.lastBroadcastSender = statsRes.lastBroadcastSender || '';
 
           const allowRes = await plugin.getAllowlist();
           if (allowRes && allowRes.allowlist) {
@@ -224,12 +271,14 @@
     }
 
     /**
-     * Enriches candidates with intelligent card matching from user's wallet store.
+     * Enriches candidates with intelligent card matching from user's wallet store,
+     * and performs Level B Potential Duplicate Detection against existing manual/ledger transactions.
      */
     enrichCandidates() {
       if (!window.store) return;
       const allCards = window.store.cards || [];
       const allBanks = window.store.banks || [];
+      const allTransactions = window.store.transactions || [];
 
       for (const c of this.pendingCandidates) {
         // Suggested category
@@ -270,6 +319,96 @@
           c.confidence = 'unknown';
           c.requiresCardSelection = true;
         }
+
+        // --- LEVEL B: Potential Duplicate Check against manual/existing wallet transactions ---
+        c.isPotentialDuplicate = false;
+        c.potentialDuplicateReason = null;
+        c.potentialDuplicateMatch = null;
+
+        const candidateAmount = parseFloat(c.amount);
+        const candidateDateStr = (c.transactionTime ? c.transactionTime.split(' ')[0] : new Date(c.receiptTime || Date.now()).toISOString().split('T')[0]);
+        const candidateTimestamp = new Date(candidateDateStr).getTime();
+
+        for (const tx of allTransactions) {
+          const txAmount = parseFloat(tx.amount);
+          // Check if exact or near-identical amount
+          if (Math.abs(txAmount - candidateAmount) < 0.01) {
+            const txTimestamp = new Date(tx.date).getTime();
+            const diffDays = Math.abs(txTimestamp - candidateTimestamp) / (1000 * 60 * 60 * 24);
+
+            // Within 2-day transaction clearance / post window
+            if (diffDays <= 2) {
+              const txCard = window.store.getCard(tx.cardId);
+              const isCardOrBankRelated = (c.matchedCardId && c.matchedCardId === tx.cardId) ||
+                                         (txCard && c.cardSuffix && txCard.last4 === c.cardSuffix) ||
+                                         (txCard && c.bank && txCard.bankName && txCard.bankName.toLowerCase().includes(c.bank.toLowerCase())) ||
+                                         (!c.cardSuffix);
+
+              if (isCardOrBankRelated) {
+                c.isPotentialDuplicate = true;
+                c.potentialDuplicateMatch = {
+                  id: tx.id,
+                  merchant: tx.merchant,
+                  amount: tx.amount,
+                  date: tx.date,
+                  cardName: txCard ? `${txCard.bankName} •••• ${txCard.last4}` : 'Wallet Card'
+                };
+                c.potentialDuplicateReason = `توجد عملية سابقة بنفس المبلغ (${tx.amount} ${c.currency || 'EGP'}) بتاريخ ${tx.date} (${tx.merchant || 'بدون اسم'}).`;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    /**
+     * Scans past bank SMS in bounded batches (max 20 per batch).
+     * Does NOT silently overflow or drop items.
+     */
+    async queryHistoricalSmsBatch(options = {}) {
+      const days = options.days || 30;
+      const offset = options.offset || 0;
+      const limit = options.limit || 20;
+
+      const plugin = getNativePlugin();
+      if (!plugin) {
+        return { success: false, error: 'Historical import is only available on native Android.' };
+      }
+
+      try {
+        const res = await plugin.queryHistoricalSms({ days, offset, limit });
+        if (res && res.success) {
+          const batch = res.candidates || [];
+          let addedCount = 0;
+          for (const item of batch) {
+            const exists = this.pendingCandidates.some(c => c.fingerprint === item.fingerprint || c.id === item.id);
+            if (!exists) {
+              item.isHistorical = true;
+              this.pendingCandidates.push(item);
+              addedCount++;
+            }
+          }
+          this.enrichCandidates();
+          this.stats.pendingCount = this.pendingCandidates.length;
+          this.notifyChange();
+
+          return {
+            success: true,
+            addedCount,
+            batchCount: batch.length,
+            totalMatched: res.totalMatched,
+            hasMore: res.hasMore,
+            nextOffset: res.nextOffset,
+            rejectedCount: res.rejectedCount,
+            duplicateCount: res.duplicateCount
+          };
+        } else {
+          return { success: false, error: (res && res.error) || 'Failed to query historical SMS' };
+        }
+      } catch (e) {
+        console.error('Error in queryHistoricalSmsBatch:', e);
+        return { success: false, error: e.message };
       }
     }
 

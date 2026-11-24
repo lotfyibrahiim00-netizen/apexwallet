@@ -33,6 +33,8 @@ public class BankSmsQueue {
     private static final String KEY_CUSTOM_ALLOWLIST = "bank_allowlist";
     private static final String KEY_STATS_TOTAL_RECEIVED = "stats_total_received";
     private static final String KEY_STATS_LAST_RECEIVED = "stats_last_received";
+    private static final String KEY_STATS_LAST_BROADCAST = "stats_last_broadcast";
+    private static final String KEY_STATS_LAST_BROADCAST_SENDER = "stats_last_broadcast_sender";
 
     private static final int MAX_QUEUE_SIZE = 50;
     private static final int MAX_PROCESSED_HISTORY = 100;
@@ -50,6 +52,8 @@ public class BankSmsQueue {
     private Set<String> mInMemoryAllowlist = new HashSet<>(BankSmsParser.DEFAULT_BANK_ALLOWLIST);
     private int mInMemoryTotalReceived = 0;
     private long mInMemoryLastReceived = 0L;
+    private long mInMemoryLastBroadcast = 0L;
+    private String mInMemoryLastBroadcastSender = "";
 
     public static synchronized BankSmsQueue getInstance(Context context) {
         if (sInstance == null) {
@@ -232,6 +236,26 @@ public class BankSmsQueue {
     }
 
     /**
+     * Records when the Android OS delivers an SMS broadcast to BankSmsReceiver.
+     * Stores only timestamp and sender tag (raw body is NEVER persisted).
+     */
+    public synchronized void recordBroadcastReceived(long timestamp, String sender) {
+        String cleanSender = sender != null ? sender.trim() : "Unknown";
+        if (cleanSender.length() > 30) {
+            cleanSender = cleanSender.substring(0, 30);
+        }
+        if (mSecurePrefs != null) {
+            mSecurePrefs.edit()
+                    .putLong(KEY_STATS_LAST_BROADCAST, timestamp)
+                    .putString(KEY_STATS_LAST_BROADCAST_SENDER, cleanSender)
+                    .apply();
+        } else {
+            mInMemoryLastBroadcast = timestamp;
+            mInMemoryLastBroadcastSender = cleanSender;
+        }
+    }
+
+    /**
      * Returns stats for diagnostic and UI monitoring.
      */
     public synchronized JSONObject getStats() {
@@ -240,11 +264,15 @@ public class BankSmsQueue {
             int pendingCount = getPendingList().size();
             int total = mSecurePrefs != null ? mSecurePrefs.getInt(KEY_STATS_TOTAL_RECEIVED, 0) : mInMemoryTotalReceived;
             long lastReceived = mSecurePrefs != null ? mSecurePrefs.getLong(KEY_STATS_LAST_RECEIVED, 0L) : mInMemoryLastReceived;
+            long lastBroadcast = mSecurePrefs != null ? mSecurePrefs.getLong(KEY_STATS_LAST_BROADCAST, 0L) : mInMemoryLastBroadcast;
+            String lastBroadcastSender = mSecurePrefs != null ? mSecurePrefs.getString(KEY_STATS_LAST_BROADCAST_SENDER, "") : mInMemoryLastBroadcastSender;
             boolean enabled = isSmsImportEnabled();
 
             stats.put("pendingCount", pendingCount);
             stats.put("totalReceived", total);
             stats.put("lastReceivedAt", lastReceived);
+            stats.put("lastBroadcastAt", lastBroadcast);
+            stats.put("lastBroadcastSender", lastBroadcastSender);
             stats.put("isSmsImportEnabled", enabled);
             stats.put("isKeystoreProtected", mIsKeystoreProtected);
         } catch (JSONException ignored) {}
@@ -286,7 +314,7 @@ public class BankSmsQueue {
         }
     }
 
-    private boolean isDuplicate(String fingerprint) {
+    public synchronized boolean isDuplicate(String fingerprint) {
         if (mSecurePrefs != null) {
             String historyStr = mSecurePrefs.getString(KEY_PROCESSED_FINGERPRINTS, "{}");
             try {

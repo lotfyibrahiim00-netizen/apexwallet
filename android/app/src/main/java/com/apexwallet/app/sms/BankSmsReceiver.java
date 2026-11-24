@@ -41,8 +41,13 @@ public class BankSmsReceiver extends BroadcastReceiver {
         }
 
         BankSmsQueue queue = BankSmsQueue.getInstance(context);
+
+        // Record that a system SMS broadcast successfully reached our manifest receiver
+        queue.recordBroadcastReceived(System.currentTimeMillis(), "System Broadcast");
+
         if (!queue.isSmsImportEnabled()) {
             // User has not explicitly enabled SMS import. Drop immediately.
+            queue.recordBroadcastReceived(System.currentTimeMillis(), "Ignored (Import Disabled)");
             return;
         }
 
@@ -56,6 +61,21 @@ public class BankSmsReceiver extends BroadcastReceiver {
 
         if (messages == null || messages.length == 0) {
             return;
+        }
+
+        // Record first sender name (no body) for diagnostic tracking
+        String firstSender = null;
+        for (SmsMessage m : messages) {
+            if (m != null) {
+                firstSender = m.getDisplayOriginatingAddress();
+                if (firstSender == null || firstSender.trim().isEmpty()) {
+                    firstSender = m.getOriginatingAddress();
+                }
+                if (firstSender != null) break;
+            }
+        }
+        if (firstSender != null) {
+            queue.recordBroadcastReceived(System.currentTimeMillis(), firstSender);
         }
 
         Set<String> allowlist = queue.getBankAllowlist();

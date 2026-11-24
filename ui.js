@@ -31,7 +31,11 @@ function initApp() {
     customizeCard: document.getElementById('modal-customize-card'),
     'customize-card': document.getElementById('modal-customize-card'),
     smsReview: document.getElementById('modal-sms-review'),
-    'sms-review': document.getElementById('modal-sms-review')
+    'sms-review': document.getElementById('modal-sms-review'),
+    smsDiagnostics: document.getElementById('modal-sms-diagnostics'),
+    'sms-diagnostics': document.getElementById('modal-sms-diagnostics'),
+    smsHistorical: document.getElementById('modal-sms-historical'),
+    'sms-historical': document.getElementById('modal-sms-historical')
   };
 
   // --- Toast System ---
@@ -1530,6 +1534,27 @@ function initApp() {
             </button>
           </div>
 
+          <!-- Real-Time Diagnostics & Historical SMS Import Actions -->
+          <div class="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
+            <button onclick="window.openSmsDiagnostics()" class="p-2.5 rounded-2xl bg-indigo-50/70 hover:bg-indigo-100/80 border border-indigo-200/60 text-indigo-900 text-left transition-all active-press flex flex-col gap-1">
+              <div class="flex items-center justify-between">
+                <i data-lucide="activity" class="w-4 h-4 text-indigo-600"></i>
+                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-200/70 text-indigo-800">تشخيص</span>
+              </div>
+              <div class="text-xs font-extrabold">حالة الاستقبال لحظياً</div>
+              <div class="text-[10px] text-slate-500">فحص الصلاحيات وآخر بث</div>
+            </button>
+
+            <button onclick="window.openHistoricalSmsImport()" class="p-2.5 rounded-2xl bg-blue-50/70 hover:bg-blue-100/80 border border-blue-200/60 text-blue-900 text-left transition-all active-press flex flex-col gap-1">
+              <div class="flex items-center justify-between">
+                <i data-lucide="history" class="w-4 h-4 text-blue-600"></i>
+                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-blue-200/70 text-blue-800">استيراد</span>
+              </div>
+              <div class="text-xs font-extrabold">الرسائل القديمة</div>
+              <div class="text-[10px] text-slate-500">فحص آمن على دفعات</div>
+            </button>
+          </div>
+
           <!-- Bank Allowlist Manager -->
           <div class="border-t border-slate-100 pt-3 space-y-2">
             <div class="flex items-center justify-between">
@@ -1848,12 +1873,26 @@ function initApp() {
             <div class="flex items-center gap-1.5">
               <span class="text-[11px] font-black tracking-tight text-slate-900 bg-white px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">${c.bank}</span>
               ${typeBadge}
+              ${c.isHistorical ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800">استيراد قديم</span>' : ''}
               ${c.cardSuffix ? `<span class="text-[10px] font-mono text-slate-500 font-bold">•••• ${c.cardSuffix}</span>` : '<span class="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">Select Card</span>'}
             </div>
             <span class="text-xs font-black font-mono ${isCredit ? 'text-emerald-600' : 'text-slate-900'}">
               ${isCredit ? '+' : '-'}${c.amount.toFixed(2)} ${c.currency}
             </span>
           </div>
+
+          ${c.isPotentialDuplicate ? `
+            <div class="bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-xs text-amber-900 space-y-1">
+              <div class="flex items-center gap-1.5 font-bold text-amber-900">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600"></i>
+                <span>⚠️ تكرار محتمل (Possible Duplicate)</span>
+              </div>
+              <p class="text-[10px] text-amber-800 leading-tight">${c.potentialDuplicateReason || 'توجد عملية سابقة مسجلة بنفس المبلغ في المحفظة.'}</p>
+              <div class="text-[9px] text-amber-700 bg-amber-100/60 p-1 rounded font-mono">
+                المسجل سابقاً: ${c.potentialDuplicateMatch ? `${c.potentialDuplicateMatch.amount} EGP بتاريخ ${c.potentialDuplicateMatch.date} (${c.potentialDuplicateMatch.merchant})` : 'عملية بنفس القيمة'}
+              </div>
+            </div>
+          ` : ''}
 
           <div class="space-y-1.5">
             <div>
@@ -2041,6 +2080,246 @@ function initApp() {
       showToast(`Message safely rejected: ${res.reason || 'Not a valid transaction'}`, 'info');
     }
     renderCurrentView();
+  };
+
+  // ==========================================
+  // SMS DIAGNOSTICS & LIVE STATUS CONTROLLER
+  // ==========================================
+  window.openSmsDiagnostics = async () => {
+    openModal('smsDiagnostics');
+    if (window.BankSmsEngine) {
+      await window.BankSmsEngine.refreshPermissionStatus();
+      await window.BankSmsEngine.refreshSettings();
+    }
+    renderSmsDiagnosticsContent();
+  };
+
+  window.refreshDiagnostics = async () => {
+    if (window.BankSmsEngine) {
+      await window.BankSmsEngine.refreshPermissionStatus();
+      await window.BankSmsEngine.refreshSettings();
+      await window.BankSmsEngine.fetchPendingTransactions();
+    }
+    renderSmsDiagnosticsContent();
+    showToast('تم تحديث بيانات التشخيص', 'info');
+  };
+
+  window.requestSmsReceivePermission = async () => {
+    if (!window.BankSmsEngine) return;
+    const res = await window.BankSmsEngine.requestPermission();
+    if (res.granted) {
+      showToast('تم منح صلاحية RECEIVE_SMS بنجاح!', 'success');
+    } else {
+      showToast('تم رفض الصلاحية أو تم تقييدها في أندرويد', 'error');
+    }
+    await window.BankSmsEngine.refreshPermissionStatus();
+    renderSmsDiagnosticsContent();
+    renderCurrentView();
+  };
+
+  window.openAppSystemSettings = async () => {
+    if (window.BankSmsEngine && window.BankSmsEngine.openAppSettings) {
+      await window.BankSmsEngine.openAppSettings();
+    } else {
+      showToast('افتح إعدادات الهاتف -> التطبيقات -> ApexWallet', 'info');
+    }
+  };
+
+  window.openBatteryOptimizationSettings = async () => {
+    if (window.BankSmsEngine && window.BankSmsEngine.openBatterySettings) {
+      await window.BankSmsEngine.openBatterySettings();
+    } else {
+      showToast('افتح إعدادات البطارية واختر "بدون قيود"', 'info');
+    }
+  };
+
+  async function renderSmsDiagnosticsContent() {
+    const container = document.getElementById('sms-diagnostics-content');
+    if (!container) return;
+
+    const stats = (window.BankSmsEngine && window.BankSmsEngine.stats) || {};
+    const receiveGranted = stats.receiveSmsGranted || false;
+    const readGranted = stats.readSmsGranted || false;
+    const isEnabled = stats.isSmsImportEnabled || false;
+    const lastBroadcast = stats.lastBroadcastAt ? new Date(stats.lastBroadcastAt).toLocaleTimeString() + ' (' + new Date(stats.lastBroadcastAt).toLocaleDateString() + ')' : 'لم يصل أي بث من أندرويد حتى الآن';
+    const lastSender = stats.lastBroadcastSender || '';
+    const queueCount = (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates.length) || 0;
+
+    container.innerHTML = `
+      <div class="space-y-3">
+        <!-- Status Card 1: Permissions -->
+        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="font-extrabold text-slate-800 flex items-center gap-1.5 text-xs">
+              <i data-lucide="shield" class="w-3.5 h-3.5 text-indigo-600"></i>
+              صلاحية الاستقبال (RECEIVE_SMS)
+            </span>
+            ${receiveGranted
+              ? '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">ممنوحة بنجاح ✅</span>'
+              : '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold">مرفوضة / مقيدة ❌</span>'}
+          </div>
+
+          <div class="flex items-center justify-between pt-1 border-t border-slate-200/60">
+            <span class="font-extrabold text-slate-800 flex items-center gap-1.5 text-xs">
+              <i data-lucide="book-open" class="w-3.5 h-3.5 text-blue-600"></i>
+              صلاحية الرسائل القديمة (READ_SMS)
+            </span>
+            ${readGranted
+              ? '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">ممنوحة ✅</span>'
+              : '<span class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold">غير مفعلة ⏸️</span>'}
+          </div>
+
+          ${!receiveGranted ? `
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-[11px] text-amber-900 space-y-1.5">
+              <p class="font-bold">⚠️ تنبيه الصلاحيات المقيدة في أندرويد الحديث:</p>
+              <p class="text-[10px] leading-relaxed">إذا كان زر تفعيل الصلاحية رمادياً وظهر تنبيه "Restricted setting / تم تقييد هذا الإعداد"، اضغط على "إعدادات التطبيق" ثم اضغط الثلاث نقاط أعلى اليمين واختر <b>"السماح بالإعدادات المقيدة" (Allow restricted settings)</b>.</p>
+              <div class="flex gap-2 pt-1">
+                <button type="button" onclick="window.requestSmsReceivePermission()" class="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[10px] active-press">طلب الصلاحية مجدداً</button>
+                <button type="button" onclick="window.openAppSystemSettings()" class="py-1.5 px-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold text-[10px] active-press">إعدادات التطبيق</button>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Status Card 2: Engine & Receiver Real-time State -->
+        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-600 font-bold">مفتاح استيراد SMS:</span>
+            <span class="font-bold ${isEnabled ? 'text-emerald-600' : 'text-slate-400'}">${isEnabled ? 'مفعل 🟢' : 'متوقف ⚪'}</span>
+          </div>
+
+          <div class="flex items-center justify-between border-t border-slate-100 pt-1.5">
+            <span class="text-slate-600 font-bold">تشفير الخزنة (Keystore):</span>
+            <span class="font-bold text-slate-800">${stats.isKeystoreProtected ? 'Hardware AES-256 🔒' : 'ذاكرة آمنة 🛡️'}</span>
+          </div>
+
+          <div class="flex items-center justify-between border-t border-slate-100 pt-1.5">
+            <span class="text-slate-600 font-bold">الرسائل في الانتظار:</span>
+            <span class="font-bold text-indigo-700 font-mono">${queueCount} من 50 عنصر</span>
+          </div>
+
+          <div class="border-t border-slate-100 pt-1.5 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-600 font-bold">آخر بث (Broadcast) وصل للتطبيق:</span>
+              <span class="font-bold text-[10px] text-slate-800 font-mono">${lastBroadcast}</span>
+            </div>
+            ${lastSender ? `<div class="text-[10px] text-slate-500 text-right">المصدر: <b class="text-slate-700">${lastSender}</b></div>` : ''}
+          </div>
+        </div>
+
+        <!-- Battery Manager Warning Note -->
+        <div class="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-3 space-y-1.5">
+          <div class="flex items-center gap-1.5 font-bold text-blue-900 text-[11px]">
+            <i data-lucide="battery-charging" class="w-3.5 h-3.5 text-blue-600"></i>
+            <span>إدارة البطارية في الخلفية (Background Receiver)</span>
+          </div>
+          <p class="text-[10px] text-blue-800 leading-relaxed">
+            لضمان استلام رسائل البنوك فوراً والشاشة مقفلة أو التطبيق مغلق، تأكد من ضبط إعدادات البطارية للتطبيق على <b>"بدون قيود" (Unrestricted)</b>.
+          </p>
+          <button type="button" onclick="window.openBatteryOptimizationSettings()" class="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-[10px] active-press transition-all">
+            فتح إعدادات توفير البطارية
+          </button>
+        </div>
+
+        <!-- Quick Actions in Diagnostics -->
+        <div class="pt-1 flex gap-2">
+          <button type="button" onclick="window.openHistoricalSmsImport()" class="flex-1 py-2 bg-slate-900 hover:bg-black text-white rounded-xl font-bold text-[11px] flex items-center justify-center gap-1.5 active-press">
+            <i data-lucide="history" class="w-3.5 h-3.5"></i>
+            <span>استيراد الرسائل القديمة</span>
+          </button>
+          <button type="button" onclick="window.refreshDiagnostics()" class="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-[11px] active-press">
+            تحديث الحالة
+          </button>
+        </div>
+      </div>
+    `;
+
+    if (window.lucide) {
+      try { lucide.createIcons({ root: container }); } catch (e) {}
+    }
+  }
+
+  // ==========================================
+  // HISTORICAL BANK SMS IMPORT CONTROLLER
+  // ==========================================
+  let historicalState = {
+    days: 30,
+    offset: 0,
+    isScanning: false,
+    scanResult: null
+  };
+
+  window.openHistoricalSmsImport = async () => {
+    openModal('smsHistorical');
+    if (window.BankSmsEngine) {
+      await window.BankSmsEngine.refreshPermissionStatus();
+    }
+    renderSmsHistoricalContent(historicalState);
+  };
+
+  window.selectHistoricalDays = (days) => {
+    historicalState.days = days;
+    historicalState.offset = 0;
+    historicalState.scanResult = null;
+    renderSmsHistoricalContent(historicalState);
+  };
+
+  window.requestReadSmsAndStart = async () => {
+    if (!window.BankSmsEngine) return;
+    const res = await window.BankSmsEngine.requestReadSmsPermission();
+    if (res.granted) {
+      showToast('تم منح صلاحية قراءة الرسائل بنجاح!', 'success');
+      historicalState.offset = 0;
+      historicalState.scanResult = null;
+      renderSmsHistoricalContent(historicalState);
+    } else {
+      showToast('تم رفض الصلاحية أو تقييدها في إعدادات أندرويد', 'error');
+    }
+  };
+
+  window.startHistoricalScan = async () => {
+    if (!window.BankSmsEngine || historicalState.isScanning) return;
+    historicalState.isScanning = true;
+    historicalState.offset = 0;
+    renderSmsHistoricalContent(historicalState);
+
+    const res = await window.BankSmsEngine.queryHistoricalSmsBatch({
+      days: historicalState.days,
+      offset: 0,
+      limit: 20
+    });
+
+    historicalState.isScanning = false;
+    if (res.success) {
+      historicalState.scanResult = res;
+      historicalState.offset = res.nextOffset;
+      showToast(`تم فحص الدفعة: عُثر على ${res.addedCount} عملية جديدة!`, 'success');
+    } else {
+      showToast(res.error || 'فشل فحص الرسائل القديمة', 'error');
+    }
+    renderSmsHistoricalContent(historicalState);
+  };
+
+  window.fetchNextHistoricalBatch = async () => {
+    if (!window.BankSmsEngine || historicalState.isScanning) return;
+    historicalState.isScanning = true;
+    renderSmsHistoricalContent(historicalState);
+
+    const res = await window.BankSmsEngine.queryHistoricalSmsBatch({
+      days: historicalState.days,
+      offset: historicalState.offset,
+      limit: 20
+    });
+
+    historicalState.isScanning = false;
+    if (res.success) {
+      historicalState.scanResult = res;
+      historicalState.offset = res.nextOffset;
+      showToast(`تم جلب دفعة جديدة: ${res.addedCount} عملية!`, 'success');
+    } else {
+      showToast(res.error || 'فشل فحص الدفعة التالية', 'error');
+    }
+    renderSmsHistoricalContent(historicalState);
   };
 
   // --- Vault Backup & Restore Migration ---

@@ -36,7 +36,7 @@
 
         <!-- Manifest-declared BroadcastReceiver for bank SMS -->
         <receiver
-            android:name=".sms.BankSmsReceiver"
+            android:name="com.apexwallet.app.sms.BankSmsReceiver"
             android:permission="android.permission.BROADCAST_SMS"
             android:exported="true">
             <intent-filter android:priority="999">
@@ -49,4 +49,5 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
 </manifest>
