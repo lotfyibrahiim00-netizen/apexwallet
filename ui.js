@@ -281,6 +281,21 @@ const I18N = {
     toast_bio_failed: 'تعذر تفعيل البصمة',
     toast_bio_enabled: 'تم تفعيل الفتح بالبصمة',
     toast_bio_disabled: 'تم إيقاف الفتح بالبصمة',
+    toast_bio_wrong_pin: 'رمز PIN الحالي غير صحيح',
+    toast_bio_cancelled: 'تم إلغاء تفعيل البصمة',
+    toast_bio_unsupported: 'البصمة غير مدعومة على هذا الجهاز أو المتصفح',
+    pin_bio_verify_title: 'تأكيد رمز PIN',
+    pin_bio_verify_sub: 'أدخل رمز PIN الحالي لتفعيل الفتح بالبصمة',
+    wallet_banks: 'بنوك المحفظة',
+    details: 'التفاصيل',
+    hide: 'إخفاء',
+    warn_bank_not_added: 'البنك غير مضاف',
+    warn_no_account_digits: 'لا يوجد حساب مطابق',
+    warn_no_card_or_acc: 'لا يوجد كارت مطابق',
+    warn_no_linked_debit: 'حساب غير مرتبط بكارت',
+    warn_multiple_matches: 'أكثر من تطابق محتمل',
+    warn_missing_digits: 'بدون أرقام تعريفية',
+    warn_select_card: 'اختر الكارت أو الحساب',
     toast_autolock_updated: 'تم تحديث مؤقت القفل التلقائي',
     confirm_delete_bank: 'هل تريد حذف بنك {name}؟ سيتم حذف الكروت والحركات المرتبطة به أيضاً.',
     toast_bank_deleted: 'تم حذف بنك {name}',
@@ -671,6 +686,21 @@ const I18N = {
     toast_cycle_new_set: 'Set new budget {amount} for cycle ({cycle})',
     toast_theme_applied: 'Applied {name} theme',
     toast_custom_color_applied: 'Custom color applied',
+    toast_bio_wrong_pin: 'Incorrect current PIN',
+    toast_bio_cancelled: 'Biometric setup cancelled',
+    toast_bio_unsupported: 'Biometrics not supported on this device/browser',
+    pin_bio_verify_title: 'Confirm Security PIN',
+    pin_bio_verify_sub: 'Enter your current PIN to enable biometric unlock',
+    wallet_banks: 'Wallet Banks',
+    details: 'Details',
+    hide: 'Hide',
+    warn_bank_not_added: 'Bank not added',
+    warn_no_account_digits: 'No matching account',
+    warn_no_card_or_acc: 'No matching card',
+    warn_no_linked_debit: 'No linked debit card',
+    warn_multiple_matches: 'Multiple matches',
+    warn_missing_digits: 'No card digits',
+    warn_select_card: 'Select card/account',
     pin_setup_title: 'Create Security PIN',
     pin_setup_sub: 'Choose a 4-digit PIN to encrypt your wallet',
     pin_confirm_title: 'Confirm Security PIN',
@@ -885,6 +915,39 @@ function initApp() {
   let editingCardId = null;
   let previousTab = 'dashboard';
   const expandedSmsEditIds = new Set();
+  const expandedSmsWarnIds = new Set();
+
+  function escapeHtmlText(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function formatWalletBanksCount(count) {
+    const n = Number(count) || 0;
+    if (getLang() === 'ar') {
+      if (n === 0) return '0 بنوك مضافة';
+      if (n === 1) return 'بنك واحد مضاف';
+      if (n === 2) return 'بنكان مضافان';
+      if (n <= 10) return `${n} بنوك مضافة`;
+      return `${n} بنكاً مضافاً`;
+    }
+    if (n === 1) return '1 bank';
+    return `${n} banks`;
+  }
+
+  function getCalmNonMatchTitle(c) {
+    const reason = (c && c.nonMatchReason) ? String(c.nonMatchReason) : '';
+    if (reason.includes('غير مسجل في محفظتك')) return t('warn_bank_not_added');
+    if (reason.includes('لا يوجد حساب بنكي')) return t('warn_no_account_digits');
+    if (reason.includes('لا يوجد كارت أو حساب')) return t('warn_no_card_or_acc');
+    if (reason.includes('لا يوجد كارت خصم مرتبط')) return t('warn_no_linked_debit');
+    if (reason.includes('أكثر من تطابق')) return t('warn_multiple_matches');
+    if (reason.includes('لا تحتوي على أرقام')) return t('warn_missing_digits');
+    return t('warn_select_card');
+  }
 
   window.__onLanguageChanged = () => {
     if (typeof updateHeaderTitle === 'function') updateHeaderTitle(store.activeTab);
@@ -2833,7 +2896,7 @@ function initApp() {
             <div class="flex items-center justify-between p-4 gap-3">
               <div>
                 <div class="text-[15px] font-bold text-[#F3F1EC]">${t('biometric_unlock')}</div>
-                <div class="text-xs text-[#C8CAD0] mt-0.5">
+                <div id="settings-biometric-status" class="text-xs text-[#C8CAD0] mt-0.5">
                   ${isBioSupported ? (isBioEnabled ? t('enabled') : t('not_enabled')) : (getLang() === 'ar' ? 'غير مدعوم في هذا المتصفح' : 'Not supported')}
                 </div>
               </div>
@@ -2885,11 +2948,11 @@ function initApp() {
               </label>
             </div>
 
-            <!-- Row: Allowed Banks -->
-            <div onclick="window.toggleDevSimulator()" class="flex items-center justify-between p-4 min-h-[52px] cursor-pointer hover:bg-[#2A2B31]/60 transition-colors active-press">
-              <span class="text-[15px] font-bold text-[#F3F1EC]">${t('allowed_banks')}</span>
+            <!-- Row: Wallet Banks (Actual registered banks in wallet, disconnected from Dev Simulator) -->
+            <div onclick="window.switchTab('cards')" class="flex items-center justify-between p-4 min-h-[52px] cursor-pointer hover:bg-[#2A2B31]/60 transition-colors active-press">
+              <span class="text-[15px] font-bold text-[#F3F1EC]">${t('wallet_banks')}</span>
               <div class="flex items-center gap-2">
-                <span class="text-xs text-[#C8CAD0] font-mono">CIB +${Math.max(store.banks.length - 1, 0)}</span>
+                <span class="text-xs text-[#C8CAD0]">${formatWalletBanksCount(store.banks.length)}</span>
                 <span class="text-[#C8CAD0] text-sm">&rsaquo;</span>
               </div>
             </div>
@@ -3033,22 +3096,23 @@ function initApp() {
       </div>
     `;
 
-    // Biometric Toggle Handler
+    // Biometric Toggle Handler (Requires current PIN verification + strict result.success === true)
     const bioToggle = document.getElementById('settings-biometric-toggle');
+    const bioStatusEl = document.getElementById('settings-biometric-status');
     if (bioToggle && isBioSupported) {
       bioToggle.addEventListener('change', async (e) => {
-        if (!window.WalletSecurity) return;
+        if (!window.WalletSecurity) {
+          e.target.checked = false;
+          return;
+        }
         const enabled = e.target.checked;
         if (enabled) {
-          const ok = await window.WalletSecurity.enableBiometrics();
-          if (!ok) {
-            e.target.checked = false;
-            showToast(t('toast_bio_failed'), 'error');
-          } else {
-            showToast(t('toast_bio_enabled'), 'success');
-          }
+          // Keep toggle visually OFF until PIN + biometric enrollment truly succeed
+          e.target.checked = false;
+          showPinLock('verify_biometric');
         } else {
-          window.WalletSecurity.disableBiometrics();
+          await window.WalletSecurity.disableBiometrics();
+          if (bioStatusEl) bioStatusEl.textContent = t('not_enabled');
           showToast(t('toast_bio_disabled'), 'info');
         }
       });
@@ -3167,6 +3231,18 @@ function initApp() {
     if (el) el.classList.toggle('hidden');
   };
 
+  window.toggleCandidateWarningDetails = (candidateId) => {
+    if (expandedSmsWarnIds.has(candidateId)) expandedSmsWarnIds.delete(candidateId);
+    else expandedSmsWarnIds.add(candidateId);
+    const isExpanded = expandedSmsWarnIds.has(candidateId);
+    const box = document.getElementById(`candidate-warn-details-${candidateId}`);
+    const labelEl = document.getElementById(`candidate-warn-btn-label-${candidateId}`);
+    const chevEl = document.getElementById(`candidate-warn-btn-chev-${candidateId}`);
+    if (box) box.classList.toggle('hidden', !isExpanded);
+    if (labelEl) labelEl.textContent = isExpanded ? t('hide') : t('details');
+    if (chevEl) chevEl.style.transform = isExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+  };
+
   function buildCandidateSummarySentence(c) {
     const isInc = c.type === 'income' || c.direction === 'income';
     const amtStr = `<span class="font-mono font-bold text-[#F3F1EC]" dir="ltr">${formatCurrency(c.amount, c.currency || currentCurrency)}</span>`;
@@ -3225,33 +3301,35 @@ function initApp() {
       const isCredit = c.type === 'income' || c.direction === 'income';
       const needsCardSelection = c.requiresCardSelection || !c.matchedCardId;
       const isExtraOpen = expandedSmsEditIds.has(c.id);
-      const summaryHtml = buildCandidateSummarySentence(c);
+      const isWarnOpen = expandedSmsWarnIds.has(c.id);
+      const messageBodyHtml = c.rawMessage ? escapeHtmlText(c.rawMessage) : buildCandidateSummarySentence(c);
+      const calmWarnTitle = getCalmNonMatchTitle(c);
 
       return `
-        <div id="candidate-card-${c.id}" class="bg-[#25262B] border ${needsCardSelection ? 'border-[#F5B700]/70' : 'border-[#33353C]'} rounded-2xl p-4 space-y-3 transition-all shadow-md card-press">
+        <div id="candidate-card-${c.id}" class="bg-[#25262B] border border-[#33353C] rounded-2xl p-4 space-y-3 transition-all shadow-md card-press">
           <!-- Row 1: Bank + Card/Tags & Amount LTR -->
           <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-2 flex-wrap min-w-0">
               <span class="text-[15px] font-black tracking-tight text-[#F3F1EC]" dir="ltr">${c.bank}</span>
-              ${c.isHistorical ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#2A2B31] text-[#C8CAD0] border border-[#43464F]">${t('historical_badge')}</span>` : ''}
-              ${c.cardSuffix ? `<span class="text-xs font-mono text-[#C8CAD0]" dir="ltr">•••• ${c.cardSuffix}</span>` : `<span class="text-[11px] font-bold text-[#F5B700] bg-[#2A2B31] border border-[#F5B700]/30 px-2 py-0.5 rounded-full">${t('choose_card_badge')}</span>`}
+              ${c.cardSuffix ? `<span class="text-[13px] font-mono text-[#C8CAD0]" dir="ltr">•••• ${c.cardSuffix}</span>` : ''}
+              ${c.isHistorical ? `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#2A2B31] text-[#C8CAD0] border border-[#43464F]">${t('historical_badge')}</span>` : ''}
             </div>
             <div class="shrink-0">
               ${formatAmountInlineHtml(c.amount, {
                 useSans: true,
                 prefixSign: isCredit ? '+' : '-',
                 currency: c.currency || currentCurrency,
-                numClass: `text-[16px] font-extrabold ${isCredit ? 'text-[#F5B700]' : 'text-[#F3F1EC]'}`,
-                currClass: 'text-[11px] text-[#C8CAD0] font-semibold'
+                numClass: `text-[17px] font-extrabold ${isCredit ? 'text-[#F5B700]' : 'text-[#F3F1EC]'}`,
+                currClass: 'text-[11.5px] text-[#C8CAD0] font-semibold'
               })}
             </div>
           </div>
 
-          <!-- Row 2: Localized One-Line Summary + Edit Toggle -->
-          <div class="flex items-start justify-between gap-2">
-            <p class="text-[13px] text-[#C8CAD0] leading-snug flex-1">${summaryHtml}</p>
-            <button type="button" onclick="window.toggleCandidateEditDetails('${c.id}')" class="w-9 h-9 rounded-xl bg-[#2A2B31] hover:bg-[#43464F] border border-[#43464F] text-[#C8CAD0] hover:text-[#F5B700] shrink-0 flex items-center justify-center transition-colors active-press" title="${t('edit_details')}">
-              <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+          <!-- Row 2: Original SMS Text (Hero Readability 16.5px) + Edit Toggle -->
+          <div class="flex items-start justify-between gap-2.5">
+            <p class="text-[16.5px] font-normal text-[#F3F1EC] leading-relaxed flex-1 min-w-0" dir="auto">${messageBodyHtml}</p>
+            <button type="button" onclick="window.toggleCandidateEditDetails('${c.id}')" class="w-11 h-11 rounded-xl bg-transparent hover:bg-[#2A2B31] border border-transparent hover:border-[#43464F] text-[#C8CAD0] hover:text-[#F5B700] shrink-0 flex items-center justify-center transition-colors active-press" title="${t('edit_details')}">
+              <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
             </button>
           </div>
 
@@ -3282,56 +3360,65 @@ function initApp() {
           </div>
 
           ${needsCardSelection ? `
-            <div class="bg-[#2A2B31] border border-[#F5B700]/40 rounded-xl p-2.5 space-y-1.5 text-xs text-[#F5B700]">
-              <div class="flex items-start gap-1.5 font-bold">
-                <i data-lucide="help-circle" class="w-4 h-4 text-[#F5B700] shrink-0 mt-0.5"></i>
-                <span>${t('non_match_prefix')} ${c.nonMatchReason || t('non_match_default')}</span>
-              </div>
-              ${c.matchSuggestion ? `
-                <div class="text-xs text-[#F3F1EC] flex items-center justify-between gap-2 pt-1.5 border-t border-[#43464F]">
-                  <span>${c.matchSuggestion}</span>
-                  ${c.suggestAddAccount ? `
-                    <button type="button" onclick="window.openAddAccountPrompt('${c.suggestAddAccount.bankId || ''}', '${c.suggestAddAccount.digits || ''}', '${c.suggestAddAccount.position || 'last'}')" class="shrink-0 px-3 py-1.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] rounded-lg text-xs font-bold active-press">
-                      ${t('add_account_btn')}
-                    </button>
-                  ` : ''}
+            <div class="bg-[#1E2025] border border-[#33353C] rounded-xl px-3.5 py-2 text-xs">
+              <div class="flex items-center justify-between gap-2 min-h-[36px]">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-2 h-2 rounded-full bg-[#F5B700] shrink-0"></span>
+                  <span class="text-[13px] font-bold text-[#F5B700] truncate">${calmWarnTitle}</span>
                 </div>
-              ` : ''}
+                <button type="button" onclick="window.toggleCandidateWarningDetails('${c.id}')" class="min-h-[36px] px-2 inline-flex items-center gap-1 text-xs font-bold text-[#C8CAD0] hover:text-[#F3F1EC] shrink-0 active-press">
+                  <span id="candidate-warn-btn-label-${c.id}">${isWarnOpen ? t('hide') : t('details')}</span>
+                  <i id="candidate-warn-btn-chev-${c.id}" data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform" style="transform: ${isWarnOpen ? 'rotate(180deg)' : 'rotate(0deg)'}"></i>
+                </button>
+              </div>
+              <div id="candidate-warn-details-${c.id}" class="${isWarnOpen ? '' : 'hidden'} pt-2 mt-1.5 border-t border-[#33353C] space-y-2 text-[13px] text-[#C8CAD0] leading-relaxed">
+                <p>${c.nonMatchReason || t('non_match_default')}</p>
+                ${c.matchSuggestion ? `
+                  <div class="text-[#C8CAD0] flex items-center justify-between gap-2 pt-1.5 border-t border-[#33353C]/70">
+                    <span>${c.matchSuggestion}</span>
+                    ${c.suggestAddAccount ? `
+                      <button type="button" onclick="window.openAddAccountPrompt('${c.suggestAddAccount.bankId || ''}', '${c.suggestAddAccount.digits || ''}', '${c.suggestAddAccount.position || 'last'}')" class="shrink-0 px-3 py-2 min-h-[44px] bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] rounded-xl text-xs font-bold active-press">
+                        ${t('add_account_btn')}
+                      </button>
+                    ` : ''}
+                  </div>
+                ` : ''}
+              </div>
             </div>
           ` : ''}
 
           ${c.isPotentialDuplicate ? `
-            <div class="bg-[#2A2B31] border border-[#F5B700]/40 rounded-xl p-2.5 text-xs text-[#F5B700] space-y-1">
-              <div class="flex items-center gap-1.5 font-bold">
-                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+            <div class="bg-[#1E2025] border border-[#33353C] rounded-xl p-3 text-xs text-[#F5B700] space-y-1.5">
+              <div class="flex items-center gap-2 font-bold">
+                <span class="w-2 h-2 rounded-full bg-[#F5B700] shrink-0"></span>
                 <span>${t('dup_title')}</span>
               </div>
-              <p class="text-xs text-[#F3F1EC] leading-snug">${c.potentialDuplicateReason || t('dup_default')}</p>
-              <div class="text-xs text-[#C8CAD0] bg-[#25262B] p-1.5 rounded font-mono border border-[#43464F]">
+              <p class="text-[13px] text-[#C8CAD0] leading-snug">${c.potentialDuplicateReason || t('dup_default')}</p>
+              <div class="text-xs text-[#C8CAD0] bg-[#1A1B1F] p-2 rounded-lg font-mono border border-[#33353C]">
                 ${t('dup_prev_label')} ${c.potentialDuplicateMatch ? `${c.potentialDuplicateMatch.amount} • ${c.potentialDuplicateMatch.date} (${c.potentialDuplicateMatch.merchant})` : t('dup_prev_fallback')}
               </div>
             </div>
           ` : ''}
 
-          <!-- Row 3: Operation Type Capsule Pills (Purchase / Cash Withdrawal / Transfer) -->
-          <div class="flex items-center gap-2 flex-wrap">
+          <!-- Row 3: Segmented Operation Type Control (Purchase / Cash Withdrawal / Transfer) -->
+          <div class="grid grid-cols-3 bg-[#1A1B1F] border border-[#33353C] rounded-2xl p-1 gap-1">
             <label class="cursor-pointer">
               <input type="radio" name="candidate-type-${c.id}" value="purchase" class="hidden peer" ${c.transactionType === 'purchase' || !c.transactionType ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
-              <span class="inline-flex items-center justify-center px-3.5 py-1.5 min-h-[36px] rounded-full text-xs font-bold border border-[#43464F] bg-[#1A1B1F] text-[#C8CAD0] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] transition-all">${t('purchase')}</span>
+              <span class="flex items-center justify-center min-h-[44px] px-1 rounded-xl text-[12px] font-bold text-[#C8CAD0] border border-transparent peer-checked:bg-[#2A2B31] peer-checked:border-[#43464F] peer-checked:text-[#F3F1EC] peer-checked:shadow-xs transition-all whitespace-nowrap">${t('purchase')}</span>
             </label>
             <label class="cursor-pointer">
               <input type="radio" name="candidate-type-${c.id}" value="withdrawal" class="hidden peer" ${c.transactionType === 'withdrawal' ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
-              <span class="inline-flex items-center justify-center px-3.5 py-1.5 min-h-[36px] rounded-full text-xs font-bold border border-[#43464F] bg-[#1A1B1F] text-[#C8CAD0] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] transition-all">${t('withdrawal')}</span>
+              <span class="flex items-center justify-center min-h-[44px] px-1 rounded-xl text-[12px] font-bold text-[#C8CAD0] border border-transparent peer-checked:bg-[#2A2B31] peer-checked:border-[#43464F] peer-checked:text-[#F3F1EC] peer-checked:shadow-xs transition-all whitespace-nowrap">${t('withdrawal')}</span>
             </label>
             <label class="cursor-pointer">
               <input type="radio" name="candidate-type-${c.id}" value="transfer" class="hidden peer" ${c.transactionType === 'transfer' ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
-              <span class="inline-flex items-center justify-center px-3.5 py-1.5 min-h-[36px] rounded-full text-xs font-bold border border-[#43464F] bg-[#1A1B1F] text-[#C8CAD0] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] transition-all">${t('transfer')}</span>
+              <span class="flex items-center justify-center min-h-[44px] px-1 rounded-xl text-[12px] font-bold text-[#C8CAD0] border border-transparent peer-checked:bg-[#2A2B31] peer-checked:border-[#43464F] peer-checked:text-[#F3F1EC] peer-checked:shadow-xs transition-all whitespace-nowrap">${t('transfer')}</span>
             </label>
           </div>
 
-          <!-- Row 4: Compact Card / Account Selector -->
+          <!-- Row 4: Neutral Card / Account Selector -->
           <div>
-            <select id="candidate-card-select-${c.id}" onchange="window.onCandidateTypeChanged('${c.id}')" class="w-full text-[13px] font-bold text-[#F3F1EC] bg-[#2A2B31] border ${needsCardSelection ? 'border-[#F5B700]' : 'border-[#43464F]'} rounded-xl px-3 py-2.5 min-h-[44px] outline-none cursor-pointer">
+            <select id="candidate-card-select-${c.id}" onchange="window.onCandidateTypeChanged('${c.id}')" class="w-full text-[13.5px] font-bold text-[#F3F1EC] bg-[#1A1B1F] border border-[#33353C] focus:border-[#43464F] rounded-xl px-3.5 py-2.5 min-h-[44px] outline-none cursor-pointer">
               <option value="" ${!c.matchedCardId && !c.matchedAccountId ? 'selected disabled' : ''}>${t('select_card_or_account')}</option>
               <optgroup label="${t('cards_optgroup')}">
                 ${cards.map(card => {
@@ -4302,14 +4389,17 @@ function initApp() {
     } else if (pinFlow === 'change_old') {
       if (pinTitle) pinTitle.textContent = t('pin_change_old_title');
       if (pinSubtitle) pinSubtitle.textContent = t('pin_change_old_sub');
+    } else if (pinFlow === 'verify_biometric') {
+      if (pinTitle) pinTitle.textContent = t('pin_bio_verify_title');
+      if (pinSubtitle) pinSubtitle.textContent = t('pin_bio_verify_sub');
     } else {
       if (pinTitle) pinTitle.textContent = t('pin_unlock_title');
       if (pinSubtitle) pinSubtitle.textContent = t('pin_unlock_sub');
     }
 
-    // Toggle Cancel button for Change PIN flow
+    // Toggle Cancel button for Change PIN & Verify Biometric flows
     if (pinCancelBtn) {
-      if (pinFlow.startsWith('change_')) {
+      if (pinFlow.startsWith('change_') || pinFlow === 'verify_biometric') {
         pinCancelBtn.classList.remove('hidden');
       } else {
         pinCancelBtn.classList.add('hidden');
@@ -4323,7 +4413,9 @@ function initApp() {
     if (window.WalletSecurity) {
       const isBioEnabled = window.WalletSecurity.isBiometricsEnabled();
       if (pinBiometricBtn) {
-        if (isBioEnabled) {
+        if (pinFlow === 'verify_biometric' || pinFlow.startsWith('change_')) {
+          pinBiometricBtn.style.visibility = 'hidden';
+        } else if (isBioEnabled) {
           pinBiometricBtn.classList.add('bg-emerald-50', 'text-emerald-600', 'border', 'border-emerald-200');
           pinBiometricBtn.style.visibility = 'visible';
           if (pinFlow === 'unlock') {
@@ -4407,6 +4499,43 @@ function initApp() {
             }, 250);
           } else {
             triggerPinError(t('pin_err_wrong'));
+          }
+          return;
+        }
+
+        if (pinFlow === 'verify_biometric') {
+          const res = await window.WalletSecurity.enableBiometrics(currentInput);
+          const bioToggleEl = document.getElementById('settings-biometric-toggle');
+          const bioStatusEl = document.getElementById('settings-biometric-status');
+
+          if (res && res.success === true) {
+            flashPinDots('success');
+            if (bioToggleEl) bioToggleEl.checked = true;
+            if (bioStatusEl) bioStatusEl.textContent = t('enabled');
+            showToast(t('toast_bio_enabled'), 'success');
+            setTimeout(() => {
+              hidePinLock();
+              isPinBusy = false;
+            }, 250);
+          } else {
+            const rawErr = (res && res.error) ? String(res.error) : '';
+            if (rawErr === 'Incorrect PIN') {
+              triggerPinError(t('toast_bio_wrong_pin'));
+            } else {
+              if (bioToggleEl) bioToggleEl.checked = false;
+              if (bioStatusEl) bioStatusEl.textContent = t('not_enabled');
+              hidePinLock();
+              isPinBusy = false;
+              let msg = t('toast_bio_failed');
+              if (/not supported|PRF/i.test(rawErr)) {
+                msg = rawErr.includes('WebAuthn PRF') ? rawErr : t('toast_bio_unsupported');
+              } else if (/cancel|إلغاء/i.test(rawErr)) {
+                msg = t('toast_bio_cancelled');
+              } else if (rawErr) {
+                msg = rawErr;
+              }
+              showToast(msg, 'error');
+            }
           }
           return;
         }
@@ -4529,6 +4658,14 @@ function initApp() {
   if (pinCancelBtn) {
     pinCancelBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      if (pinFlow === 'verify_biometric') {
+        const bioToggleEl = document.getElementById('settings-biometric-toggle');
+        const bioStatusEl = document.getElementById('settings-biometric-status');
+        if (bioToggleEl) bioToggleEl.checked = false;
+        if (bioStatusEl) bioStatusEl.textContent = t('not_enabled');
+        showToast(t('toast_bio_cancelled'), 'info');
+      }
+      isPinBusy = false;
       hidePinLock();
     });
   }
