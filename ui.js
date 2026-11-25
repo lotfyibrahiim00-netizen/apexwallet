@@ -2,7 +2,7 @@
  * ApexWallet UI & Interaction Controller
  * Visual Card-First Aesthetic (Dark Charcoal & Amber Gold Direction)
  * - Hero Card: Tilted card object (-4deg in RTL, +4deg in LTR)
- * - Colors: #16171A (Dark bg), #1F2024 (Surface), #26272B (Raised / Dock), #F5B700 (Amber Accent)
+ * - Colors: #1A1B1F (Dark bg), #25262B (Surface), #2A2B31 (Raised / Dock), #F5B700 (Amber Accent)
  * - Text: #F3F1EC (Main), #9A9CA3 (Muted), #E6A8A8 (Destructive)
  * - Bilingual: Pure Arabic RTL / Pure English LTR
  */
@@ -839,7 +839,7 @@ function formatAmountInlineHtml(amount, options = {}) {
     smallDecimals = false,
     numClass = '',
     decClass = 'text-[0.82em]',
-    currClass = 'text-[0.68em] text-[#9A9CA3] font-semibold'
+    currClass = 'text-[0.68em] text-[#C8CAD0] font-semibold'
   } = options;
   const num = Number(amount) || 0;
   const formatted = formatCurrency(Math.abs(num), currency);
@@ -1040,16 +1040,18 @@ function initApp() {
   }
 
   function switchView(targetTab) {
+    const isTabChange = store.activeTab !== targetTab;
     if (store.activeTab && store.activeTab !== 'settings') {
       previousTab = store.activeTab;
     }
     store.activeTab = targetTab;
 
-    // Update floating nav buttons + localized labels
+    // Update floating nav buttons + localized labels (always visible)
     navButtons.forEach(btn => {
       const tab = btn.dataset.tab;
       const label = btn.querySelector('.tab-label');
       if (label) {
+        label.classList.remove('hidden');
         if (tab === 'dashboard') label.textContent = t('home');
         else if (tab === 'history') label.textContent = t('activity');
         else if (tab === 'review') label.textContent = t('review');
@@ -1057,20 +1059,24 @@ function initApp() {
       }
       if (tab === targetTab) {
         btn.classList.add('active');
-        if (label) label.classList.remove('hidden');
       } else {
         btn.classList.remove('active', 'no-pill-fallback');
-        if (label) label.classList.add('hidden');
       }
     });
 
-    // Toggle view containers
+    // Toggle view containers with subtle section transition on tab change
     Object.keys(views).forEach(k => {
       if (views[k]) {
         if (k === targetTab) {
           views[k].classList.remove('hidden');
+          if (isTabChange) {
+            views[k].classList.remove('view-enter');
+            void views[k].offsetWidth;
+            views[k].classList.add('view-enter');
+          }
         } else {
           views[k].classList.add('hidden');
+          views[k].classList.remove('view-enter');
         }
       }
     });
@@ -1263,12 +1269,12 @@ function initApp() {
       if (info) {
         previewBox.classList.remove('hidden');
         previewBadge.innerHTML = `
-          <span class="inline-flex items-center gap-1 font-bold text-[#F5B700] bg-[#26272B] px-2.5 py-0.5 rounded-full text-[10px] border border-[#3A3C42]">
+          <span class="inline-flex items-center gap-1 font-bold text-[#F5B700] bg-[#2A2B31] px-2.5 py-0.5 rounded-full text-[10px] border border-[#43464F]">
             ${t('affects_stmt', { month: localizeMonthName(info.statementMonthName.substring(0, 3)) })}
           </span>
         `;
         previewRange.innerHTML = `
-          <span class="text-[11px] text-[#9A9CA3] mt-1 block">
+          <span class="text-xs text-[#C8CAD0] mt-1 block">
             <span dir="ltr" class="font-mono">${card.cycleStartDay} → ${card.cycleEndDay}</span> (${localizeCycleText(info.cycleRange)})
           </span>
         `;
@@ -1276,12 +1282,12 @@ function initApp() {
     } else if (card) {
       previewBox.classList.remove('hidden');
       previewBadge.innerHTML = `
-        <span class="inline-flex items-center gap-1 font-bold text-[#F3F1EC] bg-[#26272B] px-2.5 py-0.5 rounded-full text-[10px] border border-[#3A3C42]">
+        <span class="inline-flex items-center gap-1 font-bold text-[#F3F1EC] bg-[#2A2B31] px-2.5 py-0.5 rounded-full text-[10px] border border-[#43464F]">
           ${t('card_' + card.cardType)}
         </span>
       `;
       previewRange.innerHTML = `
-        <span class="text-[11px] text-[#9A9CA3] mt-1 block">
+        <span class="text-xs text-[#C8CAD0] mt-1 block">
           ${getLang() === 'ar' ? 'عملية مباشرة تُسجل بتاريخ اليوم.' : 'Direct transaction logged against current date.'}
         </span>
       `;
@@ -1716,9 +1722,9 @@ function initApp() {
     const count = (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates) ? window.BankSmsEngine.pendingCandidates.length : 0;
     if (count === 0) return '';
     return `
-      <div id="sms-inbox-banner" onclick="window.switchTab('review')" class="cursor-pointer bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] px-4 py-4 rounded-2xl shadow-md flex items-center justify-between active-press transition-all">
-        <span class="text-[13px] font-extrabold text-[#111111]">${t('bank_messages_ready', { n: count })}</span>
-        <button type="button" class="px-5 py-2 rounded-xl bg-[#16171A] text-[#F5B700] font-extrabold text-xs shrink-0">${t('review_btn')}</button>
+      <div id="sms-inbox-banner" onclick="window.switchTab('review')" class="cursor-pointer bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] px-4 py-3.5 rounded-2xl shadow-md flex items-center justify-between gap-3 card-press transition-all">
+        <span class="text-[17px] font-extrabold text-[#111111] leading-snug">${t('bank_messages_ready', { n: count })}</span>
+        <button type="button" class="px-5 py-2 min-h-[44px] rounded-full bg-[#1A1B1F] text-[#F5B700] font-extrabold text-[14px] shrink-0 active-press">${t('review_btn')}</button>
       </div>
     `;
   }
@@ -1738,13 +1744,13 @@ function initApp() {
         <div class="space-y-4 py-6">
           ${pendingCandidates.length > 0 ? renderSmsBannerHtml() : ''}
 
-          <div class="bg-[#1F2024] p-8 rounded-3xl border border-[#2F3136] text-center shadow-lg space-y-4">
-            <div class="w-16 h-16 mx-auto rounded-3xl bg-[#26272B] text-[#F5B700] flex items-center justify-center border border-[#3A3C42]">
+          <div class="bg-[#25262B] p-8 rounded-3xl border border-[#33353C] text-center shadow-lg space-y-4">
+            <div class="w-16 h-16 mx-auto rounded-3xl bg-[#2A2B31] text-[#F5B700] flex items-center justify-center border border-[#43464F]">
               <i data-lucide="credit-card" class="w-8 h-8 text-[#F5B700]"></i>
             </div>
             <div>
               <h3 class="text-base font-extrabold text-[#F3F1EC]">${store.banks.length === 0 ? t('your_wallet_ready') : t('no_cards_yet')}</h3>
-              <p class="text-xs text-[#9A9CA3] mt-1 max-w-[280px] mx-auto">
+              <p class="text-xs text-[#C8CAD0] mt-1 max-w-[280px] mx-auto">
                 ${store.banks.length === 0 ? t('add_card_account_desc') : t('no_cards_yet')}
               </p>
             </div>
@@ -1798,9 +1804,9 @@ function initApp() {
               </div>
 
               <!-- Bottom Row (dir=ltr): Remaining label BOTTOM LEFT, Big Bold Sans Balance BOTTOM RIGHT -->
-              <div class="flex items-baseline justify-between gap-2 pt-1.5 z-10" dir="ltr">
+              <div class="flex items-baseline justify-between gap-1.5 pt-1.5 z-10" dir="ltr">
                 <div class="min-w-0">
-                  <span class="text-[12px] text-[#B0B3BA] font-medium block truncate" dir="${isRtl ? 'rtl' : 'ltr'}">
+                  <span class="text-[12px] text-[#C8CAD0] font-medium block truncate" dir="${isRtl ? 'rtl' : 'ltr'}">
                     ${cardStat.isExceeded
                       ? t('over_limit')
                       : `${t('left_of')} <span dir="ltr" class="font-sans-num">${formatCurrency(cardStat.target)}</span>`}
@@ -1810,8 +1816,8 @@ function initApp() {
                   ${formatAmountInlineHtml(cardStat.isExceeded ? cardStat.overAmount : cardStat.remaining, {
                     useSans: true,
                     prefixSign: cardStat.isExceeded ? '+' : '',
-                    numClass: `text-[23px] leading-none font-extrabold ${cardStat.isExceeded ? 'text-[#E6A8A8]' : 'text-[#F3F1EC]'}`,
-                    currClass: `text-[13.5px] font-bold ${cardStat.isExceeded ? 'text-[#E6A8A8]/85' : 'text-[#D1D5DB]'}`
+                    numClass: `text-[24px] leading-none font-extrabold ${cardStat.isExceeded ? 'text-[#E6A8A8]' : 'text-[#F3F1EC]'}`,
+                    currClass: `text-[13px] font-bold ${cardStat.isExceeded ? 'text-[#E6A8A8]/85' : 'text-[#D1D5DB]'}`
                   })}
                 </div>
               </div>
@@ -1822,37 +1828,37 @@ function initApp() {
         <!-- Expandable Card Details Drawer (Opens when hero card is tapped) -->
         <div id="hero-card-details-drawer" class="hero-details-drawer ${isHeroCardExpanded ? 'expanded' : ''}">
           <div class="hero-details-inner">
-            <div class="bg-[#1F2024] border border-[#2F3136] rounded-2xl p-3.5 space-y-2 shadow-lg">
-              <div class="flex items-center justify-between text-xs py-1 border-b border-[#2F3136]/60">
-                <span class="text-[#9A9CA3] font-medium">${t('cycle_budget')}</span>
+            <div class="bg-[#25262B] border border-[#33353C] rounded-2xl p-3.5 space-y-2 shadow-lg">
+              <div class="flex items-center justify-between text-xs py-1 border-b border-[#33353C]/60">
+                <span class="text-[#C8CAD0] font-medium">${t('cycle_budget')}</span>
                 <div class="flex items-center gap-2">
                   ${formatAmountInlineHtml(cardStat.target, { numClass: 'text-xs font-bold text-[#F3F1EC]' })}
-                  <button type="button" onclick="window.promptSetCycleBudget('${card.id}', event)" class="px-2 py-0.5 rounded-lg bg-[#26272B] hover:bg-[#3A3C42] text-[#F5B700] text-[10px] font-bold border border-[#3A3C42]">${t('change')}</button>
+                  <button type="button" onclick="window.promptSetCycleBudget('${card.id}', event)" class="px-2.5 py-1 rounded-lg bg-[#2A2B31] hover:bg-[#43464F] text-[#F5B700] text-xs font-bold border border-[#43464F]">${t('change')}</button>
                 </div>
               </div>
-              <div class="flex items-center justify-between text-xs py-1 border-b border-[#2F3136]/60">
-                <span class="text-[#9A9CA3] font-medium">${t('credit_limit')}</span>
+              <div class="flex items-center justify-between text-xs py-1 border-b border-[#33353C]/60">
+                <span class="text-[#C8CAD0] font-medium">${t('credit_limit')}</span>
                 <span class="text-xs font-bold text-[#F3F1EC]">
                   ${card.cardType === 'credit'
                     ? (cardStat.creditLimit !== null ? formatAmountInlineHtml(cardStat.creditLimit, { numClass: 'text-xs font-bold text-[#F3F1EC]' }) : t('not_recorded'))
                     : t('na_debit')}
                 </span>
               </div>
-              <div class="flex items-center justify-between text-xs py-1 border-b border-[#2F3136]/60">
-                <span class="text-[#9A9CA3] font-medium">${t('cycle_purchases')}</span>
+              <div class="flex items-center justify-between text-xs py-1 border-b border-[#33353C]/60">
+                <span class="text-[#C8CAD0] font-medium">${t('cycle_purchases')}</span>
                 ${formatAmountInlineHtml(cardStat.spent, { numClass: 'text-xs font-bold text-[#F3F1EC]' })}
               </div>
-              <div class="flex items-center justify-between text-xs py-1 border-b border-[#2F3136]/60">
-                <span class="text-[#9A9CA3] font-medium">${t('cash_advance_debt')}</span>
+              <div class="flex items-center justify-between text-xs py-1 border-b border-[#33353C]/60">
+                <span class="text-[#C8CAD0] font-medium">${t('cash_advance_debt')}</span>
                 ${formatAmountInlineHtml(cardStat.cashAdvance, { numClass: 'text-xs font-bold text-[#F3F1EC]' })}
               </div>
               <div class="flex items-center justify-between text-xs py-1">
-                <span class="text-[#9A9CA3] font-medium">${t('total_owed')}</span>
+                <span class="text-[#C8CAD0] font-medium">${t('total_owed')}</span>
                 ${formatAmountInlineHtml(cardStat.totalObligations, { numClass: 'text-xs font-extrabold text-[#F5B700]' })}
               </div>
               <div class="grid grid-cols-2 gap-2 pt-1.5">
-                <button type="button" onclick="window.switchTab('history')" class="py-2 rounded-xl bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-[#F3F1EC] text-[11px] font-bold active-press">${t('view_activity')}</button>
-                <button type="button" onclick="window.openEditCardModal('${card.id}')" class="py-2 rounded-xl bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-[11px] font-bold active-press">${t('edit_card')}</button>
+                <button type="button" onclick="window.switchTab('history')" class="py-2.5 min-h-[44px] rounded-xl bg-[#2A2B31] hover:bg-[#43464F] border border-[#43464F] text-[#F3F1EC] text-xs font-bold active-press">${t('view_activity')}</button>
+                <button type="button" onclick="window.openEditCardModal('${card.id}')" class="py-2.5 min-h-[44px] rounded-xl bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-xs font-bold active-press">${t('edit_card')}</button>
               </div>
             </div>
           </div>
@@ -1863,30 +1869,30 @@ function initApp() {
           <div class="flex justify-center items-center gap-1.5 py-0.5">
             ${store.cards.map(c => `
               <button type="button" onclick="window.selectFeaturedCard('${c.id}')" class="h-1.5 rounded-full transition-all duration-300 ${
-                c.id === card.id ? 'w-6 bg-[#F5B700]' : 'w-2 bg-[#3A3C42] hover:bg-[#9A9CA3]'
+                c.id === card.id ? 'w-6 bg-[#F5B700]' : 'w-2 bg-[#43464F] hover:bg-[#C8CAD0]'
               }" title="${c.name}"></button>
             `).join('')}
           </div>
         ` : ''}
 
-        <!-- 2. SUMMARY TILES (Single-Line Full Precision Bold Sans Amount + Smaller Currency) -->
-        <div class="grid grid-cols-3 gap-2 mt-1">
-          <div class="bg-[#1F2024] border border-[#2F3136] rounded-2xl p-2.5 flex flex-col justify-between shadow-2xs min-w-0">
-            <span class="text-[10px] text-[#9A9CA3] font-medium leading-tight">${t('cycle_purchases')}</span>
+        <!-- 2. SUMMARY TILES (Single-Line Full Precision Bold Sans Amount + 12.5px #C8CAD0 Labels) -->
+        <div class="grid grid-cols-3 gap-2.5 mt-1">
+          <div class="bg-[#25262B] border border-[#33353C] rounded-2xl p-3 flex flex-col justify-between shadow-2xs min-w-0 card-press">
+            <span class="text-[12.5px] text-[#C8CAD0] font-medium leading-snug">${t('cycle_purchases')}</span>
             <div class="mt-2 truncate">
-              ${formatAmountInlineHtml(cardStat.spent, { useSans: true, smallDecimals: true, numClass: 'tile-amount-num font-extrabold text-[#F3F1EC]', decClass: 'text-[0.78em] text-[#C8CAD0] font-bold', currClass: 'tile-amount-curr text-[#9A9CA3] font-semibold' })}
+              ${formatAmountInlineHtml(cardStat.spent, { useSans: true, smallDecimals: true, numClass: 'tile-amount-num font-extrabold text-[#F3F1EC]', decClass: 'text-[0.8em] text-[#C8CAD0] font-bold', currClass: 'tile-amount-curr text-[#C8CAD0] font-semibold' })}
             </div>
           </div>
-          <div class="bg-[#1F2024] border border-[#2F3136] rounded-2xl p-2.5 flex flex-col justify-between shadow-2xs min-w-0">
-            <span class="text-[10px] text-[#9A9CA3] font-medium leading-tight">${t('cash_advance_debt')}</span>
+          <div class="bg-[#25262B] border border-[#33353C] rounded-2xl p-3 flex flex-col justify-between shadow-2xs min-w-0 card-press">
+            <span class="text-[12.5px] text-[#C8CAD0] font-medium leading-snug">${t('cash_advance_debt')}</span>
             <div class="mt-2 truncate">
-              ${formatAmountInlineHtml(cardStat.cashAdvance, { useSans: true, smallDecimals: true, numClass: 'tile-amount-num font-extrabold text-[#F3F1EC]', decClass: 'text-[0.78em] text-[#C8CAD0] font-bold', currClass: 'tile-amount-curr text-[#9A9CA3] font-semibold' })}
+              ${formatAmountInlineHtml(cardStat.cashAdvance, { useSans: true, smallDecimals: true, numClass: 'tile-amount-num font-extrabold text-[#F3F1EC]', decClass: 'text-[0.8em] text-[#C8CAD0] font-bold', currClass: 'tile-amount-curr text-[#C8CAD0] font-semibold' })}
             </div>
           </div>
-          <div class="bg-[#1F2024] border border-[#2F3136] rounded-2xl p-2.5 flex flex-col justify-between shadow-2xs min-w-0">
-            <span class="text-[10px] text-[#9A9CA3] font-medium leading-tight">${t('total_owed')}</span>
+          <div class="bg-[#25262B] border border-[#33353C] rounded-2xl p-3 flex flex-col justify-between shadow-2xs min-w-0 card-press">
+            <span class="text-[12.5px] text-[#C8CAD0] font-medium leading-snug">${t('total_owed')}</span>
             <div class="mt-2 truncate">
-              ${formatAmountInlineHtml(cardStat.totalObligations, { useSans: true, smallDecimals: true, numClass: 'tile-amount-num font-extrabold text-[#F3F1EC]', decClass: 'text-[0.78em] text-[#C8CAD0] font-bold', currClass: 'tile-amount-curr text-[#9A9CA3] font-semibold' })}
+              ${formatAmountInlineHtml(cardStat.totalObligations, { useSans: true, smallDecimals: true, numClass: 'tile-amount-num font-extrabold text-[#F3F1EC]', decClass: 'text-[0.8em] text-[#C8CAD0] font-bold', currClass: 'tile-amount-curr text-[#C8CAD0] font-semibold' })}
             </div>
           </div>
         </div>
@@ -1897,8 +1903,8 @@ function initApp() {
         <!-- 4. RECENT ACTIVITY LIST -->
         <div class="mt-3 space-y-1.5">
           <div class="flex justify-between items-center px-1">
-            <span class="text-xs font-bold text-[#9A9CA3]">${t('recent_activity')}</span>
-            <button onclick="window.switchTab('history')" class="text-[11px] font-bold text-[#F5B700] hover:underline">${t('all_history')}</button>
+            <span class="text-[17px] font-extrabold text-[#F3F1EC]">${t('recent_activity')}</span>
+            <button onclick="window.switchTab('history')" class="text-[13.5px] font-bold text-[#F5B700] hover:underline min-h-[44px] inline-flex items-center px-1 active-press">${t('all_history')}</button>
           </div>
           <div id="overview-activity-container" class="space-y-0.5"></div>
         </div>
@@ -1982,9 +1988,9 @@ function initApp() {
 
     if (cardTxs.length === 0) {
       container.innerHTML = `
-        <div class="bg-[#1F2024] p-5 rounded-2xl text-center border border-[#2F3136] shadow-2xs">
-          <p class="text-xs text-[#9A9CA3] font-medium">${t('no_activity')}</p>
-          <button onclick="window.openAddTxForCard('${card.id}')" class="mt-2.5 px-3.5 py-1.5 bg-[#26272B] hover:bg-[#3A3C42] text-[#F5B700] text-xs font-bold rounded-full transition-all inline-flex items-center gap-1 border border-[#3A3C42]">
+        <div class="bg-[#25262B] p-5 rounded-2xl text-center border border-[#33353C] shadow-2xs">
+          <p class="text-xs text-[#C8CAD0] font-medium">${t('no_activity')}</p>
+          <button onclick="window.openAddTxForCard('${card.id}')" class="mt-2.5 px-3.5 py-1.5 bg-[#2A2B31] hover:bg-[#43464F] text-[#F5B700] text-xs font-bold rounded-full transition-all inline-flex items-center gap-1 border border-[#43464F]">
             <span>+</span>
             <span>${t('create_new')}</span>
           </button>
@@ -1997,10 +2003,10 @@ function initApp() {
       const isCashAdvance = tx.transactionType === 'withdrawal';
       const isInc = tx.direction === 'income';
       return `
-        <div class="py-3 px-2 flex justify-between items-center border-b border-[#2F3136]/60 last:border-b-0 hover:bg-[#1F2024]/40 rounded-xl transition-all">
+        <div class="py-3 px-2.5 flex justify-between items-center border-b border-[#33353C]/70 last:border-b-0 hover:bg-[#25262B]/60 rounded-xl transition-all card-press">
           <div class="min-w-0 flex-1 pr-2 rtl:pr-0 rtl:pl-2">
-            <p class="text-[14px] font-bold text-[#F3F1EC] leading-tight truncate">${tx.merchant}</p>
-            <p class="text-[11px] text-[#9A9CA3] font-medium truncate mt-0.5">
+            <p class="text-[16px] font-bold text-[#F3F1EC] leading-tight truncate">${tx.merchant}</p>
+            <p class="text-[13px] text-[#C8CAD0] font-medium truncate mt-1">
               ${bank ? bank.shortCode + ' ' : ''}${card.name} ${card.last4 ? card.last4 : ''} ${isCashAdvance ? '• ' + t('cash_advance_debt') : ''}
             </p>
           </div>
@@ -2008,8 +2014,8 @@ function initApp() {
             ${formatAmountInlineHtml(tx.amount, {
               useSans: true,
               prefixSign: isInc ? '+' : '-',
-              numClass: `text-[15px] font-extrabold ${isInc ? 'text-[#F5B700]' : 'text-[#F3F1EC]'}`,
-              currClass: 'text-[10.5px] text-[#9A9CA3] font-semibold'
+              numClass: `text-[16px] font-extrabold ${isInc ? 'text-[#F5B700]' : 'text-[#F3F1EC]'}`,
+              currClass: 'text-[11px] text-[#C8CAD0] font-semibold'
             })}
           </div>
         </div>
@@ -2054,22 +2060,22 @@ function initApp() {
         <!-- Top Row: Counter + Batch Approve + Clear All + Diagnostics/History Icons -->
         <div class="flex items-center justify-between gap-2 px-0.5 pt-1 flex-wrap">
           <div class="flex items-center gap-2 min-w-0">
-            <span class="text-xs font-bold text-[#9A9CA3] whitespace-nowrap">${t('messages_waiting', { n: candidates.length })}</span>
+            <span class="text-[14px] font-bold text-[#C8CAD0] whitespace-nowrap">${t('messages_waiting', { n: candidates.length })}</span>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             ${candidates.length > 0 ? `
-              <button type="button" onclick="window.approveAllVerifiedSms()" class="px-3 py-1.5 rounded-full bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-[11px] font-extrabold active-press shadow-sm whitespace-nowrap">
+              <button type="button" onclick="window.approveAllVerifiedSms()" class="px-3.5 py-2 min-h-[44px] rounded-full bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-[12.5px] font-extrabold active-press shadow-sm whitespace-nowrap">
                 ${t('batch_approve')}
               </button>
-              <button type="button" onclick="window.clearAllPendingSms()" class="px-3 py-1.5 rounded-full bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-[#F3F1EC] text-[11px] font-bold active-press whitespace-nowrap">
+              <button type="button" onclick="window.clearAllPendingSms()" class="px-3.5 py-2 min-h-[44px] rounded-full bg-[#2A2B31] hover:bg-[#43464F] border border-[#43464F] text-[#F3F1EC] text-[12.5px] font-bold active-press whitespace-nowrap">
                 ${t('clear_all')}
               </button>
             ` : ''}
-            <button type="button" onclick="window.openSmsDiagnostics()" class="w-8 h-8 rounded-full bg-[#1F2024] hover:bg-[#26272B] border border-[#2F3136] text-[#F5B700] flex items-center justify-center transition-colors shrink-0" title="${t('check_reception_status')}">
-              <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+            <button type="button" onclick="window.openSmsDiagnostics()" class="w-11 h-11 rounded-full bg-[#25262B] hover:bg-[#2A2B31] border border-[#33353C] text-[#F5B700] flex items-center justify-center transition-colors shrink-0 active-press" title="${t('check_reception_status')}">
+              <i data-lucide="activity" class="w-4 h-4"></i>
             </button>
-            <button type="button" onclick="window.openHistoricalSmsImport()" class="w-8 h-8 rounded-full bg-[#1F2024] hover:bg-[#26272B] border border-[#2F3136] text-[#9A9CA3] hover:text-[#F3F1EC] flex items-center justify-center transition-colors shrink-0" title="${t('import_past_sms')}">
-              <i data-lucide="history" class="w-3.5 h-3.5"></i>
+            <button type="button" onclick="window.openHistoricalSmsImport()" class="w-11 h-11 rounded-full bg-[#25262B] hover:bg-[#2A2B31] border border-[#33353C] text-[#C8CAD0] hover:text-[#F3F1EC] flex items-center justify-center transition-colors shrink-0 active-press" title="${t('import_past_sms')}">
+              <i data-lucide="history" class="w-4 h-4"></i>
             </button>
           </div>
         </div>
@@ -2460,27 +2466,27 @@ function initApp() {
       <div class="space-y-4 pb-20">
         <div class="flex justify-between items-center px-1">
           <div>
-            <h2 class="text-sm font-extrabold text-[#F3F1EC]">${t('wallets')}</h2>
-            <p class="text-[11px] text-[#9A9CA3]">${t('cards_under_bank', { n: '3' })}</p>
+            <h2 class="text-[17px] font-extrabold text-[#F3F1EC]">${t('wallets')}</h2>
+            <p class="text-xs text-[#C8CAD0]">${t('cards_under_bank', { n: '3' })}</p>
           </div>
-          <button onclick="window.openModal('bank')" class="px-3.5 py-1.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-xs font-bold rounded-full shadow-xs active-press flex items-center gap-1">
-            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+          <button onclick="window.openModal('bank')" class="px-4 py-2 min-h-[44px] bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-[13px] font-extrabold rounded-full shadow-xs active-press flex items-center gap-1.5">
+            <i data-lucide="plus" class="w-4 h-4"></i>
             <span>${t('add_bank')}</span>
           </button>
         </div>
 
         <div class="space-y-4">
           ${store.banks.length === 0 ? `
-            <div class="bg-[#1F2024] p-7 rounded-3xl border border-[#2F3136] text-center shadow-xs space-y-3 mt-2">
-              <div class="w-12 h-12 mx-auto rounded-2xl bg-[#26272B] text-[#F5B700] flex items-center justify-center border border-[#3A3C42]">
+            <div class="bg-[#25262B] p-7 rounded-3xl border border-[#33353C] text-center shadow-xs space-y-3 mt-2">
+              <div class="w-12 h-12 mx-auto rounded-2xl bg-[#2A2B31] text-[#F5B700] flex items-center justify-center border border-[#43464F]">
                 <i data-lucide="building-2" class="w-6 h-6"></i>
               </div>
               <div>
-                <h3 class="text-xs font-bold text-[#F3F1EC]">${t('no_banks_yet')}</h3>
-                <p class="text-[11px] text-[#9A9CA3] mt-0.5">${getLang() === 'ar' ? 'أضف بنكك لإدارة ما يصل إلى 3 كروت لكل بنك.' : 'Add your bank to manage up to 3 cards per bank.'}</p>
+                <h3 class="text-[15px] font-bold text-[#F3F1EC]">${t('no_banks_yet')}</h3>
+                <p class="text-xs text-[#C8CAD0] mt-1">${getLang() === 'ar' ? 'أضف بنكك لإدارة ما يصل إلى 3 كروت لكل بنك.' : 'Add your bank to manage up to 3 cards per bank.'}</p>
               </div>
-              <button onclick="window.openModal('bank')" class="px-4 py-2 bg-[#F5B700] text-[#111111] text-xs font-bold rounded-full shadow-xs active-press inline-flex items-center gap-1.5 mt-1">
-                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <button onclick="window.openModal('bank')" class="px-5 py-2.5 min-h-[44px] bg-[#F5B700] text-[#111111] text-[13px] font-extrabold rounded-full shadow-xs active-press inline-flex items-center gap-1.5 mt-1">
+                <i data-lucide="plus" class="w-4 h-4"></i>
                 <span>${t('add_bank')}</span>
               </button>
             </div>
@@ -2489,27 +2495,27 @@ function initApp() {
             const isCapReached = cards.length >= 3;
 
             return `
-              <div class="bg-[#1F2024] rounded-3xl p-4.5 shadow-md border border-[#2F3136] space-y-3.5">
+              <div class="bg-[#25262B] rounded-3xl p-4.5 shadow-md border border-[#33353C] space-y-3.5">
                 <!-- Bank Header -->
-                <div class="flex justify-between items-center pb-2 border-b border-[#2F3136]/70">
+                <div class="flex justify-between items-center pb-2.5 border-b border-[#33353C]/70">
                   <div class="flex items-center gap-2.5">
-                    <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-[11px] shadow-xs" style="background-color: ${bank.accentColor || '#F5B700'}">
+                    <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-xs shadow-xs" style="background-color: ${bank.accentColor || '#F5B700'}">
                       ${(bank && bank.shortCode ? bank.shortCode : 'BNK').substring(0, 3)}
                     </div>
                     <div>
-                      <h3 class="text-xs font-bold text-[#F3F1EC]">${bank.name}</h3>
-                      <span class="text-[10px] text-[#9A9CA3] font-mono">${bank.shortCode}</span>
+                      <h3 class="text-[16px] font-bold text-[#F3F1EC]">${bank.name}</h3>
+                      <span class="text-xs text-[#C8CAD0] font-mono">${bank.shortCode}</span>
                     </div>
                   </div>
 
                   <div class="flex items-center gap-2">
-                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#26272B] border border-[#3A3C42] ${
-                      isCapReached ? 'text-[#F5B700]' : 'text-[#9A9CA3]'
+                    <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-[#2A2B31] border border-[#43464F] ${
+                      isCapReached ? 'text-[#F5B700]' : 'text-[#C8CAD0]'
                     }">
                       ${cards.length}/3 ${t('cards')}
                     </span>
-                    <button onclick="window.confirmDeleteBank('${bank.id}')" class="text-[#9A9CA3] hover:text-[#E6A8A8] p-1 transition-colors">
-                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    <button onclick="window.confirmDeleteBank('${bank.id}')" class="text-[#C8CAD0] hover:text-[#E6A8A8] w-10 h-10 flex items-center justify-center rounded-full transition-colors">
+                      <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                   </div>
                 </div>
@@ -2518,38 +2524,38 @@ function initApp() {
                 ${(() => {
                   const accounts = store.getAccountsForBank(bank.id);
                   return `
-                    <div class="space-y-1.5 pt-0.5">
+                    <div class="space-y-2 pt-0.5">
                       <div class="flex items-center justify-between px-0.5">
-                        <span class="text-[11px] font-bold text-[#F3F1EC] flex items-center gap-1">
-                          <i data-lucide="landmark" class="w-3.5 h-3.5 text-[#F5B700]"></i>
+                        <span class="text-[13px] font-bold text-[#F3F1EC] flex items-center gap-1.5">
+                          <i data-lucide="landmark" class="w-4 h-4 text-[#F5B700]"></i>
                           <span>${t('bank_accounts_count', { n: accounts.length })}</span>
                         </span>
-                        <button onclick="window.openAddAccountForBank('${bank.id}')" class="text-[10px] font-bold text-[#F5B700] hover:underline flex items-center gap-0.5">
-                          <i data-lucide="plus" class="w-3 h-3"></i>
+                        <button onclick="window.openAddAccountForBank('${bank.id}')" class="text-xs font-bold text-[#F5B700] hover:underline flex items-center gap-1 min-h-[36px] px-1">
+                          <i data-lucide="plus" class="w-3.5 h-3.5"></i>
                           <span>${t('add_account')}</span>
                         </button>
                       </div>
                       ${accounts.length === 0 ? `
-                        <div class="p-2.5 rounded-2xl bg-[#26272B] border border-dashed border-[#3A3C42] text-center text-[10px] text-[#9A9CA3]">
+                        <div class="p-3 rounded-2xl bg-[#2A2B31] border border-dashed border-[#43464F] text-center text-xs text-[#C8CAD0]">
                           ${t('no_accounts_for_bank')}
                         </div>
                       ` : accounts.map(acc => `
-                        <div class="p-2.5 rounded-2xl bg-[#26272B] border border-[#3A3C42] flex justify-between items-center">
+                        <div class="p-3 rounded-2xl bg-[#2A2B31] border border-[#43464F] flex justify-between items-center card-press">
                           <div>
-                            <div class="flex items-center gap-1.5">
-                              <span class="text-xs font-bold text-[#F3F1EC]">${acc.name}</span>
-                              <span class="text-[10px] text-[#9A9CA3] font-mono">${acc.accountNumberMasked || acc.identifierDigits}</span>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                              <span class="text-[14px] font-bold text-[#F3F1EC]">${acc.name}</span>
+                              <span class="text-xs text-[#C8CAD0] font-mono">${acc.accountNumberMasked || acc.identifierDigits}</span>
                             </div>
                           </div>
-                          <div class="flex items-center gap-2">
-                            <span class="text-xs font-black font-mono px-2 py-0.5 rounded-full ${acc.balance < 0 ? 'bg-[#3A2020] text-[#E6A8A8] border border-[#E6A8A8]/30' : 'bg-[#16171A] text-[#F3F1EC] border border-[#3A3C42]'}" dir="ltr">
+                          <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-[13px] font-black font-mono px-2.5 py-1 rounded-full ${acc.balance < 0 ? 'bg-[#3A2020] text-[#E6A8A8] border border-[#E6A8A8]/30' : 'bg-[#1A1B1F] text-[#F3F1EC] border border-[#43464F]'}" dir="ltr">
                               ${formatCurrency(acc.balance || 0, acc.currency || 'EGP')}
                             </span>
-                            <button onclick="window.openEditAccountModal('${acc.id}')" class="text-[#9A9CA3] hover:text-[#F5B700] p-0.5 transition-colors" title="${t('correct_balance')}">
-                              <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                            <button onclick="window.openEditAccountModal('${acc.id}')" class="text-[#C8CAD0] hover:text-[#F5B700] w-8 h-8 flex items-center justify-center rounded-full transition-colors" title="${t('correct_balance')}">
+                              <i data-lucide="edit-2" class="w-4 h-4"></i>
                             </button>
-                            <button onclick="window.confirmDeleteAccount('${acc.id}')" class="text-[#9A9CA3] hover:text-[#E6A8A8] p-0.5 transition-colors" title="${t('delete')}">
-                              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                            <button onclick="window.confirmDeleteAccount('${acc.id}')" class="text-[#C8CAD0] hover:text-[#E6A8A8] w-8 h-8 flex items-center justify-center rounded-full transition-colors" title="${t('delete')}">
+                              <i data-lucide="x" class="w-4 h-4"></i>
                             </button>
                           </div>
                         </div>
@@ -2559,43 +2565,43 @@ function initApp() {
                 })()}
 
                 <!-- Cards List -->
-                <div class="space-y-2.5 pt-1 border-t border-[#2F3136]/70">
-                  <div class="px-0.5 text-[11px] font-bold text-[#F3F1EC] flex items-center gap-1">
-                    <i data-lucide="credit-card" class="w-3.5 h-3.5 text-[#F5B700]"></i>
+                <div class="space-y-2.5 pt-1.5 border-t border-[#33353C]/70">
+                  <div class="px-0.5 text-[13px] font-bold text-[#F3F1EC] flex items-center gap-1.5">
+                    <i data-lucide="credit-card" class="w-4 h-4 text-[#F5B700]"></i>
                     <span>${t('registered_cards')}</span>
                   </div>
                   ${cards.map(c => {
                     const cStat = store.getCardSpendingStats(c.id);
                     const linkedAcc = c.linkedAccountId ? store.getAccount(c.linkedAccountId) : null;
                     return `
-                      <div class="p-3.5 rounded-2xl bg-[#26272B] border border-[#3A3C42] flex justify-between items-center">
+                      <div class="p-3.5 rounded-2xl bg-[#2A2B31] border border-[#43464F] flex justify-between items-center card-press">
                         <div class="min-w-0 flex-1">
                           <div class="flex items-center gap-2">
-                            <span class="text-xs font-bold text-[#F3F1EC] truncate">${c.name}</span>
-                            <span class="text-[9px] bg-[#16171A] border border-[#3A3C42] text-[#9A9CA3] px-2 py-0.5 rounded-full font-bold">${t('card_' + (c.cardType || 'credit'))}</span>
+                            <span class="text-[15px] font-bold text-[#F3F1EC] truncate">${c.name}</span>
+                            <span class="text-[11px] bg-[#1A1B1F] border border-[#43464F] text-[#C8CAD0] px-2 py-0.5 rounded-full font-bold shrink-0">${t('card_' + (c.cardType || 'credit'))}</span>
                           </div>
-                          <p class="text-[10px] text-[#9A9CA3] font-mono mt-0.5">
+                          <p class="text-xs text-[#C8CAD0] font-mono mt-1">
                             •••• ${c.last4} ${c.cycleStartDay ? `• ${t('cycle_word')} ${c.cycleStartDay}–${c.cycleEndDay}` : ''} ${linkedAcc ? `• ${linkedAcc.name}` : ''}
                           </p>
-                          <div class="w-full bg-[#16171A] rounded-full h-1 mt-2 overflow-hidden">
+                          <div class="w-full bg-[#1A1B1F] rounded-full h-1.5 mt-2 overflow-hidden">
                             <div class="${cStat.isExceeded ? 'bg-[#E6A8A8]' : 'bg-[#F5B700]'} h-full rounded-full" style="width: ${cStat.percentage}%;"></div>
                           </div>
                         </div>
 
-                        <div class="text-end shrink-0 ml-3">
-                          <span class="text-xs font-bold ${cStat.isExceeded ? 'text-[#E6A8A8]' : 'text-[#F3F1EC]'} font-mono block" dir="ltr">
+                        <div class="text-end shrink-0 ml-3 rtl:ml-0 rtl:mr-3">
+                          <span class="text-[14.5px] font-extrabold ${cStat.isExceeded ? 'text-[#E6A8A8]' : 'text-[#F3F1EC]'} font-sans-num block" dir="ltr">
                             ${formatCurrency(cStat.spent)}
                           </span>
-                          <span class="text-[10px] text-[#9A9CA3] font-mono" dir="ltr">/ ${formatCurrency(cStat.target)}</span>
-                          <div class="flex items-center justify-end gap-1.5 mt-1">
-                            <button onclick="window.openEditCardModal('${c.id}')" class="p-0.5 text-[#9A9CA3] hover:text-[#F5B700] transition-colors" title="${t('edit_card')}">
-                              <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                          <span class="text-xs text-[#C8CAD0] font-sans-num" dir="ltr">/ ${formatCurrency(cStat.target)}</span>
+                          <div class="flex items-center justify-end gap-1.5 mt-1.5">
+                            <button onclick="window.openEditCardModal('${c.id}')" class="p-1 text-[#C8CAD0] hover:text-[#F5B700] transition-colors" title="${t('edit_card')}">
+                              <i data-lucide="edit-2" class="w-4 h-4"></i>
                             </button>
-                            <button onclick="window.openCustomizeCardModal('${c.id}', event)" class="p-0.5 text-[#9A9CA3] hover:text-[#F5B700] transition-colors" title="Customize Card Color">
+                            <button onclick="window.openCustomizeCardModal('${c.id}', event)" class="p-1 text-[#C8CAD0] hover:text-[#F5B700] transition-colors" title="Customize Card Color">
                               <span class="text-xs">🎨</span>
                             </button>
-                            <button onclick="window.confirmDeleteCard('${c.id}')" class="text-[#9A9CA3] hover:text-[#E6A8A8] transition-colors" title="${t('delete')}">
-                              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                            <button onclick="window.confirmDeleteCard('${c.id}')" class="p-1 text-[#C8CAD0] hover:text-[#E6A8A8] transition-colors" title="${t('delete')}">
+                              <i data-lucide="x" class="w-4 h-4"></i>
                             </button>
                           </div>
                         </div>
@@ -2606,12 +2612,12 @@ function initApp() {
 
                 <!-- 3 Card Cap Enforcement Button -->
                 ${isCapReached ? `
-                  <div class="w-full py-2.5 rounded-full bg-[#26272B] border border-[#3A3C42] text-[#9A9CA3] text-[11px] font-bold text-center cursor-not-allowed">
+                  <div class="w-full py-3 rounded-full bg-[#2A2B31] border border-[#43464F] text-[#C8CAD0] text-xs font-bold text-center cursor-not-allowed">
                     🔒 ${t('max_3_reached')}
                   </div>
                 ` : `
-                  <button onclick="window.openAddCardForBank('${bank.id}')" class="w-full py-2.5 rounded-full bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-[#F3F1EC] text-[11px] font-bold text-center transition-all flex items-center justify-center gap-1.5 active-press">
-                    <i data-lucide="plus" class="w-3.5 h-3.5 text-[#F5B700]"></i>
+                  <button onclick="window.openAddCardForBank('${bank.id}')" class="w-full py-3 min-h-[44px] rounded-full bg-[#2A2B31] hover:bg-[#43464F] border border-[#43464F] text-[#F3F1EC] text-[13px] font-bold text-center transition-all flex items-center justify-center gap-1.5 active-press">
+                    <i data-lucide="plus" class="w-4 h-4 text-[#F5B700]"></i>
                     <span>${t('add_card')} (${cards.length}/3)</span>
                   </button>
                 `}
@@ -2640,30 +2646,30 @@ function initApp() {
       <div class="space-y-3 pb-20">
         <div class="flex justify-between items-center px-1">
           <div>
-            <h2 class="text-sm font-extrabold text-[#F3F1EC]">${t('history')}</h2>
-            <p class="text-[11px] text-[#9A9CA3]">${filtered.length} ${t('activity')}</p>
+            <h2 class="text-[17px] font-extrabold text-[#F3F1EC]">${t('history')}</h2>
+            <p class="text-xs text-[#C8CAD0]">${filtered.length} ${t('activity')}</p>
           </div>
-          <button onclick="window.exportTransactionsCSV()" class="px-3 py-1 bg-[#1F2024] border border-[#2F3136] text-[#F3F1EC] text-[11px] font-bold rounded-full shadow-2xs hover:bg-[#26272B] transition-colors">
+          <button onclick="window.exportTransactionsCSV()" class="px-3.5 py-2 min-h-[44px] bg-[#25262B] border border-[#33353C] text-[#F3F1EC] text-[12.5px] font-bold rounded-full shadow-2xs hover:bg-[#2A2B31] transition-colors active-press">
             ${t('export_csv')}
           </button>
         </div>
 
         <!-- Search Bar -->
         <div class="relative">
-          <i data-lucide="search" class="w-3.5 h-3.5 text-[#9A9CA3] absolute left-3.5 top-1/2 -translate-y-1/2 rtl:left-auto rtl:right-3.5"></i>
-          <input type="text" id="history-search-input" value="${store.searchQuery}" placeholder="${t('search_placeholder')}" class="w-full bg-[#1F2024] border border-[#2F3136] rounded-full pl-9 pr-3 rtl:pr-9 rtl:pl-3 py-2 text-xs font-medium text-[#F3F1EC] placeholder-[#9A9CA3] focus:outline-none focus:ring-1 focus:ring-[#F5B700] shadow-2xs">
+          <i data-lucide="search" class="w-4 h-4 text-[#C8CAD0] absolute left-3.5 top-1/2 -translate-y-1/2 rtl:left-auto rtl:right-3.5"></i>
+          <input type="text" id="history-search-input" value="${store.searchQuery}" placeholder="${t('search_placeholder')}" class="w-full bg-[#25262B] border border-[#33353C] rounded-full pl-10 pr-3 rtl:pr-10 rtl:pl-3 py-2.5 text-sm font-medium text-[#F3F1EC] placeholder-[#C8CAD0] focus:outline-none focus:ring-1 focus:ring-[#F5B700] shadow-2xs">
         </div>
 
         <!-- Filter Chips Carousel -->
-        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-          <button onclick="window.setFilterStatement('all')" class="px-3 py-1 rounded-full text-[10px] font-bold shrink-0 ${
-            store.selectedStatementFilter === 'all' ? 'bg-[#F5B700] text-[#111111]' : 'bg-[#1F2024] text-[#9A9CA3] border border-[#2F3136]'
+        <div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+          <button onclick="window.setFilterStatement('all')" class="px-3.5 py-1.5 rounded-full text-xs font-bold shrink-0 active-press ${
+            store.selectedStatementFilter === 'all' ? 'bg-[#F5B700] text-[#111111]' : 'bg-[#25262B] text-[#C8CAD0] border border-[#33353C]'
           }">
             ${t('all_cycles')}
           </button>
           ${store.getAvailableStatementMonths().map(m => `
-            <button onclick="window.setFilterStatement('${m.key}')" class="px-3 py-1 rounded-full text-[10px] font-bold shrink-0 ${
-              store.selectedStatementFilter === m.key ? 'bg-[#F5B700] text-[#111111]' : 'bg-[#1F2024] text-[#9A9CA3] border border-[#2F3136]'
+            <button onclick="window.setFilterStatement('${m.key}')" class="px-3.5 py-1.5 rounded-full text-xs font-bold shrink-0 active-press ${
+              store.selectedStatementFilter === m.key ? 'bg-[#F5B700] text-[#111111]' : 'bg-[#25262B] text-[#C8CAD0] border border-[#33353C]'
             }">
               ${localizeCycleText(m.badge)}
             </button>
@@ -2671,18 +2677,18 @@ function initApp() {
         </div>
 
         <!-- Transaction Items -->
-        <div class="space-y-2 pt-1">
+        <div class="space-y-2.5 pt-1">
           ${filtered.length === 0 ? `
-            <div class="bg-[#1F2024] p-7 rounded-3xl text-center border border-[#2F3136] shadow-2xs space-y-3 mt-2">
-              <div class="w-12 h-12 mx-auto rounded-2xl bg-[#26272B] text-[#9A9CA3] flex items-center justify-center border border-[#3A3C42]">
+            <div class="bg-[#25262B] p-7 rounded-3xl text-center border border-[#33353C] shadow-2xs space-y-3 mt-2">
+              <div class="w-12 h-12 mx-auto rounded-2xl bg-[#2A2B31] text-[#C8CAD0] flex items-center justify-center border border-[#43464F]">
                 <i data-lucide="receipt" class="w-6 h-6"></i>
               </div>
               <div>
-                <h3 class="text-xs font-bold text-[#F3F1EC]">${t('no_transactions_yet')}</h3>
-                <p class="text-[11px] text-[#9A9CA3] mt-0.5">${getLang() === 'ar' ? 'عند تسجيل حركة جديدة ستظهر هنا تلقائياً.' : 'When you log an expense, it will appear here.'}</p>
+                <h3 class="text-[15px] font-bold text-[#F3F1EC]">${t('no_transactions_yet')}</h3>
+                <p class="text-xs text-[#C8CAD0] mt-1">${getLang() === 'ar' ? 'عند تسجيل حركة جديدة ستظهر هنا تلقائياً.' : 'When you log an expense, it will appear here.'}</p>
               </div>
-              <button onclick="window.openModal('transaction')" class="px-4 py-2 bg-[#F5B700] text-[#111111] text-xs font-bold rounded-full shadow-xs active-press inline-flex items-center gap-1.5 mt-1">
-                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <button onclick="window.openModal('transaction')" class="px-5 py-2.5 min-h-[44px] bg-[#F5B700] text-[#111111] text-[13px] font-bold rounded-full shadow-xs active-press inline-flex items-center gap-1.5 mt-1">
+                <i data-lucide="plus" class="w-4 h-4"></i>
                 <span>${t('log_first_expense')}</span>
               </button>
             </div>
@@ -2693,49 +2699,48 @@ function initApp() {
             const txType = tx.transactionType || (tx.category === 'transfer' ? 'transfer' : 'purchase');
             let typeBadge = '';
             if (tx.isBalanceAdjustment || tx.transactionType === 'balance_adjustment') {
-              typeBadge = `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#26272B] text-[#9A9CA3] border border-[#3A3C42]">${t('badge_bal_adj')}</span>`;
+              typeBadge = `<span class="text-[11px] font-bold px-2 py-0.5 rounded bg-[#2A2B31] text-[#C8CAD0] border border-[#43464F]">${t('badge_bal_adj')}</span>`;
             } else if (txType === 'withdrawal') {
               if (tx.card && tx.card.cardType === 'credit') {
-                typeBadge = `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#26272B] text-[#E6A8A8] border border-[#E6A8A8]/30">${t('badge_credit_cash')}</span>`;
+                typeBadge = `<span class="text-[11px] font-bold px-2 py-0.5 rounded bg-[#2A2B31] text-[#E6A8A8] border border-[#E6A8A8]/30">${t('badge_credit_cash')}</span>`;
               } else {
-                typeBadge = `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#26272B] text-[#F5B700] border border-[#F5B700]/30">${t('badge_withdrawal')}</span>`;
+                typeBadge = `<span class="text-[11px] font-bold px-2 py-0.5 rounded bg-[#2A2B31] text-[#F5B700] border border-[#F5B700]/30">${t('badge_withdrawal')}</span>`;
               }
             } else if (txType === 'transfer') {
-              typeBadge = `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#26272B] text-[#9A9CA3] border border-[#3A3C42]">${t('badge_transfer')}</span>`;
+              typeBadge = `<span class="text-[11px] font-bold px-2 py-0.5 rounded bg-[#2A2B31] text-[#C8CAD0] border border-[#43464F]">${t('badge_transfer')}</span>`;
             } else {
-              typeBadge = `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#26272B] text-[#F3F1EC] border border-[#3A3C42]">${t('badge_purchase')}</span>`;
+              typeBadge = `<span class="text-[11px] font-bold px-2 py-0.5 rounded bg-[#2A2B31] text-[#F3F1EC] border border-[#43464F]">${t('badge_purchase')}</span>`;
             }
 
             return `
-              <div class="bg-[#1F2024] p-3.5 rounded-2xl flex justify-between items-center gap-2.5 shadow-2xs border border-[#2F3136] hover:border-[#3A3C42] transition-all">
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-1.5 min-w-0">
-                    <p class="text-[13px] font-bold text-[#F3F1EC] truncate">${tx.merchant}</p>
-                    <span class="shrink-0">${typeBadge}</span>
+              <div class="bg-[#25262B] p-3.5 rounded-2xl shadow-2xs border border-[#33353C] hover:border-[#43464F] transition-all card-press space-y-1.5">
+                <div class="flex justify-between items-center gap-2">
+                  <p class="text-[16px] font-bold text-[#F3F1EC] truncate min-w-0 flex-1" dir="auto">${tx.merchant}</p>
+                  <div class="flex items-center gap-1 shrink-0">
+                    ${formatAmountInlineHtml(tx.amount, {
+                      useSans: true,
+                      prefixSign: tx.direction === 'income' ? '+' : '-',
+                      numClass: `text-[15.5px] font-extrabold ${tx.direction === 'income' ? 'text-[#F5B700]' : 'text-[#F3F1EC]'}`,
+                      currClass: 'text-[11px] text-[#C8CAD0] font-semibold'
+                    })}
+                    <button onclick="window.confirmDeleteTx('${tx.id}')" class="text-[#C8CAD0] hover:text-[#E6A8A8] w-8 h-8 flex items-center justify-center rounded-full transition-colors">
+                      <i data-lucide="trash" class="w-4 h-4"></i>
+                    </button>
                   </div>
-                  <div class="flex items-center gap-1.5 mt-1 text-[10px] text-[#9A9CA3] min-w-0">
-                    <span class="font-mono whitespace-nowrap shrink-0" dir="ltr">${tx.date}</span>
-                    <span class="text-[#565963] shrink-0">·</span>
-                    ${tx.card?.name ? `<span class="truncate">${tx.card.name}</span>` : ''}
-                    <span class="font-mono whitespace-nowrap shrink-0" dir="ltr">•••• ${tx.card?.last4 || ''}</span>
-                  </div>
+                </div>
+                <div class="flex items-center gap-1.5 text-xs text-[#C8CAD0] min-w-0">
+                  <span class="font-mono whitespace-nowrap shrink-0" dir="ltr">${tx.date}</span>
+                  <span class="text-[#565963] shrink-0">·</span>
+                  ${tx.card?.name ? `<span class="truncate">${tx.card.name}</span>` : ''}
+                  <span class="font-mono whitespace-nowrap shrink-0" dir="ltr">•••• ${tx.card?.last4 || ''}</span>
+                </div>
+                <div class="flex items-center justify-between gap-2 pt-0.5">
                   ${isCredit ? `
-                    <p class="mt-0.5 text-[10px] ${isCurrentCycle ? 'text-[#F5B700]' : 'text-[#9A9CA3]'} font-semibold whitespace-nowrap">
+                    <p class="text-xs ${isCurrentCycle ? 'text-[#F5B700]' : 'text-[#C8CAD0]'} font-semibold whitespace-nowrap">
                       ${t('affects_stmt', { month: localizeMonthName(stmtName) })}
                     </p>
-                  ` : ''}
-                </div>
-
-                <div class="flex items-center gap-1.5 shrink-0">
-                  ${formatAmountInlineHtml(tx.amount, {
-                    useSans: true,
-                    prefixSign: tx.direction === 'income' ? '+' : '-',
-                    numClass: `text-[14.5px] font-extrabold ${tx.direction === 'income' ? 'text-[#F5B700]' : 'text-[#F3F1EC]'}`,
-                    currClass: 'text-[10px] text-[#9A9CA3] font-semibold'
-                  })}
-                  <button onclick="window.confirmDeleteTx('${tx.id}')" class="text-[#9A9CA3] hover:text-[#E6A8A8] p-1 transition-colors">
-                    <i data-lucide="trash" class="w-3.5 h-3.5"></i>
-                  </button>
+                  ` : '<span></span>'}
+                  <span class="shrink-0">${typeBadge}</span>
                 </div>
               </div>
             `;
@@ -2809,41 +2814,41 @@ function initApp() {
         <input type="file" id="vault-backup-file-input" accept=".json" class="hidden" onchange="window.importEncryptedVaultBackup(event)">
 
         <!-- SECTION 1: SECURITY (الأمان) -->
-        <div class="space-y-1.5">
-          <p class="text-xs font-bold text-[#9A9CA3] px-1">${t('security')}</p>
-          <div class="bg-[#1F2024] border border-[#2F3136] rounded-3xl divide-y divide-[#2F3136]/70 overflow-hidden shadow-md">
+        <div class="space-y-2">
+          <p class="text-[17px] font-extrabold text-[#F3F1EC] px-1">${t('security')}</p>
+          <div class="bg-[#25262B] border border-[#33353C] rounded-3xl divide-y divide-[#33353C]/80 overflow-hidden shadow-md">
             
             <!-- Row: PIN Code -->
-            <div class="flex items-center justify-between p-4">
+            <div class="flex items-center justify-between p-4 gap-3">
               <div>
-                <div class="text-xs font-bold text-[#F3F1EC]">${t('pin_code')}</div>
-                <div class="text-[10px] text-[#9A9CA3] mt-0.5">${t('digits_4')}</div>
+                <div class="text-[15px] font-bold text-[#F3F1EC]">${t('pin_code')}</div>
+                <div class="text-xs text-[#C8CAD0] mt-0.5">${t('digits_4')}</div>
               </div>
-              <button type="button" onclick="window.promptChangePin()" class="px-3.5 py-1.5 rounded-xl bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-xs font-bold text-[#F3F1EC] active-press transition-colors">
+              <button type="button" onclick="window.promptChangePin()" class="px-4 py-2 min-h-[44px] rounded-xl bg-[#2A2B31] hover:bg-[#43464F] border border-[#43464F] text-[13px] font-bold text-[#F3F1EC] active-press transition-colors shrink-0">
                 ${t('change')}
               </button>
             </div>
 
             <!-- Row: Biometric Unlock -->
-            <div class="flex items-center justify-between p-4">
+            <div class="flex items-center justify-between p-4 gap-3">
               <div>
-                <div class="text-xs font-bold text-[#F3F1EC]">${t('biometric_unlock')}</div>
-                <div class="text-[10px] text-[#9A9CA3] mt-0.5">
+                <div class="text-[15px] font-bold text-[#F3F1EC]">${t('biometric_unlock')}</div>
+                <div class="text-xs text-[#C8CAD0] mt-0.5">
                   ${isBioSupported ? (isBioEnabled ? t('enabled') : t('not_enabled')) : (getLang() === 'ar' ? 'غير مدعوم في هذا المتصفح' : 'Not supported')}
                 </div>
               </div>
-              <label class="relative inline-flex items-center ${isBioSupported ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'}">
+              <label class="relative inline-flex items-center min-h-[44px] shrink-0 ${isBioSupported ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'}">
                 <input type="checkbox" id="settings-biometric-toggle" ${isBioEnabled ? 'checked' : ''} ${!isBioSupported ? 'disabled' : ''} class="sr-only peer">
-                <div class="w-11 h-6 bg-[#26272B] border border-[#3A3C42] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] rtl:peer-checked:after:-translate-x-full after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700]"></div>
+                <div class="relative w-11 h-6 bg-[#2A2B31] border border-[#43464F] peer-focus:outline-none rounded-full peer after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:after:border-white peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700]"></div>
               </label>
             </div>
 
             <!-- Row: Auto-Lock -->
-            <div class="flex items-center justify-between p-4">
+            <div class="flex items-center justify-between p-4 gap-3">
               <div>
-                <div class="text-xs font-bold text-[#F3F1EC]">${t('auto_lock')}</div>
+                <div class="text-[15px] font-bold text-[#F3F1EC]">${t('auto_lock')}</div>
               </div>
-              <select id="settings-autolock-select" onchange="window.updateAutoLockTimeout(this.value)" class="text-xs font-bold bg-[#26272B] border border-[#3A3C42] text-[#F3F1EC] rounded-xl px-3 py-1.5 outline-none cursor-pointer">
+              <select id="settings-autolock-select" onchange="window.updateAutoLockTimeout(this.value)" class="text-[13px] font-bold bg-[#2A2B31] border border-[#43464F] text-[#F3F1EC] rounded-xl px-3 py-2 min-h-[44px] outline-none cursor-pointer shrink-0">
                 <option value="0" ${timeoutMs === 0 ? 'selected' : ''}>${t('immediately')}</option>
                 <option value="60000" ${timeoutMs === 60000 ? 'selected' : ''}>${t('minutes_1')}</option>
                 <option value="180000" ${timeoutMs === 180000 ? 'selected' : ''}>${t('minutes_3')}</option>
@@ -2853,95 +2858,95 @@ function initApp() {
             </div>
 
             <!-- Row: Lock Wallet Now -->
-            <div onclick="window.WalletSecurity && window.WalletSecurity.lock()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
-              <span class="text-xs font-bold text-[#F3F1EC]">${t('lock_wallet_now')}</span>
-              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
+            <div onclick="window.WalletSecurity && window.WalletSecurity.lock()" class="flex items-center justify-between p-4 min-h-[52px] cursor-pointer hover:bg-[#2A2B31]/60 transition-colors active-press">
+              <span class="text-[15px] font-bold text-[#F3F1EC]">${t('lock_wallet_now')}</span>
+              <span class="text-[#C8CAD0] text-sm">&rsaquo;</span>
             </div>
 
           </div>
         </div>
 
         <!-- SECTION 2: SMS PROCESSING (استقبال الرسائل) -->
-        <div class="space-y-1.5">
-          <p class="text-xs font-bold text-[#9A9CA3] px-1">${t('sms_intake')}</p>
-          <div class="bg-[#1F2024] border border-[#2F3136] rounded-3xl divide-y divide-[#2F3136]/70 overflow-hidden shadow-md">
+        <div class="space-y-2">
+          <p class="text-[17px] font-extrabold text-[#F3F1EC] px-1">${t('sms_intake')}</p>
+          <div class="bg-[#25262B] border border-[#33353C] rounded-3xl divide-y divide-[#33353C]/80 overflow-hidden shadow-md">
             
             <!-- Row: Read Bank SMS -->
-            <div class="flex items-center justify-between p-4">
+            <div class="flex items-center justify-between p-4 gap-3">
               <div>
-                <div class="text-xs font-bold text-[#F3F1EC]">${t('read_bank_sms')}</div>
-                <div class="text-[10px] text-[#9A9CA3] mt-0.5">
+                <div class="text-[15px] font-bold text-[#F3F1EC]">${t('read_bank_sms')}</div>
+                <div class="text-xs text-[#C8CAD0] mt-0.5">
                   ${(window.BankSmsEngine && window.BankSmsEngine.stats.permissionStatus === 'granted') ? t('active_perm_granted') : t('inactive_or_no_perm')}
                 </div>
               </div>
-              <label class="relative inline-flex items-center cursor-pointer">
+              <label class="relative inline-flex items-center min-h-[44px] shrink-0 cursor-pointer">
                 <input type="checkbox" id="settings-sms-import-toggle" ${window.BankSmsEngine && window.BankSmsEngine.stats.isSmsImportEnabled ? 'checked' : ''} onchange="window.toggleSmsImport(this.checked)" class="sr-only peer">
-                <div class="w-11 h-6 bg-[#26272B] border border-[#3A3C42] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] rtl:peer-checked:after:-translate-x-full after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700]"></div>
+                <div class="relative w-11 h-6 bg-[#2A2B31] border border-[#43464F] peer-focus:outline-none rounded-full peer after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:after:border-white peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700]"></div>
               </label>
             </div>
 
             <!-- Row: Allowed Banks -->
-            <div onclick="window.toggleDevSimulator()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
-              <span class="text-xs font-bold text-[#F3F1EC]">${t('allowed_banks')}</span>
-              <div class="flex items-center gap-1.5">
-                <span class="text-[10px] text-[#9A9CA3] font-mono">CIB +${Math.max(store.banks.length - 1, 0)}</span>
-                <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
+            <div onclick="window.toggleDevSimulator()" class="flex items-center justify-between p-4 min-h-[52px] cursor-pointer hover:bg-[#2A2B31]/60 transition-colors active-press">
+              <span class="text-[15px] font-bold text-[#F3F1EC]">${t('allowed_banks')}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-[#C8CAD0] font-mono">CIB +${Math.max(store.banks.length - 1, 0)}</span>
+                <span class="text-[#C8CAD0] text-sm">&rsaquo;</span>
               </div>
             </div>
 
             <!-- Row: Check Reception Status -->
-            <div onclick="window.openSmsDiagnostics()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
-              <span class="text-xs font-bold text-[#F3F1EC]">${t('check_reception_status')}</span>
-              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
+            <div onclick="window.openSmsDiagnostics()" class="flex items-center justify-between p-4 min-h-[52px] cursor-pointer hover:bg-[#2A2B31]/60 transition-colors active-press">
+              <span class="text-[15px] font-bold text-[#F3F1EC]">${t('check_reception_status')}</span>
+              <span class="text-[#C8CAD0] text-sm">&rsaquo;</span>
             </div>
 
             <!-- Row: Import Past SMS -->
-            <div onclick="window.openHistoricalSmsImport()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
-              <span class="text-xs font-bold text-[#F3F1EC]">${t('import_past_sms')}</span>
-              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
+            <div onclick="window.openHistoricalSmsImport()" class="flex items-center justify-between p-4 min-h-[52px] cursor-pointer hover:bg-[#2A2B31]/60 transition-colors active-press">
+              <span class="text-[15px] font-bold text-[#F3F1EC]">${t('import_past_sms')}</span>
+              <span class="text-[#C8CAD0] text-sm">&rsaquo;</span>
             </div>
 
           </div>
         </div>
 
         <!-- SECTION 3: BACKUP & GENERAL (النسخ الاحتياطي والعام) -->
-        <div class="space-y-1.5">
-          <p class="text-xs font-bold text-[#9A9CA3] px-1">${t('backup_general')}</p>
-          <div class="bg-[#1F2024] border border-[#2F3136] rounded-3xl divide-y divide-[#2F3136]/70 overflow-hidden shadow-md">
+        <div class="space-y-2">
+          <p class="text-[17px] font-extrabold text-[#F3F1EC] px-1">${t('backup_general')}</p>
+          <div class="bg-[#25262B] border border-[#33353C] rounded-3xl divide-y divide-[#33353C]/80 overflow-hidden shadow-md">
             
             <!-- Row: Export Encrypted Backup -->
-            <div onclick="window.exportEncryptedVaultBackup()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
+            <div onclick="window.exportEncryptedVaultBackup()" class="flex items-center justify-between p-4 min-h-[56px] cursor-pointer hover:bg-[#2A2B31]/60 transition-colors active-press gap-3">
               <div>
-                <div class="text-xs font-bold text-[#F3F1EC]">${t('export_encrypted_backup')}</div>
-                <div class="text-[10px] text-[#9A9CA3] mt-0.5">${t('passphrase_8_chars')}</div>
+                <div class="text-[15px] font-bold text-[#F3F1EC]">${t('export_encrypted_backup')}</div>
+                <div class="text-xs text-[#C8CAD0] mt-0.5">${t('passphrase_8_chars')}</div>
               </div>
-              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
+              <span class="text-[#C8CAD0] text-sm shrink-0">&rsaquo;</span>
             </div>
 
             <!-- Row: Import Backup -->
-            <div onclick="document.getElementById('vault-backup-file-input').click()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
+            <div onclick="document.getElementById('vault-backup-file-input').click()" class="flex items-center justify-between p-4 min-h-[56px] cursor-pointer hover:bg-[#2A2B31]/60 transition-colors active-press gap-3">
               <div>
-                <div class="text-xs font-bold text-[#F3F1EC]">${t('import_backup')}</div>
-                <div class="text-[10px] text-[#9A9CA3] mt-0.5">${t('replaces_data_after_confirm')}</div>
+                <div class="text-[15px] font-bold text-[#F3F1EC]">${t('import_backup')}</div>
+                <div class="text-xs text-[#C8CAD0] mt-0.5">${t('replaces_data_after_confirm')}</div>
               </div>
-              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
+              <span class="text-[#C8CAD0] text-sm shrink-0">&rsaquo;</span>
             </div>
 
             <!-- Row: Language -->
-            <div class="flex items-center justify-between p-4">
+            <div class="flex items-center justify-between p-4 gap-3">
               <div>
-                <div class="text-xs font-bold text-[#F3F1EC]">${t('language')}</div>
-                <div class="text-[10px] text-[#9A9CA3] mt-0.5">${t('all_screen_one_lang')}</div>
+                <div class="text-[15px] font-bold text-[#F3F1EC]">${t('language')}</div>
+                <div class="text-xs text-[#C8CAD0] mt-0.5">${t('all_screen_one_lang')}</div>
               </div>
-              <button type="button" onclick="window.toggleAppLanguage()" class="px-3.5 py-1.5 rounded-xl bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-xs font-bold text-[#F3F1EC] active-press transition-colors">
+              <button type="button" onclick="window.toggleAppLanguage()" class="px-4 py-2 min-h-[44px] rounded-xl bg-[#2A2B31] hover:bg-[#43464F] border border-[#43464F] text-[13px] font-bold text-[#F3F1EC] active-press transition-colors shrink-0">
                 ${getLang() === 'ar' ? 'العربية' : 'English'}
               </button>
             </div>
 
             <!-- Row: Currency -->
-            <div class="flex items-center justify-between p-4">
-              <span class="text-xs font-bold text-[#F3F1EC]">${t('currency')}</span>
-              <select onchange="window.switchCurrency(this.value)" class="text-xs font-bold bg-[#26272B] border border-[#3A3C42] text-[#F3F1EC] rounded-xl px-3 py-1.5 outline-none cursor-pointer">
+            <div class="flex items-center justify-between p-4 gap-3">
+              <span class="text-[15px] font-bold text-[#F3F1EC]">${t('currency')}</span>
+              <select onchange="window.switchCurrency(this.value)" class="text-[13px] font-bold bg-[#2A2B31] border border-[#43464F] text-[#F3F1EC] rounded-xl px-3 py-2 min-h-[44px] outline-none cursor-pointer shrink-0">
                 <option value="EGP" ${currentCurrency === 'EGP' ? 'selected' : ''}>EGP</option>
                 <option value="USD" ${currentCurrency === 'USD' ? 'selected' : ''}>USD ($)</option>
                 <option value="EUR" ${currentCurrency === 'EUR' ? 'selected' : ''}>EUR (€)</option>
@@ -2952,58 +2957,58 @@ function initApp() {
             </div>
 
             <!-- Row: Export CSV -->
-            <div onclick="window.exportTransactionsCSV()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
-              <span class="text-xs font-bold text-[#F3F1EC]">${t('export_csv')}</span>
-              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
+            <div onclick="window.exportTransactionsCSV()" class="flex items-center justify-between p-4 min-h-[52px] cursor-pointer hover:bg-[#2A2B31]/60 transition-colors active-press">
+              <span class="text-[15px] font-bold text-[#F3F1EC]">${t('export_csv')}</span>
+              <span class="text-[#C8CAD0] text-sm">&rsaquo;</span>
             </div>
 
             <!-- Row: Developer Tools & Simulation -->
-            <div onclick="window.toggleDevSimulator()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#26272B]/60 transition-colors active-press">
-              <span class="text-xs font-bold text-[#F3F1EC]">${t('developer_tools')}</span>
-              <span class="text-[#9A9CA3] text-xs">&rsaquo;</span>
+            <div onclick="window.toggleDevSimulator()" class="flex items-center justify-between p-4 min-h-[52px] cursor-pointer hover:bg-[#2A2B31]/60 transition-colors active-press">
+              <span class="text-[15px] font-bold text-[#F3F1EC]">${t('developer_tools')}</span>
+              <span class="text-[#C8CAD0] text-sm">&rsaquo;</span>
             </div>
 
             <!-- Row: Clear All Data -->
-            <div onclick="window.clearAllData()" class="flex items-center justify-between p-4 cursor-pointer hover:bg-[#3A2020]/40 transition-colors active-press">
-              <span class="text-xs font-bold text-[#E6A8A8]">${t('clear_all_data')}</span>
-              <span class="text-[#E6A8A8] text-xs">&rsaquo;</span>
+            <div onclick="window.clearAllData()" class="flex items-center justify-between p-4 min-h-[52px] cursor-pointer hover:bg-[#3A2020]/40 transition-colors active-press">
+              <span class="text-[15px] font-bold text-[#E6A8A8]">${t('clear_all_data')}</span>
+              <span class="text-[#E6A8A8] text-sm">&rsaquo;</span>
             </div>
 
           </div>
         </div>
 
         <!-- DEVELOPER TOOLS EXPANDABLE DRAWER -->
-        <div id="settings-dev-tools-box" class="hidden bg-[#1F2024] rounded-3xl p-5 border border-[#2F3136] space-y-4">
-          <div class="flex items-center justify-between pb-2 border-b border-[#2F3136]">
+        <div id="settings-dev-tools-box" class="hidden bg-[#25262B] rounded-3xl p-5 border border-[#33353C] space-y-4">
+          <div class="flex items-center justify-between pb-2 border-b border-[#33353C]">
             <h3 class="text-xs font-extrabold text-[#F3F1EC]">${t('developer_tools')}</h3>
-            <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#26272B] text-[#F5B700] border border-[#F5B700]/30">DEV</span>
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#2A2B31] text-[#F5B700] border border-[#F5B700]/30">DEV</span>
           </div>
 
           <!-- Bank Allowlist Manager -->
           <div class="space-y-2">
             <div class="flex items-center justify-between">
               <label class="text-xs font-bold text-[#F3F1EC]">${t('allowed_senders_label')}</label>
-              <span class="text-[10px] text-[#9A9CA3]">${t('enabled_count', { n: (window.BankSmsEngine && window.BankSmsEngine.allowlist.length) || 0 })}</span>
+              <span class="text-xs text-[#C8CAD0]">${t('enabled_count', { n: (window.BankSmsEngine && window.BankSmsEngine.allowlist.length) || 0 })}</span>
             </div>
-            <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 bg-[#26272B] rounded-2xl border border-[#3A3C42]">
+            <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 bg-[#2A2B31] rounded-2xl border border-[#43464F]">
               ${(window.BankSmsEngine && window.BankSmsEngine.allowlist || []).map(b => `
-                <span class="inline-flex items-center gap-1 text-[10px] font-bold bg-[#1F2024] text-[#F3F1EC] px-2 py-0.5 rounded-full border border-[#3A3C42]" dir="ltr">
+                <span class="inline-flex items-center gap-1 text-[10px] font-bold bg-[#25262B] text-[#F3F1EC] px-2 py-0.5 rounded-full border border-[#43464F]" dir="ltr">
                   <span>${b}</span>
-                  <button type="button" onclick="window.removeBankSender('${b}')" class="text-[#9A9CA3] hover:text-[#E6A8A8]">×</button>
+                  <button type="button" onclick="window.removeBankSender('${b}')" class="text-[#C8CAD0] hover:text-[#E6A8A8]">×</button>
                 </span>
               `).join('')}
             </div>
             <div class="flex gap-2">
-              <input type="text" id="settings-add-bank-input" placeholder="${t('add_sender_placeholder')}" class="flex-1 text-xs bg-[#26272B] border border-[#3A3C42] rounded-xl px-2.5 py-1.5 text-[#F3F1EC] outline-none">
+              <input type="text" id="settings-add-bank-input" placeholder="${t('add_sender_placeholder')}" class="flex-1 text-xs bg-[#2A2B31] border border-[#43464F] rounded-xl px-2.5 py-1.5 text-[#F3F1EC] outline-none">
               <button type="button" onclick="window.addBankSender()" class="px-3 py-1.5 bg-[#F5B700] text-[#111111] text-[11px] font-bold rounded-xl active-press">${t('add_btn')}</button>
             </div>
           </div>
 
           <!-- In-App Synthetic SMS Test Simulator -->
-          <div class="border-t border-[#2F3136] pt-3 space-y-2">
+          <div class="border-t border-[#33353C] pt-3 space-y-2">
             <label class="text-xs font-bold text-[#F3F1EC]">${t('sms_simulator_label')}</label>
             <div class="flex gap-2">
-              <select id="sms-simulator-select" class="flex-1 text-[11px] font-bold bg-[#26272B] border border-[#3A3C42] text-[#F3F1EC] rounded-xl px-2.5 py-1.5 outline-none cursor-pointer">
+              <select id="sms-simulator-select" class="flex-1 text-[11px] font-bold bg-[#2A2B31] border border-[#43464F] text-[#F3F1EC] rounded-xl px-2.5 py-1.5 outline-none cursor-pointer">
                 <option value="0">${t('sim_opt_0')}</option>
                 <option value="1">${t('sim_opt_1')}</option>
                 <option value="2">${t('sim_opt_2')}</option>
@@ -3018,8 +3023,8 @@ function initApp() {
           </div>
 
           <!-- Reset to Demo Data -->
-          <div class="border-t border-[#2F3136] pt-3">
-            <button type="button" onclick="window.resetSampleData()" class="w-full py-2 px-3 bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-[#F3F1EC] text-[11px] font-bold rounded-xl active-press">
+          <div class="border-t border-[#33353C] pt-3">
+            <button type="button" onclick="window.resetSampleData()" class="w-full py-2 px-3 bg-[#2A2B31] hover:bg-[#43464F] border border-[#43464F] text-[#F3F1EC] text-[11px] font-bold rounded-xl active-press">
               ${t('reset_demo_btn')}
             </button>
           </div>
@@ -3197,12 +3202,12 @@ function initApp() {
 
     if (candidates.length === 0) {
       const emptyHtml = `
-        <div class="py-12 text-center space-y-3 bg-[#1F2024] border border-[#2F3136] rounded-3xl p-6">
-          <div class="w-12 h-12 mx-auto rounded-full bg-[#26272B] text-[#9A9CA3] flex items-center justify-center border border-[#3A3C42]">
+        <div class="py-12 text-center space-y-3 bg-[#25262B] border border-[#33353C] rounded-3xl p-6">
+          <div class="w-12 h-12 mx-auto rounded-full bg-[#2A2B31] text-[#C8CAD0] flex items-center justify-center border border-[#43464F]">
             <i data-lucide="inbox" class="w-6 h-6"></i>
           </div>
-          <p class="text-xs font-bold text-[#F3F1EC]">${t('inbox_empty')}</p>
-          <p class="text-[10px] text-[#9A9CA3] max-w-[240px] mx-auto">${t('inbox_empty_desc')}</p>
+          <p class="text-[15px] font-bold text-[#F3F1EC]">${t('inbox_empty')}</p>
+          <p class="text-xs text-[#C8CAD0] max-w-[260px] mx-auto">${t('inbox_empty_desc')}</p>
         </div>
       `;
       listEls.forEach(el => {
@@ -3223,41 +3228,42 @@ function initApp() {
       const summaryHtml = buildCandidateSummarySentence(c);
 
       return `
-        <div id="candidate-card-${c.id}" class="bg-[#1F2024] border ${needsCardSelection ? 'border-[#F5B700]/70' : 'border-[#2F3136]'} rounded-2xl p-3.5 space-y-2.5 transition-all shadow-md">
+        <div id="candidate-card-${c.id}" class="bg-[#25262B] border ${needsCardSelection ? 'border-[#F5B700]/70' : 'border-[#33353C]'} rounded-2xl p-4 space-y-3 transition-all shadow-md card-press">
           <!-- Row 1: Bank + Card/Tags & Amount LTR -->
           <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-1.5 flex-wrap min-w-0">
-              <span class="text-xs font-black tracking-tight text-[#F3F1EC]" dir="ltr">${c.bank}</span>
-              ${c.isHistorical ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#26272B] text-[#9A9CA3] border border-[#3A3C42]">${t('historical_badge')}</span>` : ''}
-              ${c.cardSuffix ? `<span class="text-[10px] font-mono text-[#9A9CA3]" dir="ltr">•••• ${c.cardSuffix}</span>` : `<span class="text-[9px] font-bold text-[#F5B700] bg-[#26272B] border border-[#F5B700]/30 px-1.5 py-0.5 rounded-full">${t('choose_card_badge')}</span>`}
+            <div class="flex items-center gap-2 flex-wrap min-w-0">
+              <span class="text-[15px] font-black tracking-tight text-[#F3F1EC]" dir="ltr">${c.bank}</span>
+              ${c.isHistorical ? `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#2A2B31] text-[#C8CAD0] border border-[#43464F]">${t('historical_badge')}</span>` : ''}
+              ${c.cardSuffix ? `<span class="text-xs font-mono text-[#C8CAD0]" dir="ltr">•••• ${c.cardSuffix}</span>` : `<span class="text-[11px] font-bold text-[#F5B700] bg-[#2A2B31] border border-[#F5B700]/30 px-2 py-0.5 rounded-full">${t('choose_card_badge')}</span>`}
             </div>
             <div class="shrink-0">
               ${formatAmountInlineHtml(c.amount, {
+                useSans: true,
                 prefixSign: isCredit ? '+' : '-',
                 currency: c.currency || currentCurrency,
-                numClass: `text-xs font-extrabold ${isCredit ? 'text-[#F5B700]' : 'text-[#F3F1EC]'}`,
-                currClass: 'text-[10px] text-[#9A9CA3] font-semibold'
+                numClass: `text-[16px] font-extrabold ${isCredit ? 'text-[#F5B700]' : 'text-[#F3F1EC]'}`,
+                currClass: 'text-[11px] text-[#C8CAD0] font-semibold'
               })}
             </div>
           </div>
 
           <!-- Row 2: Localized One-Line Summary + Edit Toggle -->
           <div class="flex items-start justify-between gap-2">
-            <p class="text-[11px] text-[#C8CAD0] leading-snug flex-1">${summaryHtml}</p>
-            <button type="button" onclick="window.toggleCandidateEditDetails('${c.id}')" class="p-1 rounded-lg bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-[#9A9CA3] hover:text-[#F5B700] shrink-0 transition-colors" title="${t('edit_details')}">
-              <i data-lucide="sliders-horizontal" class="w-3 h-3"></i>
+            <p class="text-[13px] text-[#C8CAD0] leading-snug flex-1">${summaryHtml}</p>
+            <button type="button" onclick="window.toggleCandidateEditDetails('${c.id}')" class="w-9 h-9 rounded-xl bg-[#2A2B31] hover:bg-[#43464F] border border-[#43464F] text-[#C8CAD0] hover:text-[#F5B700] shrink-0 flex items-center justify-center transition-colors active-press" title="${t('edit_details')}">
+              <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
             </button>
           </div>
 
           <!-- Collapsible Edit Details (Merchant, Category, Date/Ref) — Always in DOM for approveSmsCandidate -->
-          <div id="candidate-extra-edit-${c.id}" class="${isExtraOpen ? '' : 'hidden'} space-y-2 bg-[#16171A] border border-[#2F3136] rounded-xl p-2.5">
+          <div id="candidate-extra-edit-${c.id}" class="${isExtraOpen ? '' : 'hidden'} space-y-2.5 bg-[#1A1B1F] border border-[#33353C] rounded-xl p-3">
             <div>
-              <label class="block text-[10px] font-bold text-[#9A9CA3] mb-1">${t('merchant_label')}</label>
-              <input type="text" id="candidate-merchant-${c.id}" value="${c.merchant ? c.merchant.replace(/"/g, '&quot;') : (c.bank + ' Transaction')}" class="w-full text-xs font-bold text-[#F3F1EC] bg-[#26272B] border border-[#3A3C42] rounded-xl px-2.5 py-1.5 outline-none focus:border-[#F5B700]">
+              <label class="block text-xs font-bold text-[#C8CAD0] mb-1">${t('merchant_label')}</label>
+              <input type="text" id="candidate-merchant-${c.id}" value="${c.merchant ? c.merchant.replace(/"/g, '&quot;') : (c.bank + ' Transaction')}" class="w-full text-[13px] font-bold text-[#F3F1EC] bg-[#2A2B31] border border-[#43464F] rounded-xl px-3 py-2 outline-none focus:border-[#F5B700]">
             </div>
             <div>
-              <label class="block text-[10px] font-bold text-[#9A9CA3] mb-1">${t('category')}</label>
-              <select id="candidate-category-select-${c.id}" class="w-full text-[11px] font-bold text-[#F3F1EC] bg-[#26272B] border border-[#3A3C42] rounded-xl px-2 py-1.5 outline-none cursor-pointer">
+              <label class="block text-xs font-bold text-[#C8CAD0] mb-1">${t('category')}</label>
+              <select id="candidate-category-select-${c.id}" class="w-full text-[13px] font-bold text-[#F3F1EC] bg-[#2A2B31] border border-[#43464F] rounded-xl px-2.5 py-2 outline-none cursor-pointer">
                 <option value="shopping" ${c.suggestedCategory === 'shopping' ? 'selected' : ''}>${t('cat_shopping')}</option>
                 <option value="food" ${c.suggestedCategory === 'food' ? 'selected' : ''}>${t('cat_food')}</option>
                 <option value="groceries" ${c.suggestedCategory === 'groceries' ? 'selected' : ''}>${t('cat_groceries')}</option>
@@ -3269,23 +3275,23 @@ function initApp() {
                 <option value="other" ${!c.suggestedCategory || c.suggestedCategory === 'other' ? 'selected' : ''}>${t('cat_other')}</option>
               </select>
             </div>
-            <div class="text-[9px] text-[#9A9CA3] flex items-center justify-between pt-0.5">
+            <div class="text-xs text-[#C8CAD0] flex items-center justify-between pt-0.5">
               <span>${t('date_prefix')} <span dir="ltr" class="font-mono">${c.transactionTime || new Date(c.receiptTime).toLocaleString()}</span></span>
               <span>${t('ref_prefix')} <span dir="ltr" class="font-mono">${(c.fingerprint || '').slice(0, 10)}</span></span>
             </div>
           </div>
 
           ${needsCardSelection ? `
-            <div class="bg-[#26272B] border border-[#F5B700]/40 rounded-xl p-2 space-y-1 text-[11px] text-[#F5B700]">
+            <div class="bg-[#2A2B31] border border-[#F5B700]/40 rounded-xl p-2.5 space-y-1.5 text-xs text-[#F5B700]">
               <div class="flex items-start gap-1.5 font-bold">
-                <i data-lucide="help-circle" class="w-3.5 h-3.5 text-[#F5B700] shrink-0 mt-0.5"></i>
+                <i data-lucide="help-circle" class="w-4 h-4 text-[#F5B700] shrink-0 mt-0.5"></i>
                 <span>${t('non_match_prefix')} ${c.nonMatchReason || t('non_match_default')}</span>
               </div>
               ${c.matchSuggestion ? `
-                <div class="text-[10px] text-[#F3F1EC] flex items-center justify-between gap-2 pt-1 border-t border-[#3A3C42]">
+                <div class="text-xs text-[#F3F1EC] flex items-center justify-between gap-2 pt-1.5 border-t border-[#43464F]">
                   <span>${c.matchSuggestion}</span>
                   ${c.suggestAddAccount ? `
-                    <button type="button" onclick="window.openAddAccountPrompt('${c.suggestAddAccount.bankId || ''}', '${c.suggestAddAccount.digits || ''}', '${c.suggestAddAccount.position || 'last'}')" class="shrink-0 px-2.5 py-1 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] rounded-lg text-[10px] font-bold active-press">
+                    <button type="button" onclick="window.openAddAccountPrompt('${c.suggestAddAccount.bankId || ''}', '${c.suggestAddAccount.digits || ''}', '${c.suggestAddAccount.position || 'last'}')" class="shrink-0 px-3 py-1.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] rounded-lg text-xs font-bold active-press">
                       ${t('add_account_btn')}
                     </button>
                   ` : ''}
@@ -3295,37 +3301,37 @@ function initApp() {
           ` : ''}
 
           ${c.isPotentialDuplicate ? `
-            <div class="bg-[#26272B] border border-[#F5B700]/40 rounded-xl p-2 text-[11px] text-[#F5B700] space-y-1">
+            <div class="bg-[#2A2B31] border border-[#F5B700]/40 rounded-xl p-2.5 text-xs text-[#F5B700] space-y-1">
               <div class="flex items-center gap-1.5 font-bold">
-                <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
                 <span>${t('dup_title')}</span>
               </div>
-              <p class="text-[10px] text-[#F3F1EC] leading-tight">${c.potentialDuplicateReason || t('dup_default')}</p>
-              <div class="text-[9px] text-[#9A9CA3] bg-[#1F2024] p-1 rounded font-mono border border-[#3A3C42]">
+              <p class="text-xs text-[#F3F1EC] leading-snug">${c.potentialDuplicateReason || t('dup_default')}</p>
+              <div class="text-xs text-[#C8CAD0] bg-[#25262B] p-1.5 rounded font-mono border border-[#43464F]">
                 ${t('dup_prev_label')} ${c.potentialDuplicateMatch ? `${c.potentialDuplicateMatch.amount} • ${c.potentialDuplicateMatch.date} (${c.potentialDuplicateMatch.merchant})` : t('dup_prev_fallback')}
               </div>
             </div>
           ` : ''}
 
           <!-- Row 3: Operation Type Capsule Pills (Purchase / Cash Withdrawal / Transfer) -->
-          <div class="flex items-center gap-1.5 flex-wrap">
+          <div class="flex items-center gap-2 flex-wrap">
             <label class="cursor-pointer">
               <input type="radio" name="candidate-type-${c.id}" value="purchase" class="hidden peer" ${c.transactionType === 'purchase' || !c.transactionType ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
-              <span class="inline-block px-3 py-1 rounded-full text-[11px] font-bold border border-[#3A3C42] bg-[#16171A] text-[#9A9CA3] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] transition-all">${t('purchase')}</span>
+              <span class="inline-flex items-center justify-center px-3.5 py-1.5 min-h-[36px] rounded-full text-xs font-bold border border-[#43464F] bg-[#1A1B1F] text-[#C8CAD0] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] transition-all">${t('purchase')}</span>
             </label>
             <label class="cursor-pointer">
               <input type="radio" name="candidate-type-${c.id}" value="withdrawal" class="hidden peer" ${c.transactionType === 'withdrawal' ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
-              <span class="inline-block px-3 py-1 rounded-full text-[11px] font-bold border border-[#3A3C42] bg-[#16171A] text-[#9A9CA3] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] transition-all">${t('withdrawal')}</span>
+              <span class="inline-flex items-center justify-center px-3.5 py-1.5 min-h-[36px] rounded-full text-xs font-bold border border-[#43464F] bg-[#1A1B1F] text-[#C8CAD0] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] transition-all">${t('withdrawal')}</span>
             </label>
             <label class="cursor-pointer">
               <input type="radio" name="candidate-type-${c.id}" value="transfer" class="hidden peer" ${c.transactionType === 'transfer' ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
-              <span class="inline-block px-3 py-1 rounded-full text-[11px] font-bold border border-[#3A3C42] bg-[#16171A] text-[#9A9CA3] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] transition-all">${t('transfer')}</span>
+              <span class="inline-flex items-center justify-center px-3.5 py-1.5 min-h-[36px] rounded-full text-xs font-bold border border-[#43464F] bg-[#1A1B1F] text-[#C8CAD0] peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700] peer-checked:text-[#111111] transition-all">${t('transfer')}</span>
             </label>
           </div>
 
           <!-- Row 4: Compact Card / Account Selector -->
           <div>
-            <select id="candidate-card-select-${c.id}" onchange="window.onCandidateTypeChanged('${c.id}')" class="w-full text-[11px] font-bold text-[#F3F1EC] bg-[#26272B] border ${needsCardSelection ? 'border-[#F5B700]' : 'border-[#3A3C42]'} rounded-xl px-3 py-2 outline-none cursor-pointer">
+            <select id="candidate-card-select-${c.id}" onchange="window.onCandidateTypeChanged('${c.id}')" class="w-full text-[13px] font-bold text-[#F3F1EC] bg-[#2A2B31] border ${needsCardSelection ? 'border-[#F5B700]' : 'border-[#43464F]'} rounded-xl px-3 py-2.5 min-h-[44px] outline-none cursor-pointer">
               <option value="" ${!c.matchedCardId && !c.matchedAccountId ? 'selected disabled' : ''}>${t('select_card_or_account')}</option>
               <optgroup label="${t('cards_optgroup')}">
                 ${cards.map(card => {
@@ -3345,7 +3351,7 @@ function initApp() {
           </div>
 
           <!-- Warning for unlinked debit withdrawal -->
-          <div id="candidate-debit-warn-${c.id}" class="text-[10px] font-bold text-[#E6A8A8] bg-[#3A2020] border border-[#E6A8A8]/30 rounded-lg p-2 ${(() => {
+          <div id="candidate-debit-warn-${c.id}" class="text-xs font-bold text-[#E6A8A8] bg-[#3A2020] border border-[#E6A8A8]/30 rounded-lg p-2.5 ${(() => {
             const matchedCard = c.matchedCardId ? store.getCard(c.matchedCardId) : null;
             return (c.transactionType === 'withdrawal' && matchedCard && matchedCard.cardType === 'debit' && !matchedCard.linkedAccountId && !c.matchedAccountId) ? '' : 'hidden';
           })()}">
@@ -3369,13 +3375,13 @@ function initApp() {
             const expAfter = isInc ? curBal + c.amount : curBal - c.amount;
             const isNeg = expAfter < 0;
             return `
-              <div id="candidate-balance-box-${c.id}" class="p-2 rounded-xl bg-[#26272B] border ${isNeg ? 'border-[#E6A8A8]/40 text-[#E6A8A8]' : 'border-[#3A3C42] text-[#F3F1EC]'} space-y-0.5">
-                <div class="flex items-center justify-between text-[10px] font-bold">
+              <div id="candidate-balance-box-${c.id}" class="p-2.5 rounded-xl bg-[#2A2B31] border ${isNeg ? 'border-[#E6A8A8]/40 text-[#E6A8A8]' : 'border-[#43464F] text-[#F3F1EC]'} space-y-1">
+                <div class="flex items-center justify-between text-xs font-bold">
                   <span>${t('balance_before_label', { name: candAcc.name })} <span dir="ltr" class="font-mono">${formatCurrency(curBal)}</span></span>
                   <span>${t('balance_after_label')} <span dir="ltr" class="font-mono ${isNeg ? 'text-[#E6A8A8] font-black' : ''}">${formatCurrency(expAfter)}</span></span>
                 </div>
                 ${isNeg ? `
-                  <div class="text-[10px] font-bold text-[#E6A8A8]">${t('negative_balance_cand_warn')}</div>
+                  <div class="text-xs font-bold text-[#E6A8A8]">${t('negative_balance_cand_warn')}</div>
                 ` : ''}
               </div>
             `;
@@ -3383,10 +3389,10 @@ function initApp() {
 
           <!-- Row 5: Approve (Amber) + Reject (Bordered) -->
           <div class="grid grid-cols-3 gap-2 pt-1">
-            <button type="button" onclick="window.approveSmsCandidate('${c.id}')" class="col-span-2 py-2.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-xs font-extrabold rounded-xl active-press transition-all flex items-center justify-center gap-1 shadow-md">
+            <button type="button" onclick="window.approveSmsCandidate('${c.id}')" class="col-span-2 py-2.5 min-h-[44px] bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-[14px] font-extrabold rounded-xl active-press transition-all flex items-center justify-center gap-1 shadow-md">
               <span>${t('approve')}</span>
             </button>
-            <button type="button" onclick="window.rejectSmsCandidate('${c.id}')" class="col-span-1 py-2.5 bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-[#F3F1EC] hover:text-[#E6A8A8] text-xs font-bold rounded-xl active-press transition-all flex items-center justify-center gap-1">
+            <button type="button" onclick="window.rejectSmsCandidate('${c.id}')" class="col-span-1 py-2.5 min-h-[44px] bg-[#2A2B31] hover:bg-[#43464F] border border-[#43464F] text-[#F3F1EC] hover:text-[#E6A8A8] text-[13px] font-bold rounded-xl active-press transition-all flex items-center justify-center gap-1">
               <span>${t('reject')}</span>
             </button>
           </div>
@@ -3807,68 +3813,68 @@ function initApp() {
 
     container.innerHTML = `
       <div class="space-y-3">
-        <div class="bg-[#16171A] border border-[#2F3136] rounded-2xl p-3.5 space-y-2.5">
+        <div class="bg-[#1A1B1F] border border-[#33353C] rounded-2xl p-3.5 space-y-2.5">
           <div class="flex items-center justify-between">
             <span class="font-extrabold text-[#F3F1EC] flex items-center gap-1.5 text-xs">
               <i data-lucide="shield" class="w-3.5 h-3.5 text-[#F5B700]"></i>
               ${t('diag_recv_perm')}
             </span>
             ${receiveGranted
-              ? `<span class="px-2 py-0.5 rounded-full bg-[#26272B] text-[#F5B700] border border-[#F5B700]/40 text-[10px] font-bold">${t('diag_granted')}</span>`
+              ? `<span class="px-2 py-0.5 rounded-full bg-[#2A2B31] text-[#F5B700] border border-[#F5B700]/40 text-[10px] font-bold">${t('diag_granted')}</span>`
               : `<span class="px-2 py-0.5 rounded-full bg-[#3A2020] text-[#E6A8A8] border border-[#E6A8A8]/30 text-[10px] font-bold">${t('diag_denied')}</span>`}
           </div>
 
-          <div class="flex items-center justify-between pt-2 border-t border-[#2F3136]">
+          <div class="flex items-center justify-between pt-2 border-t border-[#33353C]">
             <span class="font-extrabold text-[#F3F1EC] flex items-center gap-1.5 text-xs">
               <i data-lucide="book-open" class="w-3.5 h-3.5 text-[#F5B700]"></i>
               ${t('diag_read_perm')}
             </span>
             ${readGranted
-              ? `<span class="px-2 py-0.5 rounded-full bg-[#26272B] text-[#F5B700] border border-[#F5B700]/40 text-[10px] font-bold">${t('diag_granted')}</span>`
-              : `<span class="px-2 py-0.5 rounded-full bg-[#26272B] text-[#9A9CA3] border border-[#3A3C42] text-[10px] font-bold">${t('diag_inactive')}</span>`}
+              ? `<span class="px-2 py-0.5 rounded-full bg-[#2A2B31] text-[#F5B700] border border-[#F5B700]/40 text-[10px] font-bold">${t('diag_granted')}</span>`
+              : `<span class="px-2 py-0.5 rounded-full bg-[#2A2B31] text-[#C8CAD0] border border-[#43464F] text-[10px] font-bold">${t('diag_inactive')}</span>`}
           </div>
 
           ${!receiveGranted ? `
-            <div class="bg-[#26272B] border border-[#F5B700]/40 rounded-xl p-2.5 text-[11px] text-[#F5B700] space-y-1.5">
+            <div class="bg-[#2A2B31] border border-[#F5B700]/40 rounded-xl p-2.5 text-[11px] text-[#F5B700] space-y-1.5">
               <p class="font-bold">${t('diag_restricted_title')}</p>
               <p class="text-[10px] text-[#C8CAD0] leading-relaxed">${t('diag_restricted_desc')}</p>
               <div class="flex gap-2 pt-1">
                 <button type="button" onclick="window.requestSmsReceivePermission()" class="flex-1 py-1.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] rounded-lg font-bold text-[10px] active-press">${t('diag_req_again')}</button>
-                <button type="button" onclick="window.openAppSystemSettings()" class="py-1.5 px-2.5 bg-[#1F2024] border border-[#3A3C42] text-[#F3F1EC] rounded-lg font-bold text-[10px] active-press">${t('diag_app_settings')}</button>
+                <button type="button" onclick="window.openAppSystemSettings()" class="py-1.5 px-2.5 bg-[#25262B] border border-[#43464F] text-[#F3F1EC] rounded-lg font-bold text-[10px] active-press">${t('diag_app_settings')}</button>
               </div>
             </div>
           ` : ''}
         </div>
 
-        <div class="bg-[#16171A] border border-[#2F3136] rounded-2xl p-3.5 space-y-2 text-[11px]">
+        <div class="bg-[#1A1B1F] border border-[#33353C] rounded-2xl p-3.5 space-y-2 text-[11px]">
           <div class="flex items-center justify-between">
-            <span class="text-[#9A9CA3] font-bold">${t('diag_sms_switch')}</span>
-            <span class="font-bold ${isEnabled ? 'text-[#F5B700]' : 'text-[#9A9CA3]'}">${isEnabled ? t('enabled') : t('not_enabled')}</span>
+            <span class="text-[#C8CAD0] font-bold">${t('diag_sms_switch')}</span>
+            <span class="font-bold ${isEnabled ? 'text-[#F5B700]' : 'text-[#C8CAD0]'}">${isEnabled ? t('enabled') : t('not_enabled')}</span>
           </div>
-          <div class="flex items-center justify-between border-t border-[#2F3136] pt-2">
-            <span class="text-[#9A9CA3] font-bold">${t('diag_vault_enc')}</span>
+          <div class="flex items-center justify-between border-t border-[#33353C] pt-2">
+            <span class="text-[#C8CAD0] font-bold">${t('diag_vault_enc')}</span>
             <span class="font-bold text-[#F3F1EC] font-mono" dir="ltr">${stats.isKeystoreProtected ? 'Keystore AES-256' : 'Memory'}</span>
           </div>
-          <div class="flex items-center justify-between border-t border-[#2F3136] pt-2">
-            <span class="text-[#9A9CA3] font-bold">${t('diag_queue_cap')}</span>
+          <div class="flex items-center justify-between border-t border-[#33353C] pt-2">
+            <span class="text-[#C8CAD0] font-bold">${t('diag_queue_cap')}</span>
             <span class="font-bold font-mono ${isQueueFull ? 'text-[#E6A8A8]' : 'text-[#F5B700]'}" dir="ltr">${queueCount} / ${queueCapacity}</span>
           </div>
-          <div class="border-t border-[#2F3136] pt-2 space-y-1">
+          <div class="border-t border-[#33353C] pt-2 space-y-1">
             <div class="flex items-center justify-between">
-              <span class="text-[#9A9CA3] font-bold">${t('diag_last_bcast')}</span>
+              <span class="text-[#C8CAD0] font-bold">${t('diag_last_bcast')}</span>
               <span class="font-bold text-[10px] text-[#F3F1EC] font-mono" dir="ltr">${lastBroadcast}</span>
             </div>
-            ${lastSender ? `<div class="text-[10px] text-[#9A9CA3]">${t('diag_sender_prefix')} <b class="text-[#F3F1EC]">${lastSender}</b></div>` : ''}
+            ${lastSender ? `<div class="text-xs text-[#C8CAD0]">${t('diag_sender_prefix')} <b class="text-[#F3F1EC]">${lastSender}</b></div>` : ''}
           </div>
         </div>
 
-        <div class="bg-[#16171A] border border-[#2F3136] rounded-2xl p-3 space-y-1.5">
+        <div class="bg-[#1A1B1F] border border-[#33353C] rounded-2xl p-3 space-y-1.5">
           <div class="flex items-center gap-1.5 font-bold text-[#F5B700] text-[11px]">
             <i data-lucide="battery-charging" class="w-3.5 h-3.5"></i>
             <span>${t('diag_battery_title')}</span>
           </div>
           <p class="text-[10px] text-[#C8CAD0] leading-relaxed">${t('diag_battery_desc')}</p>
-          <button type="button" onclick="window.openBatteryOptimizationSettings()" class="w-full py-2 bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-[#F3F1EC] rounded-xl font-bold text-[10px] active-press transition-all">
+          <button type="button" onclick="window.openBatteryOptimizationSettings()" class="w-full py-2 bg-[#2A2B31] hover:bg-[#43464F] border border-[#43464F] text-[#F3F1EC] rounded-xl font-bold text-[10px] active-press transition-all">
             ${t('diag_battery_btn')}
           </button>
         </div>
@@ -3878,7 +3884,7 @@ function initApp() {
             <i data-lucide="history" class="w-3.5 h-3.5"></i>
             <span>${t('import_past_sms')}</span>
           </button>
-          <button type="button" onclick="window.refreshDiagnostics()" class="py-2 px-3 bg-[#26272B] hover:bg-[#3A3C42] border border-[#3A3C42] text-[#F3F1EC] rounded-xl font-bold text-[11px] active-press">
+          <button type="button" onclick="window.refreshDiagnostics()" class="py-2 px-3 bg-[#2A2B31] hover:bg-[#43464F] border border-[#43464F] text-[#F3F1EC] rounded-xl font-bold text-[11px] active-press">
             ${t('diag_refresh_btn')}
           </button>
         </div>
@@ -3975,12 +3981,12 @@ function initApp() {
     if (!readGranted) {
       container.innerHTML = `
         <div class="py-4 space-y-3 text-center">
-          <div class="w-12 h-12 mx-auto rounded-2xl bg-[#26272B] border border-[#3A3C42] text-[#F5B700] flex items-center justify-center">
+          <div class="w-12 h-12 mx-auto rounded-2xl bg-[#2A2B31] border border-[#43464F] text-[#F5B700] flex items-center justify-center">
             <i data-lucide="lock" class="w-6 h-6"></i>
           </div>
           <div class="space-y-1">
             <h4 class="font-extrabold text-sm text-[#F3F1EC]">${t('hist_perm_req')}</h4>
-            <p class="text-[11px] text-[#9A9CA3] max-w-[260px] mx-auto leading-relaxed">${t('hist_perm_desc')}</p>
+            <p class="text-xs text-[#C8CAD0] max-w-[260px] mx-auto leading-relaxed">${t('hist_perm_desc')}</p>
           </div>
           <div class="pt-2">
             <button type="button" onclick="window.requestReadSmsAndStart()" class="w-full py-2.5 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] rounded-xl font-bold text-xs active-press">
@@ -4002,14 +4008,14 @@ function initApp() {
         <div class="space-y-1.5">
           <label class="block text-xs font-bold text-[#F3F1EC]">${t('hist_choose_range')}</label>
           <div class="grid grid-cols-3 gap-2">
-            <button type="button" onclick="window.selectHistoricalDays(30)" class="py-2 rounded-xl text-xs font-bold border transition-all ${days === 30 ? 'bg-[#F5B700] text-[#111111] border-[#F5B700]' : 'bg-[#16171A] text-[#9A9CA3] border-[#2F3136]'}">${t('hist_1m')}</button>
-            <button type="button" onclick="window.selectHistoricalDays(90)" class="py-2 rounded-xl text-xs font-bold border transition-all ${days === 90 ? 'bg-[#F5B700] text-[#111111] border-[#F5B700]' : 'bg-[#16171A] text-[#9A9CA3] border-[#2F3136]'}">${t('hist_3m')}</button>
-            <button type="button" onclick="window.selectHistoricalDays(365)" class="py-2 rounded-xl text-xs font-bold border transition-all ${days === 365 ? 'bg-[#F5B700] text-[#111111] border-[#F5B700]' : 'bg-[#16171A] text-[#9A9CA3] border-[#2F3136]'}">${t('hist_1y')}</button>
+            <button type="button" onclick="window.selectHistoricalDays(30)" class="py-2 rounded-xl text-xs font-bold border transition-all ${days === 30 ? 'bg-[#F5B700] text-[#111111] border-[#F5B700]' : 'bg-[#1A1B1F] text-[#C8CAD0] border-[#33353C]'}">${t('hist_1m')}</button>
+            <button type="button" onclick="window.selectHistoricalDays(90)" class="py-2 rounded-xl text-xs font-bold border transition-all ${days === 90 ? 'bg-[#F5B700] text-[#111111] border-[#F5B700]' : 'bg-[#1A1B1F] text-[#C8CAD0] border-[#33353C]'}">${t('hist_3m')}</button>
+            <button type="button" onclick="window.selectHistoricalDays(365)" class="py-2 rounded-xl text-xs font-bold border transition-all ${days === 365 ? 'bg-[#F5B700] text-[#111111] border-[#F5B700]' : 'bg-[#1A1B1F] text-[#C8CAD0] border-[#33353C]'}">${t('hist_1y')}</button>
           </div>
         </div>
 
         ${scanResult ? `
-          <div class="bg-[#16171A] border border-[#F5B700]/40 rounded-xl p-3 space-y-2">
+          <div class="bg-[#1A1B1F] border border-[#F5B700]/40 rounded-xl p-3 space-y-2">
             <div class="flex items-center justify-between">
               <span class="font-extrabold text-[#F5B700] text-xs">${t('hist_scan_found', { n: scanResult.addedCount })}</span>
             </div>
@@ -4018,11 +4024,11 @@ function initApp() {
                 ${t('hist_open_review', { n: (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates.length) || 0 })}
               </button>
               ${scanResult.hasMore ? `
-                <button type="button" onclick="window.fetchNextHistoricalBatch()" class="py-2 px-3 bg-[#26272B] border border-[#3A3C42] text-[#F3F1EC] rounded-lg font-bold text-xs active-press">
+                <button type="button" onclick="window.fetchNextHistoricalBatch()" class="py-2 px-3 bg-[#2A2B31] border border-[#43464F] text-[#F3F1EC] rounded-lg font-bold text-xs active-press">
                   ${t('hist_next_batch')}
                 </button>
               ` : `
-                <span class="px-2.5 py-2 bg-[#26272B] text-[#F5B700] rounded-lg font-bold text-[10px] flex items-center">${t('hist_done')}</span>
+                <span class="px-2.5 py-2 bg-[#2A2B31] text-[#F5B700] rounded-lg font-bold text-[10px] flex items-center">${t('hist_done')}</span>
               `}
             </div>
           </div>

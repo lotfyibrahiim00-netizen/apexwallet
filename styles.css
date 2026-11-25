@@ -74,19 +74,23 @@
 }
 
 :root {
-  --bg-dark: #16171A;
-  --surface-dark: #1F2024;
-  --surface-raised: #26272B;
-  --border-dark: #3A3C42;
-  --border-subtle: #2F3136;
+  --bg-dark: #1A1B1F;
+  --surface-dark: #25262B;
+  --surface-raised: #2A2B31;
+  --border-dark: #43464F;
+  --border-subtle: #33353C;
   --text-main: #F3F1EC;
   --text-secondary: #C8CAD0;
-  --text-muted: #9A9CA3;
+  --text-muted: #A6AAB3;
   --accent-amber: #F5B700;
   --on-accent: #111111;
   --destructive: #E6A8A8;
   --card-radius: 20px;
   --sheet-radius: 28px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 }
 
 * {
@@ -150,9 +154,46 @@ html[lang="ar"] body {
   flex-direction: column;
   overflow: hidden;
   border-radius: 46px;
-  border: 4px solid #26272B;
+  border: 4px solid var(--surface-raised);
   box-shadow: 0 25px 70px -15px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(245, 183, 0, 0.15);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Header & Safe-Area Layout */
+.app-header {
+  padding-inline: 20px;
+  padding-top: calc(var(--safe-top) + 12px);
+  padding-bottom: 12px;
+  min-height: calc(var(--safe-top) + 72px);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--bg-dark);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.app-scroll-body {
+  flex: 1 1 0%;
+  overflow-y: auto;
+  padding-inline: 20px;
+  padding-top: 8px;
+  padding-bottom: calc(var(--safe-bottom) + 98px);
+  background-color: var(--bg-dark);
+}
+
+#toast-container {
+  top: calc(var(--safe-top) + 16px);
+}
+
+#pin-lock-overlay {
+  padding-top: calc(var(--safe-top) + 24px);
+  padding-bottom: calc(var(--safe-bottom) + 24px);
+}
+
+#pin-cancel-btn {
+  top: calc(var(--safe-top) + 16px);
 }
 
 /* Real mobile devices: 100% full screen edge-to-edge */
@@ -222,7 +263,7 @@ html[dir="ltr"] .tilted-card-container {
   border: 2px solid var(--accent-amber);
   background: radial-gradient(circle at 18% 15%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 48%), linear-gradient(135deg, #2C2E35 0%, #23252B 58%, #1C1E23 100%);
   color: var(--text-main);
-  padding: 16px 20px;
+  padding: 15px 17px;
   box-shadow: 0 14px 32px -8px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(245, 183, 0, 0.12);
   display: flex;
   flex-direction: column;
@@ -278,11 +319,11 @@ html[dir="ltr"] .tilted-card-container {
   font-variant-numeric: tabular-nums;
 }
 .tile-amount-num {
-  font-size: clamp(12.5px, 3.5vw, 15px);
+  font-size: clamp(13.5px, 3.7vw, 15px);
   line-height: 1.15;
 }
 .tile-amount-curr {
-  font-size: clamp(8.5px, 2.3vw, 10px);
+  font-size: clamp(9.5px, 2.5vw, 11px);
   line-height: 1.15;
 }
 
@@ -301,16 +342,16 @@ html[dir="ltr"] .tilted-card-container {
 /* Floating Navigation Bar (Dark Charcoal & Sliding Amber Pill Dock) */
 .floating-bottom-nav {
   position: absolute;
-  bottom: max(env(safe-area-inset-bottom, 0px) + 12px, 14px);
-  inset-inline-start: 16px;
-  inset-inline-end: 16px;
+  bottom: calc(var(--safe-bottom) + 12px);
+  inset-inline-start: 20px;
+  inset-inline-end: 20px;
+  height: 68px;
   background: var(--surface-raised);
   border: 1px solid var(--border-subtle);
   border-radius: 9999px;
-  padding: 6px 8px;
-  box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  padding: 6px;
+  box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.04);
   display: flex;
-  justify-content: space-around;
   align-items: center;
   z-index: 30;
 }
@@ -331,23 +372,38 @@ html[dir="ltr"] .tilted-card-container {
 }
 
 .floating-nav-tab {
+  flex: 1 1 0%;
+  min-width: 0;
+  height: 54px;
+  min-height: 44px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: 3px;
+  padding: 4px 4px;
   font-size: 12px;
   font-weight: 700;
   border-radius: 9999px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: color 0.22s ease, background-color 0.22s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, transform 0.12s ease;
   white-space: nowrap;
   position: relative;
   z-index: 1;
   overflow: visible;
+}
+
+.floating-nav-tab .tab-label {
+  font-size: 12px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+
+.floating-nav-tab:active {
+  transform: scale(0.96);
 }
 
 .floating-nav-tab.active {
@@ -364,10 +420,19 @@ html[dir="ltr"] .tilted-card-container {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
+.nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
 .nav-badge {
   position: absolute;
-  top: -2px;
-  inset-inline-end: 2px;
+  top: -5px;
+  inset-inline-end: -10px;
   background-color: var(--accent-amber);
   color: var(--on-accent);
   font-size: 10px;
@@ -379,12 +444,15 @@ html[dir="ltr"] .tilted-card-container {
   align-items: center;
   justify-content: center;
   padding: 0 4px;
+  border: 1.5px solid var(--surface-raised);
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
 }
 
 .floating-nav-tab.active .nav-badge {
   background-color: var(--on-accent);
   color: var(--accent-amber);
+  border-color: var(--accent-amber);
 }
 
 /* Soft Circular Tap Ripple */
@@ -426,6 +494,7 @@ html[dir="ltr"] .tilted-card-container {
   border-top: 1px solid var(--border-dark);
   border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
   box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8);
+  padding-bottom: calc(var(--safe-bottom) + 24px);
   transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform;
 }
@@ -439,10 +508,57 @@ html[dir="ltr"] .tilted-card-container {
   margin: 0 auto 14px auto;
 }
 
+/* Modest Section Transition (Fade + Subtle Slide) & Tactile Response */
+@keyframes viewEnterLtr {
+  from {
+    opacity: 0;
+    transform: translate3d(10px, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes viewEnterRtl {
+  from {
+    opacity: 0;
+    transform: translate3d(-10px, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes viewFadeOnly {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.view-enter {
+  animation: viewEnterLtr 210ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[dir="rtl"] .view-enter {
+  animation-name: viewEnterRtl;
+}
+
 /* Active tactile scale */
+.active-press {
+  transition: transform 0.12s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.16s ease, border-color 0.16s ease;
+}
+
 .active-press:active {
   transform: scale(0.97);
-  transition: transform 0.1s ease;
+}
+
+.card-press {
+  transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.card-press:active {
+  transform: scale(0.985);
 }
 
 /* Monospace font utility for numbers and currencies */
@@ -565,6 +681,9 @@ html[dir="ltr"] .tilted-card-container {
 
 /* Reduced Motion Mode for Accessibility: instant state transitions + short fade */
 @media (prefers-reduced-motion: reduce) {
+  .view-enter {
+    animation: viewFadeOnly 140ms ease both !important;
+  }
   .tilted-card-container {
     transition: opacity 0.12s ease !important;
   }
@@ -583,7 +702,9 @@ html[dir="ltr"] .tilted-card-container {
   .touch-ripple {
     display: none !important;
   }
-  .active-press:active {
+  .floating-nav-tab:active,
+  .active-press:active,
+  .card-press:active {
     transform: none !important;
   }
 }
