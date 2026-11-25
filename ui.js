@@ -340,7 +340,7 @@ const I18N = {
     credit_limit_paren: '(الحد الائتماني البنكي للكارت: {amount})',
     credit_limit_unrecorded_paren: '(الحد الائتماني البنكي: غير مسجل)',
     example_prefix: 'مثال: {val}',
-    prev_budget_btn: 'الاستمرار على ميزانية الدورة السابقة (<span dir="ltr" class="font-mono">{amount}</span>)',
+    prev_budget_btn: 'استمرار بنفس الميزانية (<span dir="ltr" class="font-mono whitespace-nowrap">{amount}</span>)',
     diag_recv_perm: 'صلاحية الاستقبال (RECEIVE_SMS)',
     diag_read_perm: 'صلاحية الرسائل القديمة (READ_SMS)',
     diag_granted: 'ممنوحة',
@@ -787,27 +787,85 @@ function t(key, params = {}) {
   return str;
 }
 
+const AR_MONTH_MAP = {
+  jan: 'يناير', january: 'يناير',
+  feb: 'فبراير', february: 'فبراير',
+  mar: 'مارس', march: 'مارس',
+  apr: 'أبريل', april: 'أبريل',
+  may: 'مايو',
+  jun: 'يونيو', june: 'يونيو',
+  jul: 'يوليو', july: 'يوليو',
+  aug: 'أغسطس', august: 'أغسطس',
+  sep: 'سبتمبر', sept: 'سبتمبر', september: 'سبتمبر',
+  oct: 'أكتوبر', october: 'أكتوبر',
+  nov: 'نوفمبر', november: 'نوفمبر',
+  dec: 'ديسمبر', december: 'ديسمبر'
+};
+
+function localizeMonthName(name) {
+  if (!name) return '';
+  if (getLang() !== 'ar') return String(name);
+  const key = String(name).trim().toLowerCase();
+  return AR_MONTH_MAP[key] || AR_MONTH_MAP[key.slice(0, 3)] || String(name);
+}
+
+function localizeCycleText(text) {
+  if (!text) return '';
+  if (getLang() !== 'ar') return String(text);
+  let out = String(text);
+  // "Dec 2026 Stmt" / "Nov 2026 Statement" -> "كشف ديسمبر 2026"
+  out = out.replace(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{4})\s+(?:Stmt|Statement)\b/gi, (_, m, y) => {
+    return `كشف ${localizeMonthName(m)} ${y}`;
+  });
+  // "Nov 25 – Dec 24, 2026" -> "25 نوفمبر – 24 ديسمبر 2026"
+  out = out.replace(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})\s*([–-])\s*(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2}),?\s*(\d{4})\b/gi, (_, m1, d1, dash, m2, d2, y) => {
+    return `${d1} ${localizeMonthName(m1)} ${dash} ${d2} ${localizeMonthName(m2)} ${y}`;
+  });
+  // Replace remaining month names
+  out = out.replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec)\b/gi, (m) => {
+    return localizeMonthName(m);
+  });
+  out = out.replace(/,\s*(\d{4})\b/g, ' $1');
+  out = out.replace(/\b(Stmt|Statement)\b/gi, 'كشف');
+  return out;
+}
+
 function formatAmountInlineHtml(amount, options = {}) {
   const {
     showPlus = false,
     prefixSign = '',
     currency = (typeof currentCurrency !== 'undefined' ? currentCurrency : 'EGP'),
+    useSans = false,
+    smallDecimals = false,
     numClass = '',
+    decClass = 'text-[0.82em]',
     currClass = 'text-[0.68em] text-[#9A9CA3] font-semibold'
   } = options;
   const num = Number(amount) || 0;
   const formatted = formatCurrency(Math.abs(num), currency);
   const sign = prefixSign || (num < 0 ? '-' : (showPlus ? '+' : ''));
+  const fontCls = useSans ? 'font-sans-num' : 'font-mono';
+
+  function splitDec(nStr) {
+    if (!smallDecimals) return nStr;
+    const dotIdx = nStr.indexOf('.');
+    if (dotIdx === -1) return nStr;
+    return `${nStr.slice(0, dotIdx)}<span class="${decClass}">${nStr.slice(dotIdx)}</span>`;
+  }
+
   const trailingMatch = formatted.match(/^([\d,.-]+)\s+([A-Za-z]+)$/);
   if (trailingMatch) {
-    return `<span class="inline-flex items-baseline gap-[3px] whitespace-nowrap font-mono amount-ltr" dir="ltr"><span class="${numClass}">${sign}${trailingMatch[1]}</span><span class="${currClass}">${trailingMatch[2]}</span></span>`;
+    return `<span class="inline-flex items-baseline gap-[3px] whitespace-nowrap ${fontCls} amount-ltr" dir="ltr"><span class="${numClass}">${sign}${splitDec(trailingMatch[1])}</span><span class="${currClass}">${trailingMatch[2]}</span></span>`;
   }
   const leadingMatch = formatted.match(/^([$€£])([\d,.]+)$/);
   if (leadingMatch) {
-    return `<span class="inline-flex items-baseline gap-[1px] whitespace-nowrap font-mono amount-ltr" dir="ltr"><span class="${currClass}">${sign}${leadingMatch[1]}</span><span class="${numClass}">${leadingMatch[2]}</span></span>`;
+    return `<span class="inline-flex items-baseline gap-[1px] whitespace-nowrap ${fontCls} amount-ltr" dir="ltr"><span class="${currClass}">${sign}${leadingMatch[1]}</span><span class="${numClass}">${splitDec(leadingMatch[2])}</span></span>`;
   }
-  return `<span class="whitespace-nowrap font-mono amount-ltr ${numClass}" dir="ltr">${sign}${formatted}</span>`;
+  return `<span class="whitespace-nowrap ${fontCls} amount-ltr ${numClass}" dir="ltr">${sign}${formatted}</span>`;
 }
+
+window.localizeMonthName = localizeMonthName;
+window.localizeCycleText = localizeCycleText;
 
 window.getLang = getLang;
 window.setLang = setLang;
@@ -1206,12 +1264,12 @@ function initApp() {
         previewBox.classList.remove('hidden');
         previewBadge.innerHTML = `
           <span class="inline-flex items-center gap-1 font-bold text-[#F5B700] bg-[#26272B] px-2.5 py-0.5 rounded-full text-[10px] border border-[#3A3C42]">
-            ${t('affects_stmt', { month: info.statementMonthName.substring(0, 3) })}
+            ${t('affects_stmt', { month: localizeMonthName(info.statementMonthName.substring(0, 3)) })}
           </span>
         `;
         previewRange.innerHTML = `
           <span class="text-[11px] text-[#9A9CA3] mt-1 block">
-            <span dir="ltr" class="font-mono">${card.cycleStartDay} → ${card.cycleEndDay}</span> (${info.cycleRange})
+            <span dir="ltr" class="font-mono">${card.cycleStartDay} → ${card.cycleEndDay}</span> (${localizeCycleText(info.cycleRange)})
           </span>
         `;
       }
@@ -1658,9 +1716,9 @@ function initApp() {
     const count = (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates) ? window.BankSmsEngine.pendingCandidates.length : 0;
     if (count === 0) return '';
     return `
-      <div id="sms-inbox-banner" onclick="window.switchTab('review')" class="cursor-pointer bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] px-3.5 py-3 rounded-2xl shadow-md flex items-center justify-between active-press transition-all">
-        <span class="text-xs font-extrabold text-[#111111]">${t('bank_messages_ready', { n: count })}</span>
-        <button type="button" class="px-4 py-1.5 rounded-xl bg-[#16171A] text-[#F5B700] font-extrabold text-xs shrink-0">${t('review_btn')}</button>
+      <div id="sms-inbox-banner" onclick="window.switchTab('review')" class="cursor-pointer bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] px-4 py-4 rounded-2xl shadow-md flex items-center justify-between active-press transition-all">
+        <span class="text-[13px] font-extrabold text-[#111111]">${t('bank_messages_ready', { n: count })}</span>
+        <button type="button" class="px-5 py-2 rounded-xl bg-[#16171A] text-[#F5B700] font-extrabold text-xs shrink-0">${t('review_btn')}</button>
       </div>
     `;
   }
@@ -1716,40 +1774,44 @@ function initApp() {
     container.innerHTML = `
       <div class="space-y-3 pb-8">
         
-        <!-- 1. TILTED HERO CARD OBJECT (Exact Proportions & Card Interior Alignment) -->
+        <!-- 1. TILTED HERO CARD OBJECT (Reference Match: Lighter Sheen, Flat Tilt, Flat Chip, Bold Sans Balance) -->
         <div class="tilted-hero-wrapper" id="hero-card-touch-zone">
           <div class="tilted-card-container ${isHeroCardExpanded ? 'straightened' : ''}" id="hero-card-tilted-box">
             <div class="bank-card-face cursor-pointer" onclick="window.toggleCardStraighten(this)">
               <!-- Top Row (dir=ltr): Bank Code FAR LEFT, Card Name FAR RIGHT -->
               <div class="flex justify-between items-center z-10" dir="ltr">
-                <span class="text-[13px] font-extrabold text-[#F5B700] tracking-wider uppercase">${bank ? bank.shortCode : ''}</span>
-                <span class="text-xs font-bold text-[#F5B700] opacity-90 truncate max-w-[65%]">${card.name}</span>
+                <span class="text-[14px] font-extrabold text-[#F5B700] tracking-wider uppercase">${bank ? bank.shortCode : ''}</span>
+                <span class="text-[14px] font-bold text-[#F5B700] truncate max-w-[65%]">${card.name}</span>
               </div>
 
-              <!-- Middle-Left: Golden EMV Chip -->
+              <!-- Middle-Left: Flat Solid Amber EMV Chip -->
               <div class="my-auto flex items-center justify-start z-10" dir="ltr">
                 <div class="bank-card-chip"></div>
               </div>
 
-              <!-- Masked Card Digits Centered -->
-              <div class="flex items-center justify-center gap-3 text-[11px] font-mono tracking-[0.2em] text-[#C8CAD0] z-10" dir="ltr">
-                <span>••••</span><span>••••</span><span>••••</span><span class="text-[#F3F1EC] font-bold">${card.last4}</span>
+              <!-- Masked Card Digits (Larger Brighter Dots + Large Mono Last 4) -->
+              <div class="flex items-center justify-center gap-3.5 z-10" dir="ltr">
+                <span class="inline-flex items-center gap-1.5"><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span></span>
+                <span class="inline-flex items-center gap-1.5"><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span></span>
+                <span class="inline-flex items-center gap-1.5"><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span></span>
+                <span class="text-[15px] font-mono font-bold tracking-[0.16em] text-[#F3F1EC] ml-1">${card.last4}</span>
               </div>
 
-              <!-- Bottom Row (dir=ltr): Remaining label BOTTOM LEFT, Big Balance BOTTOM RIGHT -->
+              <!-- Bottom Row (dir=ltr): Remaining label BOTTOM LEFT, Big Bold Sans Balance BOTTOM RIGHT -->
               <div class="flex items-baseline justify-between gap-2 pt-1.5 z-10" dir="ltr">
                 <div class="min-w-0">
-                  <span class="text-[10.5px] text-[#9A9CA3] block truncate" dir="${isRtl ? 'rtl' : 'ltr'}">
+                  <span class="text-[12px] text-[#B0B3BA] font-medium block truncate" dir="${isRtl ? 'rtl' : 'ltr'}">
                     ${cardStat.isExceeded
                       ? t('over_limit')
-                      : `${t('left_of')} <span dir="ltr" class="font-mono">${formatCurrency(cardStat.target)}</span>`}
+                      : `${t('left_of')} <span dir="ltr" class="font-sans-num">${formatCurrency(cardStat.target)}</span>`}
                   </span>
                 </div>
                 <div class="shrink-0">
                   ${formatAmountInlineHtml(cardStat.isExceeded ? cardStat.overAmount : cardStat.remaining, {
+                    useSans: true,
                     prefixSign: cardStat.isExceeded ? '+' : '',
-                    numClass: `text-lg font-extrabold ${cardStat.isExceeded ? 'text-[#E6A8A8]' : 'text-[#F3F1EC]'}`,
-                    currClass: `text-xs font-bold ${cardStat.isExceeded ? 'text-[#E6A8A8]/80' : 'text-[#C8CAD0]'}`
+                    numClass: `text-[23px] leading-none font-extrabold ${cardStat.isExceeded ? 'text-[#E6A8A8]' : 'text-[#F3F1EC]'}`,
+                    currClass: `text-[13.5px] font-bold ${cardStat.isExceeded ? 'text-[#E6A8A8]/85' : 'text-[#D1D5DB]'}`
                   })}
                 </div>
               </div>
@@ -1807,24 +1869,24 @@ function initApp() {
           </div>
         ` : ''}
 
-        <!-- 2. SUMMARY TILES (Single-Line Full Precision Amount + Currency) -->
+        <!-- 2. SUMMARY TILES (Single-Line Full Precision Bold Sans Amount + Smaller Currency) -->
         <div class="grid grid-cols-3 gap-2 mt-1">
           <div class="bg-[#1F2024] border border-[#2F3136] rounded-2xl p-2.5 flex flex-col justify-between shadow-2xs min-w-0">
             <span class="text-[10px] text-[#9A9CA3] font-medium leading-tight">${t('cycle_purchases')}</span>
             <div class="mt-2 truncate">
-              ${formatAmountInlineHtml(cardStat.spent, { numClass: 'tile-amount-num font-extrabold text-[#F3F1EC]', currClass: 'tile-amount-curr text-[#9A9CA3] font-semibold' })}
+              ${formatAmountInlineHtml(cardStat.spent, { useSans: true, smallDecimals: true, numClass: 'tile-amount-num font-extrabold text-[#F3F1EC]', decClass: 'text-[0.78em] text-[#C8CAD0] font-bold', currClass: 'tile-amount-curr text-[#9A9CA3] font-semibold' })}
             </div>
           </div>
           <div class="bg-[#1F2024] border border-[#2F3136] rounded-2xl p-2.5 flex flex-col justify-between shadow-2xs min-w-0">
             <span class="text-[10px] text-[#9A9CA3] font-medium leading-tight">${t('cash_advance_debt')}</span>
             <div class="mt-2 truncate">
-              ${formatAmountInlineHtml(cardStat.cashAdvance, { numClass: 'tile-amount-num font-extrabold text-[#F3F1EC]', currClass: 'tile-amount-curr text-[#9A9CA3] font-semibold' })}
+              ${formatAmountInlineHtml(cardStat.cashAdvance, { useSans: true, smallDecimals: true, numClass: 'tile-amount-num font-extrabold text-[#F3F1EC]', decClass: 'text-[0.78em] text-[#C8CAD0] font-bold', currClass: 'tile-amount-curr text-[#9A9CA3] font-semibold' })}
             </div>
           </div>
           <div class="bg-[#1F2024] border border-[#2F3136] rounded-2xl p-2.5 flex flex-col justify-between shadow-2xs min-w-0">
             <span class="text-[10px] text-[#9A9CA3] font-medium leading-tight">${t('total_owed')}</span>
             <div class="mt-2 truncate">
-              ${formatAmountInlineHtml(cardStat.totalObligations, { numClass: 'tile-amount-num font-extrabold text-[#F3F1EC]', currClass: 'tile-amount-curr text-[#9A9CA3] font-semibold' })}
+              ${formatAmountInlineHtml(cardStat.totalObligations, { useSans: true, smallDecimals: true, numClass: 'tile-amount-num font-extrabold text-[#F3F1EC]', decClass: 'text-[0.78em] text-[#C8CAD0] font-bold', currClass: 'tile-amount-curr text-[#9A9CA3] font-semibold' })}
             </div>
           </div>
         </div>
@@ -1935,18 +1997,19 @@ function initApp() {
       const isCashAdvance = tx.transactionType === 'withdrawal';
       const isInc = tx.direction === 'income';
       return `
-        <div class="py-2.5 px-2 flex justify-between items-center border-b border-[#2F3136]/60 last:border-b-0 hover:bg-[#1F2024]/40 rounded-xl transition-all">
+        <div class="py-3 px-2 flex justify-between items-center border-b border-[#2F3136]/60 last:border-b-0 hover:bg-[#1F2024]/40 rounded-xl transition-all">
           <div class="min-w-0 flex-1 pr-2 rtl:pr-0 rtl:pl-2">
-            <p class="text-xs font-bold text-[#F3F1EC] leading-tight truncate">${tx.merchant}</p>
-            <p class="text-[10px] text-[#9A9CA3] font-medium truncate mt-0.5">
+            <p class="text-[14px] font-bold text-[#F3F1EC] leading-tight truncate">${tx.merchant}</p>
+            <p class="text-[11px] text-[#9A9CA3] font-medium truncate mt-0.5">
               ${bank ? bank.shortCode + ' ' : ''}${card.name} ${card.last4 ? card.last4 : ''} ${isCashAdvance ? '• ' + t('cash_advance_debt') : ''}
             </p>
           </div>
           <div class="shrink-0">
             ${formatAmountInlineHtml(tx.amount, {
+              useSans: true,
               prefixSign: isInc ? '+' : '-',
-              numClass: `text-xs font-extrabold ${isInc ? 'text-[#F5B700]' : 'text-[#F3F1EC]'}`,
-              currClass: 'text-[10px] text-[#9A9CA3] font-semibold'
+              numClass: `text-[15px] font-extrabold ${isInc ? 'text-[#F5B700]' : 'text-[#F3F1EC]'}`,
+              currClass: 'text-[10.5px] text-[#9A9CA3] font-semibold'
             })}
           </div>
         </div>
@@ -2224,7 +2287,7 @@ function initApp() {
           ? `\n${t('credit_limit_paren', { amount: formatCurrency(p.creditLimit) })}`
           : `\n${t('credit_limit_unrecorded_paren')}`;
         const msg = t('confirm_new_cycle_headless', {
-          badge: p.statementBadge || p.cycleKey,
+          badge: localizeCycleText(p.statementBadge || p.cycleKey),
           name: p.cardName,
           last4: p.last4,
           limit: limitStr,
@@ -2258,7 +2321,7 @@ function initApp() {
     const btnContinue = document.getElementById('btn-cycle-continue');
 
     if (nameEl) nameEl.textContent = `${p.cardName} (•••• ${p.last4}) - ${p.bankName}`;
-    if (stmtEl) stmtEl.textContent = `${p.statementBadge || p.cycleKey} ${p.cycleRange ? `(${p.cycleRange})` : ''}`;
+    if (stmtEl) stmtEl.textContent = `${localizeCycleText(p.statementBadge || p.cycleKey)} ${p.cycleRange ? `(${localizeCycleText(p.cycleRange)})` : ''}`;
     if (prevEl) prevEl.textContent = formatCurrency(p.previousBudget);
 
     if (limitRow && limitEl) {
@@ -2277,8 +2340,8 @@ function initApp() {
 
     if (btnContinue) {
       btnContinue.innerHTML = `
-        <i data-lucide="check" class="w-4 h-4 text-[#111111]"></i>
-        <span>${t('prev_budget_btn', { amount: formatCurrency(p.previousBudget) })}</span>
+        <i data-lucide="check" class="w-4 h-4 text-[#111111] shrink-0"></i>
+        <span class="text-[11.5px] whitespace-nowrap">${t('prev_budget_btn', { amount: formatCurrency(p.previousBudget) })}</span>
       `;
     }
 
@@ -2602,7 +2665,7 @@ function initApp() {
             <button onclick="window.setFilterStatement('${m.key}')" class="px-3 py-1 rounded-full text-[10px] font-bold shrink-0 ${
               store.selectedStatementFilter === m.key ? 'bg-[#F5B700] text-[#111111]' : 'bg-[#1F2024] text-[#9A9CA3] border border-[#2F3136]'
             }">
-              ${m.badge}
+              ${localizeCycleText(m.badge)}
             </button>
           `).join('')}
         </div>
@@ -2644,34 +2707,34 @@ function initApp() {
             }
 
             return `
-              <div class="bg-[#1F2024] p-3.5 rounded-2xl flex justify-between items-center shadow-2xs border border-[#2F3136] hover:border-[#3A3C42] transition-all">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <p class="text-xs font-bold text-[#F3F1EC]">${tx.merchant}</p>
-                    <span class="text-[10px] text-[#9A9CA3] font-mono">• ${tx.date}</span>
+              <div class="bg-[#1F2024] p-3.5 rounded-2xl flex justify-between items-center gap-2.5 shadow-2xs border border-[#2F3136] hover:border-[#3A3C42] transition-all">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <p class="text-[13px] font-bold text-[#F3F1EC] truncate">${tx.merchant}</p>
+                    <span class="shrink-0">${typeBadge}</span>
                   </div>
-                  <div class="flex items-center gap-2 mt-0.5">
-                    ${isCredit ? `
-                      <span class="text-[10px] ${isCurrentCycle ? 'text-[#F5B700]' : 'text-[#9A9CA3]'} font-semibold">
-                        ${t('affects_stmt', { month: stmtName })}
-                      </span>
-                    ` : `
-                      <span class="text-[10px] text-[#9A9CA3] font-medium">${tx.card?.name || t('na_debit')}</span>
-                    `}
-                    <span class="text-[#3A3C42]">•</span>
-                    <span class="text-[10px] text-[#9A9CA3] font-mono" dir="ltr">•••• ${tx.card?.last4 || ''}</span>
+                  <div class="flex items-center gap-1.5 mt-1 text-[10px] text-[#9A9CA3] min-w-0">
+                    <span class="font-mono whitespace-nowrap shrink-0" dir="ltr">${tx.date}</span>
+                    <span class="text-[#565963] shrink-0">·</span>
+                    ${tx.card?.name ? `<span class="truncate">${tx.card.name}</span>` : ''}
+                    <span class="font-mono whitespace-nowrap shrink-0" dir="ltr">•••• ${tx.card?.last4 || ''}</span>
                   </div>
+                  ${isCredit ? `
+                    <p class="mt-0.5 text-[10px] ${isCurrentCycle ? 'text-[#F5B700]' : 'text-[#9A9CA3]'} font-semibold whitespace-nowrap">
+                      ${t('affects_stmt', { month: localizeMonthName(stmtName) })}
+                    </p>
+                  ` : ''}
                 </div>
 
                 <div class="flex items-center gap-1.5 shrink-0">
-                  ${typeBadge}
                   ${formatAmountInlineHtml(tx.amount, {
+                    useSans: true,
                     prefixSign: tx.direction === 'income' ? '+' : '-',
-                    numClass: `text-xs font-bold ${tx.direction === 'income' ? 'text-[#F5B700]' : 'text-[#F3F1EC]'}`,
+                    numClass: `text-[14.5px] font-extrabold ${tx.direction === 'income' ? 'text-[#F5B700]' : 'text-[#F3F1EC]'}`,
                     currClass: 'text-[10px] text-[#9A9CA3] font-semibold'
                   })}
                   <button onclick="window.confirmDeleteTx('${tx.id}')" class="text-[#9A9CA3] hover:text-[#E6A8A8] p-1 transition-colors">
-                    <i data-lucide="trash" class="w-3 h-3"></i>
+                    <i data-lucide="trash" class="w-3.5 h-3.5"></i>
                   </button>
                 </div>
               </div>

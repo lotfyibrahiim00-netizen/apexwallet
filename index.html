@@ -838,9 +838,9 @@
 
         <!-- Cycle Info Box -->
         <div class="bg-[#16171A] rounded-2xl p-3.5 text-xs space-y-2 border border-[#2F3136]">
-          <div class="flex justify-between items-center text-[#C8CAD0]">
-            <span data-i18n="billing_cycle_label">دورة الفوترة:</span>
-            <span id="cycle-prompt-statement" class="font-bold text-[#F3F1EC]"></span>
+          <div class="flex justify-between items-center gap-2 text-[#C8CAD0]">
+            <span class="shrink-0 whitespace-nowrap" data-i18n="billing_cycle_label">دورة الفوترة:</span>
+            <span id="cycle-prompt-statement" class="font-bold text-[#F3F1EC] text-[10px] leading-snug text-end min-w-0"></span>
           </div>
           <div class="flex justify-between items-center text-[#C8CAD0]">
             <span data-i18n="prev_cycle_budget_label">ميزانية الدورة السابقة:</span>
@@ -853,7 +853,7 @@
         </div>
 
         <!-- Option 1: Continue with previous budget -->
-        <button type="button" id="btn-cycle-continue" class="w-full py-3 px-4 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active-press">
+        <button type="button" id="btn-cycle-continue" class="w-full py-3 px-3 bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm active-press">
           <i data-lucide="check" class="w-4 h-4 text-[#111111]"></i>
           <span data-i18n="continue_prev_budget">الاستمرار على ميزانية الدورة السابقة</span>
         </button>

@@ -178,10 +178,9 @@ html[lang="ar"] body {
   }
 }
 
-/* Tilted Hero Card Object (~91% viewport width, ~1.82:1 aspect ratio, ~23% height) */
+/* Tilted Hero Card Object (~91% viewport width, ~1.82:1 aspect ratio, flat 2D tilt without perspective skew) */
 .tilted-hero-wrapper {
-  perspective: 1000px;
-  padding: 6px 0 8px 0;
+  padding: 6px 0 10px 0;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -197,11 +196,11 @@ html[lang="ar"] body {
 }
 
 html[dir="rtl"] .tilted-card-container {
-  transform: rotate(-4deg);
+  transform: rotate(-3.5deg);
 }
 
 html[dir="ltr"] .tilted-card-container {
-  transform: rotate(4deg);
+  transform: rotate(3.5deg);
 }
 
 .tilted-card-container:hover {
@@ -212,19 +211,19 @@ html[dir="ltr"] .tilted-card-container {
   transform: rotate(0deg) translateY(-4px) !important;
 }
 
-/* Bank Card Face (Compact ~1.82:1 aspect ratio) */
+/* Bank Card Face (Lighter charcoal-grey sheen, more rounded corners, clearer 2px amber border) */
 .bank-card-face {
   position: relative;
   width: 100%;
   aspect-ratio: 1.82 / 1;
   min-height: 175px;
   max-height: 196px;
-  border-radius: var(--card-radius);
-  border: 1.5px solid var(--accent-amber);
-  background: linear-gradient(135deg, #212227 0%, #17181B 65%, #121316 100%);
+  border-radius: 26px;
+  border: 2px solid var(--accent-amber);
+  background: radial-gradient(circle at 18% 15%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 48%), linear-gradient(135deg, #2C2E35 0%, #23252B 58%, #1C1E23 100%);
   color: var(--text-main);
-  padding: 14px 18px;
-  box-shadow: 0 14px 32px -8px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(245, 183, 0, 0.12);
+  padding: 16px 20px;
+  box-shadow: 0 14px 32px -8px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(245, 183, 0, 0.12);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -234,37 +233,26 @@ html[dir="ltr"] .tilted-card-container {
 }
 
 .tilted-card-container.straightened .bank-card-face {
-  box-shadow: 0 18px 38px -6px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(245, 183, 0, 0.25);
+  box-shadow: 0 18px 38px -6px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(245, 183, 0, 0.25);
 }
 
-/* Golden Chip on Card */
+/* Flat Solid Amber Chip on Card (No grid lines, no metallic gradient) */
 .bank-card-chip {
-  width: 36px;
-  height: 26px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #F5B700 0%, #D49700 50%, #B88000 100%);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.3), 0 2px 4px rgba(0, 0, 0, 0.4);
+  width: 44px;
+  height: 32px;
+  border-radius: 7px;
+  background: #F5B700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
   position: relative;
   overflow: hidden;
 }
-.bank-card-chip::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: rgba(0, 0, 0, 0.25);
-}
-.bank-card-chip::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(0, 0, 0, 0.25);
+
+.card-mask-dot {
+  width: 5.5px;
+  height: 5.5px;
+  border-radius: 9999px;
+  background-color: #E2E4E9;
+  display: inline-block;
 }
 
 /* Hero Expandable Details Drawer */
@@ -285,13 +273,17 @@ html[dir="ltr"] .tilted-card-container {
 }
 
 /* Compact Responsive Amounts inside Tiles & Rows */
+.font-sans-num {
+  font-family: 'Noto Sans', 'Noto Kufi Arabic', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-variant-numeric: tabular-nums;
+}
 .tile-amount-num {
-  font-size: clamp(10.5px, 2.95vw, 13px);
-  line-height: 1.2;
+  font-size: clamp(12.5px, 3.5vw, 15px);
+  line-height: 1.15;
 }
 .tile-amount-curr {
-  font-size: clamp(8px, 2.2vw, 9.5px);
-  line-height: 1.2;
+  font-size: clamp(8.5px, 2.3vw, 10px);
+  line-height: 1.15;
 }
 
 /* Carousel Control */
@@ -463,7 +455,6 @@ html[dir="ltr"] .tilted-card-container {
   direction: ltr !important;
   unicode-bidi: isolate;
   display: inline-flex;
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace !important;
   font-variant-numeric: tabular-nums;
 }
 
