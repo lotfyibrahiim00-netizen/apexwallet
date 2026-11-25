@@ -288,7 +288,10 @@ const I18N = {
     pin_bio_verify_sub: 'أدخل رمز PIN الحالي لتفعيل الفتح بالبصمة',
     pin_waiting_biometric: 'بانتظار البصمة...',
     toast_bio_busy: 'جاري إنهاء عملية البصمة الحالية، يرجى الانتظار',
-    toast_bio_cleanup_failed: 'تعذر التراجع عن تفعيل البصمة السابق',
+    toast_bio_cleanup_failed: 'تعذر إلغاء تسجيل البصمة، أعد المحاولة',
+    bio_quarantine_msg: 'تعذر إلغاء تسجيل البصمة، أعد المحاولة',
+    retry_btn: 'إعادة المحاولة',
+    toast_bio_cleanup_ok: 'تم تنظيف تسجيل البصمة بنجاح',
     wallet_banks: 'بنوك المحفظة',
     details: 'التفاصيل',
     hide: 'إخفاء',
@@ -696,7 +699,10 @@ const I18N = {
     pin_bio_verify_sub: 'Enter your current PIN to enable biometric unlock',
     pin_waiting_biometric: 'Waiting for fingerprint...',
     toast_bio_busy: 'Previous biometric operation is still finishing',
-    toast_bio_cleanup_failed: 'Failed to roll back previous biometric setup',
+    toast_bio_cleanup_failed: 'Could not remove biometric registration, retry',
+    bio_quarantine_msg: 'Could not remove biometric registration, retry',
+    retry_btn: 'Retry',
+    toast_bio_cleanup_ok: 'Biometric registration cleared',
     wallet_banks: 'Wallet Banks',
     details: 'Details',
     hide: 'Hide',
@@ -2865,8 +2871,23 @@ function initApp() {
     const container = document.getElementById('view-settings');
     if (!container) return;
 
+    if (window.WalletSecurity && typeof window.WalletSecurity.isBiometricsQuarantined === 'function' &&
+        window.WalletSecurity.isBiometricsQuarantined() && !bioEnrollmentInFlight) {
+      bioEnrollmentInFlight = true;
+      try {
+        await window.WalletSecurity.retryBiometricCleanup();
+      } finally {
+        bioEnrollmentInFlight = false;
+      }
+    }
+
     const isBioSupported = window.WalletSecurity ? await window.WalletSecurity.isBiometricsAvailable() : false;
+    lastBioSupported = isBioSupported;
+    const isBioQuarantined = (window.WalletSecurity && typeof window.WalletSecurity.isBiometricsQuarantined === 'function')
+      ? window.WalletSecurity.isBiometricsQuarantined()
+      : false;
     const isBioEnabled = window.WalletSecurity ? window.WalletSecurity.isBiometricsEnabled() : false;
+    const canToggleBio = isBioSupported && !bioEnrollmentInFlight && !isBioQuarantined;
     const timeoutMs = window.WalletSecurity ? window.WalletSecurity.getAutoLockTimeout() : 180000;
     const currentCurrency = (typeof store.currency !== 'undefined') ? store.currency : 'EGP';
 
@@ -2900,16 +2921,23 @@ function initApp() {
 
             <!-- Row: Biometric Unlock -->
             <div class="flex items-center justify-between p-4 gap-3">
-              <div>
+              <div class="min-w-0 flex-1">
                 <div class="text-[15px] font-bold text-[#F3F1EC]">${t('biometric_unlock')}</div>
-                <div id="settings-biometric-status" class="text-xs text-[#C8CAD0] mt-0.5">
-                  ${isBioSupported ? (isBioEnabled ? t('enabled') : t('not_enabled')) : (getLang() === 'ar' ? 'غير مدعوم في هذا المتصفح' : 'Not supported')}
+                <div id="settings-biometric-status" class="text-xs ${isBioQuarantined ? 'text-[#E6A8A8] font-semibold' : 'text-[#C8CAD0]'} mt-0.5">
+                  ${isBioQuarantined
+                    ? t('bio_quarantine_msg')
+                    : (isBioSupported ? (isBioEnabled ? t('enabled') : t('not_enabled')) : (getLang() === 'ar' ? 'غير مدعوم في هذا المتصفح' : 'Not supported'))}
                 </div>
               </div>
-              <label class="relative inline-flex items-center min-h-[44px] shrink-0 ${(isBioSupported && !bioEnrollmentInFlight && !bioCleanupFailed) ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'}">
-                <input type="checkbox" id="settings-biometric-toggle" ${isBioEnabled ? 'checked' : ''} ${(!isBioSupported || bioEnrollmentInFlight || bioCleanupFailed) ? 'disabled' : ''} class="sr-only peer">
-                <div class="relative w-11 h-6 bg-[#2A2B31] border border-[#43464F] peer-focus:outline-none rounded-full peer after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:after:border-white peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700]"></div>
-              </label>
+              <div class="flex items-center gap-2 shrink-0">
+                <button type="button" id="settings-biometric-retry-btn" onclick="window.retryBiometricCleanupAction()" class="${isBioQuarantined ? '' : 'hidden'} px-3 py-2 min-h-[44px] rounded-xl bg-[#2A2B31] hover:bg-[#43464F] border border-[#E6A8A8]/50 text-[#E6A8A8] text-xs font-bold active-press">
+                  ${t('retry_btn')}
+                </button>
+                <label id="settings-biometric-label" class="relative inline-flex items-center min-h-[44px] shrink-0 ${canToggleBio ? 'cursor-pointer' : 'opacity-40 cursor-not-allowed'}">
+                  <input type="checkbox" id="settings-biometric-toggle" ${isBioEnabled ? 'checked' : ''} ${!canToggleBio ? 'disabled' : ''} class="sr-only peer">
+                  <div class="relative w-11 h-6 bg-[#2A2B31] border border-[#43464F] peer-focus:outline-none rounded-full peer after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5 rtl:peer-checked:after:-translate-x-5 peer-checked:after:border-white peer-checked:bg-[#F5B700] peer-checked:border-[#F5B700]"></div>
+                </label>
+              </div>
             </div>
 
             <!-- Row: Auto-Lock -->
@@ -3102,19 +3130,18 @@ function initApp() {
       </div>
     `;
 
-    // Biometric Toggle Handler (Serialized lifecycle + PIN verification + strict result.success === true)
+    // Biometric Toggle Handler (Serialized lifecycle + PIN verification + strict verified cleanup)
     const bioToggle = document.getElementById('settings-biometric-toggle');
-    const bioStatusEl = document.getElementById('settings-biometric-status');
     if (bioToggle && isBioSupported) {
       bioToggle.addEventListener('change', async (e) => {
         if (!window.WalletSecurity) {
           e.target.checked = false;
           return;
         }
-        if (bioEnrollmentInFlight || bioCleanupFailed) {
-          e.target.checked = window.WalletSecurity.isBiometricsEnabled();
-          if (bioStatusEl) bioStatusEl.textContent = e.target.checked ? t('enabled') : t('not_enabled');
-          showToast(bioCleanupFailed ? t('toast_bio_cleanup_failed') : t('toast_bio_busy'), 'error');
+        const isQuarantinedNow = typeof window.WalletSecurity.isBiometricsQuarantined === 'function' && window.WalletSecurity.isBiometricsQuarantined();
+        if (bioEnrollmentInFlight || isQuarantinedNow) {
+          syncSettingsBiometricDom();
+          showToast(isQuarantinedNow ? t('toast_bio_cleanup_failed') : t('toast_bio_busy'), 'error');
           return;
         }
         const enabled = e.target.checked;
@@ -3124,22 +3151,45 @@ function initApp() {
           showPinLock('verify_biometric');
         } else {
           bioEnrollmentInFlight = true;
+          syncSettingsBiometricDom();
           try {
             const disRes = await window.WalletSecurity.disableBiometrics();
-            if (disRes && disRes.success === false) {
-              e.target.checked = window.WalletSecurity.isBiometricsEnabled();
-              if (bioStatusEl) bioStatusEl.textContent = e.target.checked ? t('enabled') : t('not_enabled');
-              showToast(t('toast_bio_cleanup_failed'), 'error');
-            } else {
-              if (bioStatusEl) bioStatusEl.textContent = t('not_enabled');
+            if (disRes && disRes.success === true) {
               showToast(t('toast_bio_disabled'), 'info');
+            } else {
+              showToast(t('toast_bio_cleanup_failed'), 'error');
             }
+          } catch (err) {
+            showToast(t('toast_bio_cleanup_failed'), 'error');
           } finally {
             bioEnrollmentInFlight = false;
+            syncSettingsBiometricDom();
           }
         }
       });
     }
+
+    window.retryBiometricCleanupAction = async () => {
+      if (!window.WalletSecurity || bioEnrollmentInFlight) return;
+      bioEnrollmentInFlight = true;
+      const retryBtn = document.getElementById('settings-biometric-retry-btn');
+      if (retryBtn) retryBtn.disabled = true;
+      syncSettingsBiometricDom();
+      try {
+        const res = await window.WalletSecurity.retryBiometricCleanup();
+        if (res && res.success === true) {
+          showToast(t('toast_bio_cleanup_ok'), 'success');
+        } else {
+          showToast(t('toast_bio_cleanup_failed'), 'error');
+        }
+      } catch (err) {
+        showToast(t('toast_bio_cleanup_failed'), 'error');
+      } finally {
+        bioEnrollmentInFlight = false;
+        if (retryBtn) retryBtn.disabled = false;
+        syncSettingsBiometricDom();
+      }
+    };
 
     if (window.lucide) {
       try { lucide.createIcons({ root: container }); } catch (e) {}
@@ -4354,7 +4404,7 @@ function initApp() {
   let isPinBusy = false;
   let bioAttemptCounter = 0;
   let bioEnrollmentInFlight = false;
-  let bioCleanupFailed = false;
+  let lastBioSupported = false;
   let activeBioAttempt = null; // { token, cancelled, lockedDuringWait }
 
   function setPinCancelDisabled(disabled) {
@@ -4369,16 +4419,38 @@ function initApp() {
 
   function syncSettingsBiometricDom() {
     const bioToggleEl = document.getElementById('settings-biometric-toggle');
+    const bioLabelEl = document.getElementById('settings-biometric-label');
     const bioStatusEl = document.getElementById('settings-biometric-status');
+    const retryBtn = document.getElementById('settings-biometric-retry-btn');
     const actualEnabled = window.WalletSecurity ? window.WalletSecurity.isBiometricsEnabled() : false;
+    const isQuarantined = (window.WalletSecurity && typeof window.WalletSecurity.isBiometricsQuarantined === 'function')
+      ? window.WalletSecurity.isBiometricsQuarantined()
+      : false;
+    const canToggle = lastBioSupported && !bioEnrollmentInFlight && !isQuarantined;
+
     if (bioToggleEl) {
       bioToggleEl.checked = actualEnabled;
-      if (bioEnrollmentInFlight || bioCleanupFailed) {
-        bioToggleEl.disabled = true;
-      }
+      bioToggleEl.disabled = !canToggle;
+    }
+    if (bioLabelEl) {
+      bioLabelEl.classList.toggle('cursor-pointer', canToggle);
+      bioLabelEl.classList.toggle('opacity-40', !canToggle);
+      bioLabelEl.classList.toggle('cursor-not-allowed', !canToggle);
+    }
+    if (retryBtn) {
+      retryBtn.classList.toggle('hidden', !isQuarantined);
     }
     if (bioStatusEl) {
-      bioStatusEl.textContent = actualEnabled ? t('enabled') : t('not_enabled');
+      bioStatusEl.classList.toggle('text-[#E6A8A8]', isQuarantined);
+      bioStatusEl.classList.toggle('font-semibold', isQuarantined);
+      bioStatusEl.classList.toggle('text-[#C8CAD0]', !isQuarantined);
+      if (isQuarantined) {
+        bioStatusEl.textContent = t('bio_quarantine_msg');
+      } else if (!lastBioSupported) {
+        bioStatusEl.textContent = getLang() === 'ar' ? 'غير مدعوم في هذا المتصفح' : 'Not supported';
+      } else {
+        bioStatusEl.textContent = actualEnabled ? t('enabled') : t('not_enabled');
+      }
     }
   }
 
@@ -4463,11 +4535,15 @@ function initApp() {
     pinOverlay.classList.remove('opacity-0', 'pointer-events-none');
     if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
 
-    // Check biometric availability & status
+    // Check biometric availability & status (fail-closed: hide biometric button when quarantined)
     if (window.WalletSecurity) {
+      const isBioQuarantined = (typeof window.WalletSecurity.isBiometricsQuarantined === 'function')
+        ? window.WalletSecurity.isBiometricsQuarantined()
+        : false;
       const isBioEnabled = window.WalletSecurity.isBiometricsEnabled();
       if (pinBiometricBtn) {
-        if (pinFlow === 'verify_biometric' || pinFlow.startsWith('change_')) {
+        if (pinFlow === 'verify_biometric' || pinFlow.startsWith('change_') || isBioQuarantined) {
+          pinBiometricBtn.classList.remove('bg-emerald-50', 'text-emerald-600', 'border', 'border-emerald-200');
           pinBiometricBtn.style.visibility = 'hidden';
         } else if (isBioEnabled) {
           pinBiometricBtn.classList.add('bg-emerald-50', 'text-emerald-600', 'border', 'border-emerald-200');
@@ -4521,9 +4597,11 @@ function initApp() {
             await window.WalletSecurity.setupPin(currentInput);
             showToast(t('pin_toast_created'), 'success');
             setTimeout(() => {
-              hidePinLock();
-              isPinBusy = false;
-              renderCurrentView();
+              if (pinFlow === 'setup_confirm' && !(window.WalletSecurity && window.WalletSecurity.isLocked)) {
+                hidePinLock();
+                isPinBusy = false;
+                renderCurrentView();
+              }
             }, 300);
           } else {
             triggerPinError(t('pin_err_mismatch'));
@@ -4541,14 +4619,16 @@ function initApp() {
             store.loadFromDecrypted(res.data);
             showToast(t('pin_toast_unlocked'), 'info');
             setTimeout(() => {
-              hidePinLock();
-              isPinBusy = false;
-              renderCurrentView();
-              if (localStorage.getItem('apexwallet_bio_migrated_notice') === 'true') {
-                localStorage.removeItem('apexwallet_bio_migrated_notice');
-                setTimeout(() => {
-                  showToast('تم تحديث أمان البصمة إلى WebAuthn PRF. تم إيقاف البصمة السابقة، يرجى إعادة تفعيلها من الإعدادات.', 'info');
-                }, 500);
+              if (pinFlow === 'unlock' && !(window.WalletSecurity && window.WalletSecurity.isLocked)) {
+                hidePinLock();
+                isPinBusy = false;
+                renderCurrentView();
+                if (localStorage.getItem('apexwallet_bio_migrated_notice') === 'true') {
+                  localStorage.removeItem('apexwallet_bio_migrated_notice');
+                  setTimeout(() => {
+                    showToast('تم تحديث أمان البصمة إلى WebAuthn PRF. تم إيقاف البصمة السابقة، يرجى إعادة تفعيلها من الإعدادات.', 'info');
+                  }, 500);
+                }
               }
             }, 250);
           } else {
@@ -4558,26 +4638,36 @@ function initApp() {
         }
 
         if (pinFlow === 'verify_biometric') {
-          if (bioEnrollmentInFlight || bioCleanupFailed) {
-            hidePinLock();
-            isPinBusy = false;
-            showToast(bioCleanupFailed ? t('toast_bio_cleanup_failed') : t('toast_bio_busy'), 'error');
+          const isQuarantinedNow = typeof window.WalletSecurity.isBiometricsQuarantined === 'function' && window.WalletSecurity.isBiometricsQuarantined();
+          if (bioEnrollmentInFlight || isQuarantinedNow) {
+            if (pinFlow === 'verify_biometric' && !(window.WalletSecurity && window.WalletSecurity.isLocked)) {
+              hidePinLock();
+              isPinBusy = false;
+            }
+            syncSettingsBiometricDom();
+            showToast(isQuarantinedNow ? t('toast_bio_cleanup_failed') : t('toast_bio_busy'), 'error');
             return;
           }
 
           // Verify PIN first so wrong PIN fails immediately without touching native Keystore/BiometricPrompt
           const pinOk = await window.WalletSecurity.verifyPinOnly(currentInput);
+          if (pinFlow !== 'verify_biometric' || (window.WalletSecurity && window.WalletSecurity.isLocked)) {
+            enteredPin = '';
+            return;
+          }
           if (!pinOk) {
             triggerPinError(t('toast_bio_wrong_pin'));
             return;
           }
 
-          // Enter serialized native biometric wait state: disable keypad + Cancel while OS BiometricPrompt owns cancellation
+          // Enter serialized native biometric wait state: disable keypad + Cancel + settings toggle while OS BiometricPrompt owns cancellation
           const token = ++bioAttemptCounter;
           const attempt = { token, cancelled: false, lockedDuringWait: false };
           activeBioAttempt = attempt;
           bioEnrollmentInFlight = true;
+          enteredPin = '';
           setPinCancelDisabled(true);
+          syncSettingsBiometricDom();
           if (pinSubtitle) pinSubtitle.textContent = t('pin_waiting_biometric');
 
           let res = null;
@@ -4586,8 +4676,6 @@ function initApp() {
             res = await window.WalletSecurity.enableBiometrics(currentInput);
           } catch (err) {
             caughtErr = err;
-          } finally {
-            enteredPin = '';
           }
 
           const isStillValid = (
@@ -4600,17 +4688,12 @@ function initApp() {
           );
 
           // If attempt became invalid (cancelled or wallet locked while waiting) AND enrollment succeeded,
-          // serialize rollback before releasing bioEnrollmentInFlight so no newer enrollment can overlap.
+          // serialize verified cleanup before releasing bioEnrollmentInFlight so no newer enrollment can overlap.
           if (!isStillValid) {
             if (!caughtErr && res && res.success === true) {
               try {
-                const rb = await window.WalletSecurity.disableBiometrics();
-                if (rb && rb.success === false) {
-                  bioCleanupFailed = true;
-                  console.warn('Biometric rollback returned failure');
-                }
+                await window.WalletSecurity.disableBiometrics();
               } catch (rbErr) {
-                bioCleanupFailed = true;
                 console.warn('Biometric rollback threw:', rbErr && rbErr.message ? rbErr.message : 'error');
               }
             }
@@ -4641,8 +4724,17 @@ function initApp() {
             syncSettingsBiometricDom();
             showToast(t('toast_bio_enabled'), 'success');
             setTimeout(() => {
-              hidePinLock();
-              isPinBusy = false;
+              if (
+                pinFlow === 'verify_biometric' &&
+                !(window.WalletSecurity && window.WalletSecurity.isLocked) &&
+                !attempt.lockedDuringWait &&
+                !attempt.cancelled &&
+                bioAttemptCounter === token
+              ) {
+                hidePinLock();
+                isPinBusy = false;
+                syncSettingsBiometricDom();
+              }
             }, 250);
           } else {
             hidePinLock();
@@ -4670,12 +4762,14 @@ function initApp() {
             flashPinDots('success');
             tempOldPin = currentInput;
             setTimeout(() => {
-              enteredPin = '';
-              pinFlow = 'change_new';
-              if (pinTitle) pinTitle.textContent = t('pin_change_new_title');
-              if (pinSubtitle) pinSubtitle.textContent = t('pin_change_new_sub');
-              updatePinDots();
-              isPinBusy = false;
+              if (pinFlow === 'change_old' && !(window.WalletSecurity && window.WalletSecurity.isLocked)) {
+                enteredPin = '';
+                pinFlow = 'change_new';
+                if (pinTitle) pinTitle.textContent = t('pin_change_new_title');
+                if (pinSubtitle) pinSubtitle.textContent = t('pin_change_new_sub');
+                updatePinDots();
+                isPinBusy = false;
+              }
             }, 250);
           } else {
             triggerPinError(t('pin_err_wrong_old'));
@@ -4687,12 +4781,14 @@ function initApp() {
           tempFirstPin = currentInput;
           flashPinDots('success');
           setTimeout(() => {
-            enteredPin = '';
-            pinFlow = 'change_confirm';
-            if (pinTitle) pinTitle.textContent = t('pin_change_confirm_title');
-            if (pinSubtitle) pinSubtitle.textContent = t('pin_change_confirm_sub');
-            updatePinDots();
-            isPinBusy = false;
+            if (pinFlow === 'change_new' && !(window.WalletSecurity && window.WalletSecurity.isLocked)) {
+              enteredPin = '';
+              pinFlow = 'change_confirm';
+              if (pinTitle) pinTitle.textContent = t('pin_change_confirm_title');
+              if (pinSubtitle) pinSubtitle.textContent = t('pin_change_confirm_sub');
+              updatePinDots();
+              isPinBusy = false;
+            }
           }, 250);
           return;
         }
@@ -4704,9 +4800,11 @@ function initApp() {
             if (res && res.success) {
               showToast(t('pin_toast_changed'), 'success');
               setTimeout(() => {
-                hidePinLock();
-                isPinBusy = false;
-                renderCurrentView();
+                if (pinFlow === 'change_confirm' && !(window.WalletSecurity && window.WalletSecurity.isLocked)) {
+                  hidePinLock();
+                  isPinBusy = false;
+                  renderCurrentView();
+                }
               }, 300);
             } else {
               triggerPinError((res && res.error) || 'Failed to update PIN');
@@ -4714,9 +4812,11 @@ function initApp() {
           } else {
             triggerPinError(t('pin_err_mismatch'));
             setTimeout(() => {
-              pinFlow = 'change_new';
-              if (pinTitle) pinTitle.textContent = t('pin_change_new_title');
-              if (pinSubtitle) pinSubtitle.textContent = t('pin_change_new_sub');
+              if (pinFlow === 'change_confirm' && !(window.WalletSecurity && window.WalletSecurity.isLocked)) {
+                pinFlow = 'change_new';
+                if (pinTitle) pinTitle.textContent = t('pin_change_new_title');
+                if (pinSubtitle) pinSubtitle.textContent = t('pin_change_new_sub');
+              }
             }, 600);
           }
           return;
@@ -4751,7 +4851,10 @@ function initApp() {
   }
 
   async function triggerBiometricUnlock() {
-    if (!window.WalletSecurity) return;
+    if (!window.WalletSecurity || pinFlow !== 'unlock' || !window.WalletSecurity.isLocked) return;
+    if (typeof window.WalletSecurity.isBiometricsQuarantined === 'function' && window.WalletSecurity.isBiometricsQuarantined()) {
+      return;
+    }
     if (!window.WalletSecurity.isBiometricsEnabled()) {
       showToast(t('pin_toast_bio_enable_first'), 'info');
       return;
@@ -4763,15 +4866,17 @@ function initApp() {
         store.loadFromDecrypted(res.data);
         showToast(t('pin_toast_bio_unlocked'), 'success');
         setTimeout(() => {
-          hidePinLock();
-          isPinBusy = false;
-          renderCurrentView();
+          if (pinFlow === 'unlock' && !(window.WalletSecurity && window.WalletSecurity.isLocked)) {
+            hidePinLock();
+            isPinBusy = false;
+            renderCurrentView();
+          }
         }, 250);
-      } else if (res && res.error) {
-        if (!res.error.toLowerCase().includes('cancel')) {
-          triggerPinError(res.error);
-        } else {
+      } else if (res && (res.cancelled || res.error)) {
+        if (res.cancelled === true || /cancel|إلغاء/i.test(res.error || '')) {
           showToast(t('pin_toast_bio_cancelled'), 'info');
+        } else {
+          triggerPinError(res.error);
         }
       }
     } catch (err) {
@@ -4837,7 +4942,15 @@ function initApp() {
   const currSelect = document.getElementById('header-currency-select');
   if (currSelect) currSelect.value = currentCurrency;
 
-  // Check initial security lock state
+  // Check initial security lock state & run verified biometric cleanup if quarantined from prior failure
+  if (window.WalletSecurity && typeof window.WalletSecurity.isBiometricsQuarantined === 'function' &&
+      window.WalletSecurity.isBiometricsQuarantined() && !bioEnrollmentInFlight) {
+    bioEnrollmentInFlight = true;
+    Promise.resolve(window.WalletSecurity.retryBiometricCleanup()).finally(() => {
+      bioEnrollmentInFlight = false;
+      syncSettingsBiometricDom();
+    });
+  }
   if (window.WalletSecurity && (!window.WalletSecurity.isConfigured() || window.WalletSecurity.isLocked)) {
     showPinLock();
   }

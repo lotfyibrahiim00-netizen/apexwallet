@@ -773,16 +773,51 @@ public class BankSmsPlugin extends Plugin {
 
     @PluginMethod
     public void clearBiometricPin(PluginCall call) {
+        String errMsg = null;
+        boolean aliasPresent = false;
+        boolean recordPresent = false;
+
         try {
             KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
             keyStore.load(null);
             if (keyStore.containsAlias(BIOMETRIC_KEY_ALIAS)) {
                 keyStore.deleteEntry(BIOMETRIC_KEY_ALIAS);
             }
-        } catch (Exception ignored) {}
-        mQueue.clearBiometricPinRecord();
+            aliasPresent = keyStore.containsAlias(BIOMETRIC_KEY_ALIAS);
+        } catch (Exception e) {
+            errMsg = e.getMessage() != null ? e.getMessage() : "Keystore delete failed";
+            try {
+                KeyStore verifyStore = KeyStore.getInstance("AndroidKeyStore");
+                verifyStore.load(null);
+                aliasPresent = verifyStore.containsAlias(BIOMETRIC_KEY_ALIAS);
+            } catch (Exception verifyErr) {
+                aliasPresent = true;
+            }
+        }
+
+        try {
+            mQueue.clearBiometricPinRecord();
+        } catch (Exception e) {
+            String recErr = e.getMessage() != null ? e.getMessage() : "Record clear failed";
+            errMsg = errMsg == null ? recErr : (errMsg + "; " + recErr);
+        }
+
+        try {
+            recordPresent = mQueue.hasBiometricPinRecord();
+        } catch (Exception e) {
+            recordPresent = true;
+            String checkErr = e.getMessage() != null ? e.getMessage() : "Record verify failed";
+            errMsg = errMsg == null ? checkErr : (errMsg + "; " + checkErr);
+        }
+
+        boolean ok = (errMsg == null && !aliasPresent && !recordPresent);
         JSObject ret = new JSObject();
-        ret.put("success", true);
+        ret.put("success", ok);
+        ret.put("aliasPresent", aliasPresent);
+        ret.put("recordPresent", recordPresent);
+        if (errMsg != null) {
+            ret.put("error", errMsg);
+        }
         call.resolve(ret);
     }
 

@@ -28,6 +28,7 @@
 
   const STORAGE_KEY = 'apexwallet_security_vault_v1';
   const BIOMETRIC_KEY = 'apexwallet_biometrics_v1';
+  const BIOMETRIC_QUARANTINE_KEY = 'apexwallet_biometrics_quarantine_v1';
   const AUTOLOCK_KEY = 'apexwallet_autolock_ms';
   const LEGACY_STORAGE_KEY = 'apexwallet_user_vault_v1';
   const PBKDF2_ITERATIONS = 100000;
@@ -404,15 +405,40 @@
       this.isLocked = true;
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(BIOMETRIC_KEY);
+      localStorage.removeItem(BIOMETRIC_QUARANTINE_KEY);
       localStorage.removeItem(AUTOLOCK_KEY);
       localStorage.removeItem(LEGACY_STORAGE_KEY);
       if (this.onLockStateChange) this.onLockStateChange(true);
     }
 
+    isBiometricsQuarantined() {
+      const raw = localStorage.getItem(BIOMETRIC_QUARANTINE_KEY);
+      if (!raw) return false;
+      try {
+        const parsed = JSON.parse(raw);
+        return !!(parsed && parsed.quarantined === true);
+      } catch (e) {
+        return true;
+      }
+    }
+
+    _setBiometricsQuarantine(reason) {
+      localStorage.setItem(BIOMETRIC_QUARANTINE_KEY, JSON.stringify({
+        quarantined: true,
+        updatedAt: new Date().toISOString(),
+        reason: String(reason || 'cleanup_failed')
+      }));
+    }
+
+    _clearBiometricsQuarantine() {
+      localStorage.removeItem(BIOMETRIC_QUARANTINE_KEY);
+    }
+
     /**
-     * Check if Biometrics is currently enabled by user
+     * Check if Biometrics is currently enabled by user (fail-closed if quarantined)
      */
     isBiometricsEnabled() {
+      if (this.isBiometricsQuarantined()) return false;
       const raw = localStorage.getItem(BIOMETRIC_KEY);
       if (!raw) return false;
       try {
@@ -465,6 +491,9 @@
     async enableBiometrics(currentPin) {
       if (!this.isConfigured()) {
         return { success: false, error: 'Security PIN is not set up' };
+      }
+      if (this.isBiometricsQuarantined()) {
+        return { success: false, quarantined: true, error: 'Biometric cleanup pending retry' };
       }
 
       // Verify current PIN first against PBKDF2 verifier
@@ -607,25 +636,87 @@
     }
 
     /**
-     * Disable Biometrics
+     * Disable Biometrics with verified native cleanup and fail-closed quarantine on failure
      */
     async disableBiometrics() {
+      let existingRecord = null;
+      try {
+        const rawBio = localStorage.getItem(BIOMETRIC_KEY);
+        existingRecord = rawBio ? JSON.parse(rawBio) : null;
+      } catch (e) {}
+
+      const isNativeEnv = (typeof window !== 'undefined' &&
+        window.Capacitor &&
+        typeof window.Capacitor.isNativePlatform === 'function' &&
+        window.Capacitor.isNativePlatform());
+      const wasKeystoreBound = !!(existingRecord && (existingRecord.isKeystoreBound || existingRecord.credId === 'native_android_keystore'));
+      const wasQuarantined = this.isBiometricsQuarantined();
       const nativePlugin = getNativeSmsPlugin();
+
       if (nativePlugin && typeof nativePlugin.clearBiometricPin === 'function') {
         try {
-          await nativePlugin.clearBiometricPin();
+          const res = await nativePlugin.clearBiometricPin();
+          let aliasPresent = res ? res.aliasPresent : undefined;
+          let recordPresent = res ? res.recordPresent : undefined;
+
+          if (recordPresent === undefined && typeof nativePlugin.hasBiometricPin === 'function') {
+            const checkRes = await nativePlugin.hasBiometricPin();
+            recordPresent = checkRes ? !!checkRes.hasRecord : true;
+          }
+
+          if (res && res.success === true && aliasPresent === false && recordPresent === false) {
+            localStorage.removeItem(BIOMETRIC_KEY);
+            this._clearBiometricsQuarantine();
+            return { success: true, aliasPresent: false, recordPresent: false };
+          }
+
+          const errMsg = (res && res.error) ? String(res.error) : 'Native biometric cleanup not verified';
+          localStorage.removeItem(BIOMETRIC_KEY);
+          this._setBiometricsQuarantine(errMsg);
+          return {
+            success: false,
+            quarantined: true,
+            aliasPresent: aliasPresent !== false,
+            recordPresent: recordPresent !== false,
+            error: errMsg
+          };
         } catch (e) {
-          console.warn('Error clearing native biometric pin:', e);
+          const errMsg = (e && e.message) ? String(e.message) : 'Error clearing native biometric pin';
+          console.warn('Error clearing native biometric pin:', errMsg);
+          localStorage.removeItem(BIOMETRIC_KEY);
+          this._setBiometricsQuarantine(errMsg);
+          return { success: false, quarantined: true, error: errMsg };
         }
       }
+
+      // If native platform/keystore-bound/quarantined state requires native cleanup but module is absent -> fail closed
+      if (isNativeEnv || wasKeystoreBound || wasQuarantined) {
+        const errMsg = 'Native biometric module unavailable for cleanup';
+        localStorage.removeItem(BIOMETRIC_KEY);
+        this._setBiometricsQuarantine(errMsg);
+        return { success: false, quarantined: true, error: errMsg };
+      }
+
+      // Web-only / unit-test mode (no native keystore record)
       localStorage.removeItem(BIOMETRIC_KEY);
+      this._clearBiometricsQuarantine();
       return { success: true };
+    }
+
+    async retryBiometricCleanup() {
+      if (!this.isBiometricsQuarantined()) {
+        return { success: true, quarantined: false };
+      }
+      return await this.disableBiometrics();
     }
 
     /**
      * Unlock using Biometrics (Native Android Keystore-bound BiometricPrompt or Web WebAuthn)
      */
     async unlockWithBiometrics() {
+      if (this.isBiometricsQuarantined()) {
+        return { success: false, quarantined: true, error: 'Biometrics is disabled pending cleanup' };
+      }
       if (!this.isBiometricsEnabled()) {
         return { success: false, error: 'Biometrics is not enabled' };
       }
