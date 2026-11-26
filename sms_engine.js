@@ -375,10 +375,24 @@
     enrichCandidates() {
       const store = typeof window !== 'undefined' ? (window.walletStore || window.store) : (typeof global !== 'undefined' ? (global.walletStore || global.store) : null);
       if (!store) return;
-      const allCards = store.cards || [];
-      const allBanks = store.banks || [];
-      const allAccounts = store.accounts || [];
-      const allTransactions = store.transactions || [];
+      const allCards = Array.isArray(store.cards) ? store.cards : [];
+      const allBanks = Array.isArray(store.banks) ? store.banks.filter(Boolean) : [];
+      const allAccounts = Array.isArray(store.accounts) ? store.accounts : [];
+      const allTransactions = Array.isArray(store.transactions) ? store.transactions : [];
+
+      // Helper to access catalog bank lookup if available
+      const getCatalogHelper = () => {
+        if (typeof window !== 'undefined') {
+          if (typeof window.findBankExactMatch === 'function') return window.findBankExactMatch;
+          if (typeof window.findBankInCatalog === 'function') return window.findBankInCatalog;
+        }
+        if (typeof global !== 'undefined') {
+          if (typeof global.findBankExactMatch === 'function') return global.findBankExactMatch;
+          if (typeof global.findBankInCatalog === 'function') return global.findBankInCatalog;
+        }
+        return null;
+      };
+      const catalogLookup = getCatalogHelper();
 
       for (const c of this.pendingCandidates) {
         // Suggested category
@@ -390,16 +404,53 @@
         const candidatePos = c.digitsPosition || 'last';
         const candidateEntity = c.entityType || 'card';
 
-        // Resolve Bank
+        // Resolve Bank with safe null/undefined guards, case normalization, and catalog aliases
         let candidateBank = null;
-        if (c.bank) {
-          const bLower = c.bank.toLowerCase().trim();
-          candidateBank = allBanks.find(b =>
-            b.name.toLowerCase().includes(bLower) ||
-            b.shortCode.toLowerCase().includes(bLower) ||
-            bLower.includes(b.shortCode.toLowerCase()) ||
-            bLower.includes(b.name.toLowerCase())
-          );
+        const bQuery = c.bank ? String(c.bank).trim() : '';
+        const bLower = bQuery.toLowerCase();
+
+        if (bLower) {
+          // Direct matching on wallet banks
+          candidateBank = allBanks.find(b => {
+            if (!b) return false;
+            const bName = b.name ? String(b.name).toLowerCase().trim() : '';
+            const bShort = b.shortCode ? String(b.shortCode).toLowerCase().trim() : '';
+            const bCatalog = b.catalogId ? String(b.catalogId).toLowerCase().trim() : '';
+
+            if (bShort && (bShort === bLower || bLower.includes(bShort) || bShort.includes(bLower))) return true;
+            if (bName && (bName === bLower || bName.includes(bLower) || bLower.includes(bName))) return true;
+            if (bCatalog && (bCatalog === bLower || bLower.includes(bCatalog))) return true;
+            return false;
+          });
+
+          // Catalog alias resolution (e.g. Arabic vs English: "البنك التجاري الدولي" <-> "Commercial International Bank" / CIB)
+          if (!candidateBank && catalogLookup) {
+            try {
+              const catEntry = catalogLookup(bQuery);
+              if (catEntry) {
+                const catKey = (catEntry.key || '').toLowerCase();
+                const catShort = (catEntry.shortCode || '').toLowerCase();
+                const catEn = (catEntry.nameEn || '').toLowerCase();
+                const catAr = (catEntry.nameAr || '').toLowerCase();
+
+                candidateBank = allBanks.find(b => {
+                  if (!b) return false;
+                  const bName = b.name ? String(b.name).toLowerCase().trim() : '';
+                  const bShort = b.shortCode ? String(b.shortCode).toLowerCase().trim() : '';
+                  const bCatalog = b.catalogId ? String(b.catalogId).toLowerCase().trim() : '';
+
+                  if (catKey && (bCatalog === catKey || bShort === catKey || bName === catKey)) return true;
+                  if (catShort && (bShort === catShort || bName.includes(catShort))) return true;
+                  if (catEn && (bName === catEn || bName.includes(catEn))) return true;
+                  if (catAr && (bName === catAr || bName.includes(catAr))) return true;
+
+                  const bCatEntry = catalogLookup(b.name || b.shortCode);
+                  if (bCatEntry && bCatEntry.key === catEntry.key) return true;
+                  return false;
+                });
+              }
+            } catch (catErr) {}
+          }
         }
 
         let matchingCards = [];
@@ -408,13 +459,13 @@
         if (candidateBank && candidateDigits && candidateDigits.length === 4) {
           if (candidateEntity === 'account') {
             matchingAccounts = allAccounts.filter(acc =>
-              acc.bankId === candidateBank.id &&
+              acc && acc.bankId === candidateBank.id &&
               acc.identifierDigits === candidateDigits &&
               (acc.digitsPosition || 'last') === candidatePos
             );
             // Also check debit cards linked to matching account or matching debit cards
             matchingCards = allCards.filter(card =>
-              card.bankId === candidateBank.id &&
+              card && card.bankId === candidateBank.id &&
               (card.cardType === 'debit') &&
               (card.identifierDigits === candidateDigits || card.last4 === candidateDigits) &&
               (card.digitsPosition || 'last') === candidatePos
@@ -422,10 +473,47 @@
           } else {
             // Card entity
             matchingCards = allCards.filter(card =>
-              card.bankId === candidateBank.id &&
+              card && card.bankId === candidateBank.id &&
               (card.identifierDigits === candidateDigits || card.last4 === candidateDigits) &&
               (card.digitsPosition || 'last') === candidatePos
             );
+          }
+        } else if (!candidateBank && candidateDigits && candidateDigits.length === 4) {
+          // Strict single-match fallback: If bank could not be resolved from SMS sender
+          // (e.g. InstaPay, IPN, unknown sender), check if exactly ONE card or account in the entire wallet matches.
+          let globalCards = [];
+          let globalAccounts = [];
+
+          if (candidateEntity === 'account') {
+            globalAccounts = allAccounts.filter(acc =>
+              acc && acc.identifierDigits === candidateDigits &&
+              (acc.digitsPosition || 'last') === candidatePos
+            );
+            globalCards = allCards.filter(card =>
+              card && card.cardType === 'debit' &&
+              (card.identifierDigits === candidateDigits || card.last4 === candidateDigits) &&
+              (card.digitsPosition || 'last') === candidatePos
+            );
+          } else {
+            globalCards = allCards.filter(card =>
+              card && (card.identifierDigits === candidateDigits || card.last4 === candidateDigits) &&
+              (card.digitsPosition || 'last') === candidatePos
+            );
+          }
+
+          const totalGlobal = globalCards.length + globalAccounts.length;
+          if (totalGlobal === 1) {
+            const matchedEntity = globalCards[0] || globalAccounts[0];
+            const resolvedBank = allBanks.find(b => b && b.id === matchedEntity.bankId);
+            if (resolvedBank) {
+              candidateBank = resolvedBank;
+              if (candidateEntity === 'account') {
+                matchingAccounts = globalAccounts;
+                matchingCards = globalCards;
+              } else {
+                matchingCards = globalCards;
+              }
+            }
           }
         }
 
@@ -443,7 +531,14 @@
           c.matchedCardId = null;
           c.matchedAccountId = matchingAccounts[0].id;
           // If a card is linked to this account, suggest it
-          const linkedCard = allCards.find(cd => cd.linkedAccountId === matchingAccounts[0].id);
+          let linkedCard = allCards.find(cd => cd && cd.linkedAccountId === matchingAccounts[0].id);
+          if (!linkedCard && candidateBank) {
+            // Also check if there is a single debit card for this bank
+            const bankDebits = allCards.filter(cd => cd && cd.bankId === candidateBank.id && cd.cardType === 'debit');
+            if (bankDebits.length === 1) {
+              linkedCard = bankDebits[0];
+            }
+          }
           if (linkedCard) {
             c.matchedCardId = linkedCard.id;
             c.confidence = 'high';

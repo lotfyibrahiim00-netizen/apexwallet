@@ -2093,6 +2093,9 @@ function initApp() {
   // --- Render Current View ---
   function renderCurrentView() {
     store = window.walletStore || window.store || store;
+    if (window.BankSmsEngine && typeof window.BankSmsEngine.enrichCandidates === 'function') {
+      window.BankSmsEngine.enrichCandidates();
+    }
     const stats = store.getOverallStats();
     const topSubtitle = document.getElementById('header-subtitle');
     if (topSubtitle) {
@@ -2730,6 +2733,10 @@ function initApp() {
   function renderReviewView() {
     const container = document.getElementById('view-review');
     if (!container) return;
+
+    if (window.BankSmsEngine && typeof window.BankSmsEngine.enrichCandidates === 'function') {
+      window.BankSmsEngine.enrichCandidates();
+    }
 
     const candidates = (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates) ? window.BankSmsEngine.pendingCandidates : [];
 
@@ -3944,6 +3951,10 @@ function initApp() {
       document.getElementById('view-review-candidates-container')
     ].filter(Boolean);
     const counterEl = document.getElementById('sms-inbox-counter');
+
+    if (window.BankSmsEngine && typeof window.BankSmsEngine.enrichCandidates === 'function') {
+      window.BankSmsEngine.enrichCandidates();
+    }
 
     const candidates = (window.BankSmsEngine && window.BankSmsEngine.pendingCandidates) ? window.BankSmsEngine.pendingCandidates : [];
     if (counterEl) {
@@ -5379,6 +5390,9 @@ function initApp() {
           if (res.success) {
             flashPinDots('success');
             store.loadFromDecrypted(res.data);
+            if (window.BankSmsEngine && typeof window.BankSmsEngine.enrichCandidates === 'function') {
+              window.BankSmsEngine.enrichCandidates();
+            }
             showToast(t('pin_toast_unlocked'), 'info');
             setTimeout(() => {
               if (pinFlow === 'unlock' && !(window.WalletSecurity && window.WalletSecurity.isLocked)) {
@@ -5626,6 +5640,9 @@ function initApp() {
       if (res && res.success) {
         flashPinDots('success');
         store.loadFromDecrypted(res.data);
+        if (window.BankSmsEngine && typeof window.BankSmsEngine.enrichCandidates === 'function') {
+          window.BankSmsEngine.enrichCandidates();
+        }
         showToast(t('pin_toast_bio_unlocked'), 'success');
         setTimeout(() => {
           if (pinFlow === 'unlock' && !(window.WalletSecurity && window.WalletSecurity.isLocked)) {
