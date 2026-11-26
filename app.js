@@ -52,6 +52,595 @@ const PRESET_BANKS = [
   { name: 'Barclays', code: 'BARC', color: '#00AEEF' }
 ];
 
+// --- Egyptian Banks Catalog (34 Banks + Other Bank) ---
+// Brand colors documentation:
+// VERIFIED:
+// - HSBC: #db0011 (official art)
+// - NBK: #0e4c8c (official)
+// - ADIB: #066094 (official)
+// - Banque Misr: #871e35 (official site)
+// - Credit Agricole: #3f8277 (official site)
+// THIRD-PARTY ART / TUNED:
+// - CIB: #002d62 (navy/blue, third-party art)
+// - Banque du Caire: #f26a21 (graphite + orange, third-party)
+// UNVERIFIED GUESSES (can be tuned or corrected by owner later):
+// - QNB: #7c003d (unverified guess)
+// - NBE: #0a5c3a (unverified guess)
+// - NXT: #3a1d6e (unverified guess)
+// - All other banks below marked verified: false (unverified dominant brand colors)
+const EGYPTIAN_BANKS = [
+  {
+    key: 'cib',
+    shortCode: 'CIB',
+    nameEn: 'CIB',
+    nameAr: 'البنك التجاري الدولي (CIB)',
+    brandColor: '#002D62', // third-party art
+    verified: false,
+    types: ['credit', 'debit'],
+    variants: [
+      { id: 'cib_prime', nameEn: 'Prime', nameAr: 'برايم', type: 'debit', look: 'cib_prime' },
+      { id: 'cib_titanium', nameEn: 'Titanium', nameAr: 'تيتانيوم', type: 'credit', look: 'cib_titanium' },
+      { id: 'cib_cashback', nameEn: 'Cashback', nameAr: 'كاش باك', type: 'credit', look: 'cib_cashback' },
+      { id: 'cib_gold', nameEn: 'Gold', nameAr: 'جولد', type: 'credit', look: 'cib_gold' }
+    ]
+  },
+  {
+    key: 'nbe',
+    shortCode: 'NBE',
+    nameEn: 'National Bank of Egypt (NBE)',
+    nameAr: 'البنك الأهلي المصري',
+    brandColor: '#0a5c3a', // unverified guess
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'bm',
+    shortCode: 'BM',
+    nameEn: 'Banque Misr',
+    nameAr: 'بنك مصر',
+    brandColor: '#871e35', // official site
+    verified: true,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'qnb',
+    shortCode: 'QNB',
+    nameEn: 'QNB',
+    nameAr: 'بنك قطر الوطني (QNB)',
+    brandColor: '#7c003d', // unverified guess
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'hsbc',
+    shortCode: 'HSBC',
+    nameEn: 'HSBC',
+    nameAr: 'إتش إس بي سي (HSBC)',
+    brandColor: '#db0011', // official art
+    verified: true,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'nbk',
+    shortCode: 'NBK',
+    nameEn: 'NBK (National Bank of Kuwait Egypt)',
+    nameAr: 'بنك الكويت الوطني مصر (NBK)',
+    brandColor: '#0e4c8c', // official
+    verified: true,
+    types: ['credit', 'debit'],
+    variants: [
+      { id: 'nbk_debit', nameEn: 'Debit', nameAr: 'ديبت', type: 'debit', look: 'nbk_debit' },
+      { id: 'nbk_gold', nameEn: 'Gold', nameAr: 'جولد', type: 'credit', look: 'nbk_gold' },
+      { id: 'nbk_titanium', nameEn: 'Titanium', nameAr: 'تيتانيوم', type: 'credit', look: 'nbk_titanium' }
+    ]
+  },
+  {
+    key: 'bdc',
+    shortCode: 'BDC',
+    nameEn: 'Banque du Caire',
+    nameAr: 'بنك القاهرة',
+    brandColor: '#f26a21', // third-party graphite/orange
+    verified: false,
+    types: ['credit', 'debit'],
+    variants: [
+      { id: 'bdc_debit', nameEn: 'Debit', nameAr: 'ديبت', type: 'debit', look: 'bdc_debit' },
+      { id: 'bdc_titanium', nameEn: 'Titanium', nameAr: 'تيتانيوم', type: 'credit', look: 'bdc_titanium' }
+    ]
+  },
+  {
+    key: 'adib',
+    shortCode: 'ADIB',
+    nameEn: 'ADIB (Abu Dhabi Islamic Bank)',
+    nameAr: 'مصرف أبوظبي الإسلامي (ADIB)',
+    brandColor: '#066094', // official
+    verified: true,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'ca',
+    shortCode: 'CA',
+    nameEn: 'Credit Agricole',
+    nameAr: 'كريدي أجريكول مصر',
+    brandColor: '#3f8277', // official site
+    verified: true,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'nxt',
+    shortCode: 'NXT',
+    nameEn: 'NXT',
+    nameAr: 'بنك نكست',
+    brandColor: '#3a1d6e', // unverified guess
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'abe',
+    shortCode: 'ABE',
+    nameEn: 'Agricultural Bank of Egypt',
+    nameAr: 'البنك الزراعي المصري',
+    brandColor: '#1a5e20', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'midbank',
+    shortCode: 'MID',
+    nameEn: 'Midbank',
+    nameAr: 'ميد بنك',
+    brandColor: '#e30613', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'enbd',
+    shortCode: 'ENBD',
+    nameEn: 'Emirates NBD Egypt',
+    nameAr: 'بنك الإمارات دبي الوطني مصر',
+    brandColor: '#0b3082', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'abc',
+    shortCode: 'ABC',
+    nameEn: 'Arab Banking Corporation Egypt (ABC)',
+    nameAr: 'بنك المؤسسة العربية المصرفية مصر (ABC)',
+    brandColor: '#c20430', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'fab',
+    shortCode: 'FAB',
+    nameEn: 'First Abu Dhabi Bank Egypt (FAB Misr)',
+    nameAr: 'بنك أبوظبي الأول مصر (FAB Misr)',
+    brandColor: '#002b49', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'egbank',
+    shortCode: 'EGB',
+    nameEn: 'Egyptian Gulf Bank',
+    nameAr: 'البنك المصري الخليجي (EG Bank)',
+    brandColor: '#005596', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'aaib',
+    shortCode: 'AAIB',
+    nameEn: 'Arab African International Bank (AAIB)',
+    nameAr: 'البنك العربي الأفريقي الدولي (AAIB)',
+    brandColor: '#9b111e', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'ealb',
+    shortCode: 'EALB',
+    nameEn: 'Egyptian Arab Land Bank',
+    nameAr: 'البنك العقاري المصري العربي',
+    brandColor: '#1c355e', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'mashreq',
+    shortCode: 'MASH',
+    nameEn: 'Mashreq Egypt',
+    nameAr: 'بنك المشرق مصر',
+    brandColor: '#ff5a00', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'alex',
+    shortCode: 'ALEX',
+    nameEn: 'Alex Bank',
+    nameAr: 'بنك الإسكندرية',
+    brandColor: '#004b32', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'abk',
+    shortCode: 'ABK',
+    nameEn: 'Al Ahli Bank of Kuwait Egypt',
+    nameAr: 'البنك الأهلي الكويتي مصر (ABK)',
+    brandColor: '#004f9f', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'scb',
+    shortCode: 'SCB',
+    nameEn: 'Suez Canal Bank',
+    nameAr: 'بنك قناة السويس',
+    brandColor: '#003366', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'arabbank',
+    shortCode: 'ARAB',
+    nameEn: 'Arab Bank',
+    nameAr: 'البنك العربي',
+    brandColor: '#002b49', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'hdb',
+    shortCode: 'HDB',
+    nameEn: 'Housing and Development Bank',
+    nameAr: 'بنك التعمير والإسكان (HDB)',
+    brandColor: '#004d2c', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'saib',
+    shortCode: 'SAIB',
+    nameEn: 'SAIB',
+    nameAr: 'بنك الشركة المصرفية العربية الدولية (SAIB)',
+    brandColor: '#c49a45', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'ebank',
+    shortCode: 'EBANK',
+    nameEn: 'Export Development Bank of Egypt',
+    nameAr: 'البنك المصري لتنمية الصادرات (EBank)',
+    brandColor: '#003b70', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'aib',
+    shortCode: 'AIB',
+    nameEn: 'Arab International Bank',
+    nameAr: 'المصرف العربي الدولي',
+    brandColor: '#103058', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'adcb',
+    shortCode: 'ADCB',
+    nameEn: 'ADCB Egypt',
+    nameAr: 'بنك أبوظبي التجاري مصر (ADCB)',
+    brandColor: '#d31145', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'ub',
+    shortCode: 'UB',
+    nameEn: 'The United Bank',
+    nameAr: 'المصرف المتحد',
+    brandColor: '#005a9c', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'idb',
+    shortCode: 'IDB',
+    nameEn: 'Industrial Development Bank',
+    nameAr: 'بنك التنمية الصناعية (IDB)',
+    brandColor: '#003366', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'attijari',
+    shortCode: 'AWB',
+    nameEn: 'Attijariwafa Bank Egypt',
+    nameAr: 'التجاري وفا بنك مصر',
+    brandColor: '#f2a900', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'baraka',
+    shortCode: 'BARAKA',
+    nameEn: 'Al Baraka Bank Egypt',
+    nameAr: 'بنك البركة مصر',
+    brandColor: '#004b32', // unverified
+    verified: false,
+    types: ['debit'] // debit only as specified
+  },
+  {
+    key: 'faisal',
+    shortCode: 'FAISAL',
+    nameEn: 'Faisal Islamic Bank',
+    nameAr: 'بنك فيصل الإسلامي المصري',
+    brandColor: '#155724', // unverified
+    verified: false,
+    types: ['debit'] // debit only as specified
+  },
+  {
+    key: 'kfh',
+    shortCode: 'KFH',
+    nameEn: 'Kuwait Finance House Egypt',
+    nameAr: 'بيت التمويل الكويتي مصر (KFH)',
+    brandColor: '#006837', // unverified
+    verified: false,
+    types: ['credit', 'debit']
+  },
+  {
+    key: 'other',
+    shortCode: 'OTHER',
+    nameEn: 'Other bank',
+    nameAr: 'بنك آخر',
+    brandColor: '#6c737c', // neutral titanium tint
+    verified: false,
+    types: ['credit', 'debit']
+  }
+];
+
+// --- 7 Tier Styles (Drawn in code, tinted with bank brand color) ---
+const CARD_TIER_STYLES = [
+  { id: 'classic', key: 'tier_classic', nameEn: 'Classic', nameAr: 'كلاسيك', descEn: 'Charcoal gradient, clean', descAr: 'تدرج رمادي فحمي بدون نقوش' },
+  { id: 'gold', key: 'tier_gold', nameEn: 'Gold', nameAr: 'جولد', descEn: 'Soft diagonal sheen band', descAr: 'شريط بريق ذهبي ناعم' },
+  { id: 'titanium', key: 'tier_titanium', nameEn: 'Titanium', nameAr: 'تيتانيوم', descEn: 'Fine brushed metal lines', descAr: 'خطوط معدنية ناعمة مصقولة' },
+  { id: 'platinum', key: 'tier_platinum', nameEn: 'Platinum', nameAr: 'بلاتينيوم', descEn: 'Thin light diagonal stripe', descAr: 'خط بلاتيني قطري رفيع' },
+  { id: 'world', key: 'tier_world', nameEn: 'World', nameAr: 'ورلد', descEn: 'Subtle globe/meridian arcs', descAr: 'أقواس خطوط الطول والكرة الأرضية' },
+  { id: 'cashback', key: 'tier_cashback', nameEn: 'Cashback', nameAr: 'كاش باك', descEn: 'Amber ring & chevron', descAr: 'حلقة برتقالية وأسهم كاش باك' },
+  { id: 'debit', key: 'tier_debit', nameEn: 'Debit', nameAr: 'ديبت', descEn: 'Clean contactless waves', descAr: 'أمواج الدفع اللاتلامسي' }
+];
+
+// --- 9 Real Cards (Hand-tuned to match v4 sheet) ---
+const REAL_CARD_LOOKS = {
+  cib_prime: {
+    id: 'cib_prime',
+    bankKey: 'cib',
+    cardType: 'debit',
+    nameEn: 'CIB Prime Debit',
+    nameAr: 'برايم ديبت CIB',
+    variantNameEn: 'Prime',
+    variantNameAr: 'برايم',
+    gradient: 'linear-gradient(135deg, #1ab0d6 0%, #0780a8 100%)',
+    motif: 'cib_cloud'
+  },
+  cib_titanium: {
+    id: 'cib_titanium',
+    bankKey: 'cib',
+    cardType: 'credit',
+    nameEn: 'CIB Titanium Credit',
+    nameAr: 'تيتانيوم كريدت CIB',
+    variantNameEn: 'Titanium',
+    variantNameAr: 'تيتانيوم',
+    gradient: 'linear-gradient(135deg, #0d4a55 0%, #0a6f73 100%)',
+    motif: 'cib_concentric'
+  },
+  cib_cashback: {
+    id: 'cib_cashback',
+    bankKey: 'cib',
+    cardType: 'credit',
+    nameEn: 'CIB Cashback Credit',
+    nameAr: 'كاش باك كريدت CIB',
+    variantNameEn: 'Cashback',
+    variantNameAr: 'كاش باك',
+    gradient: 'linear-gradient(135deg, #0a1f6b 0%, #2a52c4 100%)',
+    motif: 'cib_cashback_chevron'
+  },
+  cib_gold: {
+    id: 'cib_gold',
+    bankKey: 'cib',
+    cardType: 'credit',
+    nameEn: 'CIB Gold Credit',
+    nameAr: 'جولد كريدت CIB',
+    variantNameEn: 'Gold',
+    variantNameAr: 'جولد',
+    gradient: 'linear-gradient(135deg, #7a5a14 0%, #c9a23a 60%, #8a6a1c 100%)',
+    motif: 'gold_sheen'
+  },
+  bdc_debit: {
+    id: 'bdc_debit',
+    bankKey: 'bdc',
+    cardType: 'debit',
+    nameEn: 'Banque du Caire Debit',
+    nameAr: 'ديبت بنك القاهرة',
+    variantNameEn: 'Debit',
+    variantNameAr: 'ديبت',
+    gradient: 'linear-gradient(135deg, #8fe0c8 0%, #c9f0e2 100%)',
+    motif: 'bdc_arch',
+    isLightMint: true
+  },
+  bdc_titanium: {
+    id: 'bdc_titanium',
+    bankKey: 'bdc',
+    cardType: 'credit',
+    nameEn: 'Banque du Caire Titanium Credit',
+    nameAr: 'تيتانيوم كريدت بنك القاهرة',
+    variantNameEn: 'Titanium',
+    variantNameAr: 'تيتانيوم',
+    gradient: 'linear-gradient(135deg, #6c6e72 0%, #c8cacd 55%, #808387 100%)',
+    motif: 'bdc_arch'
+  },
+  nbk_debit: {
+    id: 'nbk_debit',
+    bankKey: 'nbk',
+    cardType: 'debit',
+    nameEn: 'NBK Debit',
+    nameAr: 'ديبت بنك الكويت الوطني',
+    variantNameEn: 'Debit',
+    variantNameAr: 'ديبت',
+    gradient: 'linear-gradient(135deg, #102a7a 0%, #4a6fd0 55%, #1a2f80 100%)',
+    motif: 'nbk_wave'
+  },
+  nbk_gold: {
+    id: 'nbk_gold',
+    bankKey: 'nbk',
+    cardType: 'credit',
+    nameEn: 'NBK Gold Credit',
+    nameAr: 'جولد كريدت بنك الكويت الوطني',
+    variantNameEn: 'Gold',
+    variantNameAr: 'جولد',
+    gradient: 'linear-gradient(135deg, #5e4210 0%, #b8943a 55%, #6b4c14 100%)',
+    motif: 'nbk_wave'
+  },
+  nbk_titanium: {
+    id: 'nbk_titanium',
+    bankKey: 'nbk',
+    cardType: 'credit',
+    nameEn: 'NBK Titanium Credit',
+    nameAr: 'تيتانيوم كريدت بنك الكويت الوطني',
+    variantNameEn: 'Titanium',
+    variantNameAr: 'تيتانيوم',
+    gradient: 'linear-gradient(135deg, #2a3038 0%, #7d8691 55%, #3a424b 100%)',
+    motif: 'nbk_wave'
+  }
+};
+
+/**
+ * Returns sorted Egyptian banks for UI dropdowns.
+ * Sorted alphabetically in the active language, with "Other bank / بنك آخر" placed last.
+ */
+function getEgyptianBanks(lang = 'ar') {
+  const isEn = lang === 'en';
+  const regular = EGYPTIAN_BANKS.filter(b => b.key !== 'other');
+  const other = EGYPTIAN_BANKS.find(b => b.key === 'other');
+  regular.sort((a, b) => {
+    const nameA = isEn ? a.nameEn : a.nameAr;
+    const nameB = isEn ? b.nameEn : b.nameAr;
+    return nameA.localeCompare(nameB, isEn ? 'en' : 'ar', { sensitivity: 'base' });
+  });
+  return other ? [...regular, other] : regular;
+}
+
+/**
+ * Finds a bank catalog entry by key, code, or name.
+ */
+function findBankInCatalog(query) {
+  if (!query) return null;
+  const q = String(query).trim().toLowerCase();
+  // Exact match first
+  let match = EGYPTIAN_BANKS.find(b => 
+    b.key.toLowerCase() === q ||
+    b.shortCode.toLowerCase() === q ||
+    b.nameEn.toLowerCase() === q ||
+    b.nameAr.toLowerCase() === q
+  );
+  if (match) return match;
+  // Substring / fuzzy match
+  return EGYPTIAN_BANKS.find(b =>
+    b.key.toLowerCase() === q ||
+    b.shortCode.toLowerCase() === q ||
+    b.nameEn.toLowerCase().includes(q) ||
+    b.nameAr.toLowerCase().includes(q) ||
+    q.includes(b.shortCode.toLowerCase()) ||
+    q.includes(b.nameEn.toLowerCase()) ||
+    q.includes(b.nameAr.toLowerCase())
+  ) || null;
+}
+
+/**
+ * Resolves the visual look info for a given card.
+ */
+function getCardLookInfo(card, bank) {
+  if (!card) return { lookKey: null, isDefault: true };
+
+  const preset = card.colorPreset || null;
+  const customColor = card.customColor || null;
+
+  // Resolve associated bank info
+  let bankBrandColor = '#6c737c'; // default neutral tint
+  let bankCatalogEntry = null;
+
+  if (bank) {
+    bankCatalogEntry = findBankInCatalog(bank.shortCode) || findBankInCatalog(bank.name);
+    bankBrandColor = (bankCatalogEntry && bankCatalogEntry.brandColor) || bank.accentColor || '#6c737c';
+  }
+
+  // 1. Check if matching one of the 9 Real Cards
+  if (preset && REAL_CARD_LOOKS[preset]) {
+    const realLook = REAL_CARD_LOOKS[preset];
+    return {
+      lookKey: preset,
+      isRealCard: true,
+      realLook,
+      tierStyle: null,
+      motif: realLook.motif,
+      gradient: realLook.gradient,
+      isLightMint: Boolean(realLook.isLightMint),
+      brandColor: bankBrandColor,
+      isDefault: false,
+      isCustomColor: false
+    };
+  }
+
+  // 2. Check if matching one of the 7 Tier Styles (e.g. 'tier_classic', 'tier_gold', or bare 'classic', etc.)
+  const tierMatch = CARD_TIER_STYLES.find(t => t.key === preset || t.id === preset);
+  if (tierMatch) {
+    return {
+      lookKey: tierMatch.key,
+      isRealCard: false,
+      tierStyle: tierMatch.id,
+      tierInfo: tierMatch,
+      motif: tierMatch.id,
+      brandColor: bankBrandColor,
+      isDefault: false,
+      isCustomColor: false
+    };
+  }
+
+  // 3. Custom color
+  if (customColor) {
+    return {
+      lookKey: 'custom',
+      isRealCard: false,
+      tierStyle: null,
+      isCustomColor: true,
+      customColor,
+      gradient: `linear-gradient(135deg, ${customColor} 0%, #0F172A 100%)`,
+      brandColor: customColor,
+      isDefault: false
+    };
+  }
+
+  // 4. Legacy CARD_THEMES preset (if any from older version)
+  if (preset && CARD_THEMES[preset]) {
+    return {
+      lookKey: preset,
+      isLegacyPreset: true,
+      gradient: CARD_THEMES[preset].gradient,
+      brandColor: CARD_THEMES[preset].color || bankBrandColor,
+      isDefault: false
+    };
+  }
+
+  // 5. Default card face (approved dark amber look)
+  return {
+    lookKey: null,
+    isDefault: true,
+    brandColor: bankBrandColor
+  };
+}
+
 // --- Card Color & Gradient Themes (Real Bank & Luxury Styles) ---
 const CARD_THEMES = {
   cib: { id: 'cib', name: 'CIB Navy', gradient: 'linear-gradient(135deg, #002D62 0%, #06172E 100%)', color: '#002D62', isDark: true },
@@ -609,7 +1198,7 @@ class WalletAppStore {
     } catch (e) {}
 
     // If security vault is configured and locked, wait for PIN unlock
-    if (window.WalletSecurity && window.WalletSecurity.isConfigured() && window.WalletSecurity.isLocked) {
+    if (typeof window !== 'undefined' && window.WalletSecurity && window.WalletSecurity.isConfigured() && window.WalletSecurity.isLocked) {
       this.banks = [];
       this.cards = [];
       this.accounts = [];
@@ -652,7 +1241,7 @@ class WalletAppStore {
       accounts: this.accounts,
       transactions: this.transactions
     };
-    if (window.WalletSecurity && window.WalletSecurity.isConfigured() && !window.WalletSecurity.isLocked) {
+    if (typeof window !== 'undefined' && window.WalletSecurity && window.WalletSecurity.isConfigured() && !window.WalletSecurity.isLocked) {
       window.WalletSecurity.saveVault(payload);
     } else {
       localStorage.setItem(this.storageKey, JSON.stringify(payload));
@@ -863,6 +1452,9 @@ class WalletAppStore {
     if (!card) return false;
 
     if (data.name) card.name = data.name.trim();
+    if (data.bankId) card.bankId = data.bankId;
+    if (data.colorPreset !== undefined) card.colorPreset = data.colorPreset;
+    if (data.customColor !== undefined) card.customColor = data.customColor;
     if (data.last4 && /^\d{4}$/.test(data.last4)) {
       card.last4 = data.last4.trim();
       card.identifierDigits = data.last4.trim();
@@ -1377,7 +1969,21 @@ class WalletAppStore {
 if (typeof window !== 'undefined') {
   window.walletStore = new WalletAppStore();
   window.store = window.walletStore;
+  window.EGYPTIAN_BANKS = EGYPTIAN_BANKS;
+  window.CARD_TIER_STYLES = CARD_TIER_STYLES;
+  window.REAL_CARD_LOOKS = REAL_CARD_LOOKS;
+  window.getEgyptianBanks = getEgyptianBanks;
+  window.findBankInCatalog = findBankInCatalog;
+  window.getCardLookInfo = getCardLookInfo;
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { WalletAppStore };
+  module.exports = {
+    WalletAppStore,
+    EGYPTIAN_BANKS,
+    CARD_TIER_STYLES,
+    REAL_CARD_LOOKS,
+    getEgyptianBanks,
+    findBankInCatalog,
+    getCardLookInfo
+  };
 }

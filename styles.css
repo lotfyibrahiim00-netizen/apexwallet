@@ -296,6 +296,129 @@ html[dir="ltr"] .tilted-card-container {
   display: inline-block;
 }
 
+/* ========================================================
+   Card Looks v3: 7 Tier Styles + 9 Real Cards
+   Drawn purely in CSS and inline vector motifs
+   ======================================================== */
+.card-art-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 24px;
+  z-index: 1;
+}
+
+.card-art-layer svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* --- 7 Tier Styles (Base dark charcoal + bank brand tint 25-35% + accent line) --- */
+.bank-card-face.card-tier-classic {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #2a2d33) 0%, #3b4048 100%);
+}
+.bank-card-face.card-tier-classic::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--bank-brand, #F5B700) 65%, transparent), transparent);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.bank-card-face.card-tier-gold {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #a6842c) 30%, #3a2c0c) 0%, #a6842c 60%, #4a380e 100%);
+}
+
+.bank-card-face.card-tier-titanium {
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0px, rgba(255, 255, 255, 0.05) 1px, transparent 1px, transparent 4px),
+    linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #25282d) 0%, #6c737c 55%, #33383e 100%);
+}
+
+.bank-card-face.card-tier-platinum {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #1b1d22) 0%, #4b5058 50%, #23262b 100%);
+}
+
+.bank-card-face.card-tier-world {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #0b0b0d) 0%, #1f2025 60%, #111215 100%);
+}
+
+.bank-card-face.card-tier-cashback {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #24262b) 0%, #30333a 100%);
+}
+
+.bank-card-face.card-tier-debit {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #22262c) 0%, #343a43 100%);
+}
+
+/* --- 9 Real Cards (Hand-tuned to match v4 sheet) --- */
+.bank-card-face.card-look-cib_prime {
+  background: linear-gradient(135deg, #1ab0d6 0%, #0780a8 100%);
+}
+
+.bank-card-face.card-look-cib_titanium {
+  background: linear-gradient(135deg, #0d4a55 0%, #0a6f73 100%);
+}
+
+.bank-card-face.card-look-cib_cashback {
+  background: linear-gradient(135deg, #0a1f6b 0%, #2a52c4 100%);
+}
+
+.bank-card-face.card-look-cib_gold {
+  background: linear-gradient(135deg, #7a5a14 0%, #c9a23a 60%, #8a6a1c 100%);
+}
+
+.bank-card-face.card-look-bdc_debit {
+  background: linear-gradient(135deg, #8fe0c8 0%, #c9f0e2 100%);
+  border-color: #0b5c43 !important;
+}
+
+/* High-contrast dark green text & chip for Banque du Caire light mint debit */
+.bank-card-face.card-look-bdc_debit .card-bank-code,
+.bank-card-face.card-look-bdc_debit .card-name-text,
+.bank-card-face.card-look-bdc_debit .card-balance-num,
+.bank-card-face.card-look-bdc_debit .card-digits-text {
+  color: #063d2c !important;
+}
+
+.bank-card-face.card-look-bdc_debit .card-currency-code,
+.bank-card-face.card-look-bdc_debit .card-remaining-label {
+  color: #0a523c !important;
+}
+
+.bank-card-face.card-look-bdc_debit .card-mask-dot {
+  background-color: #063d2c !important;
+}
+
+.bank-card-face.card-look-bdc_debit .bank-card-chip {
+  background: #0d5c43 !important;
+  box-shadow: 0 2px 6px rgba(11, 92, 67, 0.4);
+}
+
+.bank-card-face.card-look-bdc_titanium {
+  background: linear-gradient(135deg, #6c6e72 0%, #c8cacd 55%, #808387 100%);
+}
+
+.bank-card-face.card-look-nbk_debit {
+  background: linear-gradient(135deg, #102a7a 0%, #4a6fd0 55%, #1a2f80 100%);
+}
+
+.bank-card-face.card-look-nbk_gold {
+  background: linear-gradient(135deg, #5e4210 0%, #b8943a 55%, #6b4c14 100%);
+}
+
+.bank-card-face.card-look-nbk_titanium {
+  background: linear-gradient(135deg, #2a3038 0%, #7d8691 55%, #3a424b 100%);
+}
+
 /* Hero Expandable Details Drawer */
 .hero-details-drawer {
   display: grid;

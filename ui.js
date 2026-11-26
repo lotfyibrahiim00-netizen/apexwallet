@@ -394,7 +394,22 @@ const I18N = {
     hist_scan_found: 'عُثر على {n} عملية جديدة',
     hist_open_review: 'فتح المراجعة ({n})',
     hist_next_batch: 'فحص الدفعة التالية (20)',
-    hist_done: 'اكتمل الفحص'
+    hist_done: 'اكتمل الفحص',
+    search_bank_placeholder: 'ابحث عن البنك...',
+    other_bank_name_label: 'اسم البنك',
+    other_bank_name_placeholder: 'اكتب اسم البنك هنا',
+    card_look_label: 'شكل وتصميم الكارت',
+    tier_classic: 'كلاسيك',
+    tier_gold: 'جولد',
+    tier_titanium: 'تيتانيوم',
+    tier_platinum: 'بلاتينيوم',
+    tier_world: 'ورلد',
+    tier_cashback: 'كاش باك',
+    tier_debit: 'ديبت',
+    default_no_look: 'افتراضي (بدون تصميم خاص)',
+    bank_variants_title: 'تصاميم البنك المخصصة',
+    tier_styles_title: 'أنماط الفئات الـ 7 (ملونة بلون البنك)',
+    other_bank: 'بنك آخر'
   },
   en: {
     home: 'Home',
@@ -779,7 +794,22 @@ const I18N = {
     hist_scan_found: 'Found {n} new transactions',
     hist_open_review: 'Open Review ({n})',
     hist_next_batch: 'Scan Next Batch (20)',
-    hist_done: 'Scan Complete'
+    hist_done: 'Scan Complete',
+    search_bank_placeholder: 'Search bank...',
+    other_bank_name_label: 'Bank Name',
+    other_bank_name_placeholder: 'Type bank name here',
+    card_look_label: 'Card Look & Tier Style',
+    tier_classic: 'Classic',
+    tier_gold: 'Gold',
+    tier_titanium: 'Titanium',
+    tier_platinum: 'Platinum',
+    tier_world: 'World',
+    tier_cashback: 'Cashback',
+    tier_debit: 'Debit',
+    default_no_look: 'Default (No special look)',
+    bank_variants_title: 'Bank Real Card Looks',
+    tier_styles_title: '7 Tier Styles (Tinted)',
+    other_bank: 'Other bank'
   }
 };
 
@@ -1565,21 +1595,251 @@ function initApp() {
     }
   }
 
+  function ensureBankInStore(bankKey, isOther, customName) {
+    if (isOther) {
+      const cleanName = (customName || '').trim() || (getLang() === 'en' ? 'Other bank' : 'بنك آخر');
+      let existing = store.banks.find(b => b.name.toLowerCase() === cleanName.toLowerCase());
+      if (existing) return existing;
+      const shortCode = cleanName.replace(/[^A-Za-z0-9\u0600-\u06FF]/g, '').substring(0, 4).toUpperCase() || 'OTHR';
+      return store.addBank({ name: cleanName, shortCode, accentColor: '#6c737c' });
+    }
+
+    const catBanks = (typeof EGYPTIAN_BANKS !== 'undefined' ? EGYPTIAN_BANKS : (window.EGYPTIAN_BANKS || []));
+    const catalogEntry = catBanks.find(b => b.key === bankKey);
+    if (!catalogEntry) {
+      return store.banks[0] || store.addBank({ name: 'Bank', shortCode: 'BANK', accentColor: '#6c737c' });
+    }
+
+    let existing = store.banks.find(b =>
+      b.shortCode.toUpperCase() === catalogEntry.shortCode.toUpperCase() ||
+      b.name.toLowerCase() === catalogEntry.nameEn.toLowerCase() ||
+      b.name.toLowerCase() === catalogEntry.nameAr.toLowerCase()
+    );
+    if (existing) return existing;
+
+    return store.addBank({
+      name: catalogEntry.nameEn,
+      shortCode: catalogEntry.shortCode,
+      accentColor: catalogEntry.brandColor
+    });
+  }
+
+  function populateLookDropdown(selectEl, bankKey, cardType, selectedLook = null) {
+    if (!selectEl) return;
+    const isEn = getLang() === 'en';
+    const catBanks = (typeof EGYPTIAN_BANKS !== 'undefined' ? EGYPTIAN_BANKS : (window.EGYPTIAN_BANKS || []));
+    const tierStyles = (typeof CARD_TIER_STYLES !== 'undefined' ? CARD_TIER_STYLES : (window.CARD_TIER_STYLES || []));
+    const catBank = catBanks.find(b => b.key === bankKey);
+    selectEl.innerHTML = '';
+
+    // 1. Bank specific variants if available for this type
+    const variants = (catBank && catBank.variants)
+      ? catBank.variants.filter(v => !cardType || v.type === cardType)
+      : [];
+
+    if (variants.length > 0) {
+      const grp = document.createElement('optgroup');
+      grp.label = isEn ? (catBank.nameEn + ' Card Looks') : ('تصاميم ' + catBank.nameAr);
+      variants.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.look;
+        opt.textContent = isEn ? (catBank.nameEn + ' ' + v.nameEn) : (catBank.nameAr + ' - ' + v.nameAr);
+        if (selectedLook && selectedLook === v.look) opt.selected = true;
+        grp.appendChild(opt);
+      });
+      selectEl.appendChild(grp);
+    }
+
+    // 2. 7 Tier Styles (Tinted)
+    const tierGrp = document.createElement('optgroup');
+    tierGrp.label = isEn ? '7 Tier Styles (Tinted)' : 'أنماط الفئات الـ 7 (ملونة بلون البنك)';
+    tierStyles.forEach(tStyle => {
+      const opt = document.createElement('option');
+      opt.value = tStyle.key;
+      opt.textContent = isEn ? `${tStyle.nameEn} (${tStyle.descEn})` : `${tStyle.nameAr} (${tStyle.descAr})`;
+      if (selectedLook && (selectedLook === tStyle.key || selectedLook === tStyle.id)) opt.selected = true;
+      tierGrp.appendChild(opt);
+    });
+    selectEl.appendChild(tierGrp);
+
+    // 3. Default (No Look)
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = 'none';
+    defaultOpt.textContent = isEn ? 'Default (No special look)' : 'افتراضي (بدون تصميم خاص)';
+    if (!selectedLook || selectedLook === 'none') defaultOpt.selected = true;
+    selectEl.appendChild(defaultOpt);
+  }
+
+  window.ensureBankInStore = ensureBankInStore;
+  window.populateLookDropdown = populateLookDropdown;
+
   function populateCardBankDropdown(preselectedBankId = null) {
     const select = document.getElementById('card-bank-select');
     if (!select) return;
 
-    select.innerHTML = '';
-    store.banks.forEach(bank => {
-      const cards = store.getCardsForBank(bank.id);
-      const isFull = cards.length >= 3;
-      const opt = document.createElement('option');
-      opt.value = bank.id;
-      opt.textContent = `${bank.name} (${cards.length}/3 cards)${isFull ? ' - MAX CAP REACHED' : ''}`;
-      if (isFull) opt.disabled = true;
-      if (preselectedBankId && bank.id === preselectedBankId && !isFull) opt.selected = true;
-      select.appendChild(opt);
+    const isEn = getLang() === 'en';
+
+    // Inject search filter above select if not present
+    let searchInput = document.getElementById('card-bank-search');
+    if (!searchInput) {
+      searchInput = document.createElement('input');
+      searchInput.type = 'text';
+      searchInput.id = 'card-bank-search';
+      searchInput.placeholder = t('search_bank_placeholder');
+      searchInput.className = 'w-full bg-[#1A1B1F] border border-[#33353C] rounded-2xl px-3 py-1.5 text-xs font-semibold text-[#F3F1EC] mb-1.5 focus:outline-none focus:border-[#F5B700]';
+      select.parentNode.insertBefore(searchInput, select);
+    }
+
+    // Inject "Other bank" text input below select if not present
+    let otherContainer = document.getElementById('card-other-bank-container');
+    if (!otherContainer) {
+      otherContainer = document.createElement('div');
+      otherContainer.id = 'card-other-bank-container';
+      otherContainer.className = 'hidden mt-2';
+      otherContainer.innerHTML = `
+        <label class="block text-xs font-bold text-[#C8CAD0] mb-1">${t('other_bank_name_label')}</label>
+        <input type="text" id="card-other-bank-name" placeholder="${t('other_bank_name_placeholder')}" class="w-full bg-[#1A1B1F] border border-[#33353C] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700]">
+      `;
+      select.parentNode.appendChild(otherContainer);
+    }
+
+    // Inject Card Look dropdown if not present
+    let lookContainer = document.getElementById('card-look-container');
+    if (!lookContainer) {
+      lookContainer = document.createElement('div');
+      lookContainer.id = 'card-look-container';
+      lookContainer.className = 'mt-2.5';
+      lookContainer.innerHTML = `
+        <label class="block text-xs font-bold text-[#C8CAD0] mb-1">${t('card_look_label')}</label>
+        <select id="card-look-select" class="w-full bg-[#1A1B1F] border border-[#33353C] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700] cursor-pointer"></select>
+      `;
+      const typeContainer = document.querySelector('input[name="card-type"]')?.closest('div.grid')?.parentNode;
+      if (typeContainer && typeContainer.parentNode) {
+        typeContainer.parentNode.insertBefore(lookContainer, typeContainer.nextSibling);
+      } else {
+        select.parentNode.parentNode.appendChild(lookContainer);
+      }
+    }
+
+    // Fetch and render bank catalog
+    const allBanks = (typeof getEgyptianBanks === 'function')
+      ? getEgyptianBanks(getLang())
+      : (window.EGYPTIAN_BANKS || []);
+
+    function renderOptions(filterText = '') {
+      select.innerHTML = '';
+      const q = filterText.trim().toLowerCase();
+      const filtered = allBanks.filter(b => {
+        if (!q) return true;
+        if (b.key === 'other') return true;
+        return (
+          b.shortCode.toLowerCase().includes(q) ||
+          b.nameEn.toLowerCase().includes(q) ||
+          b.nameAr.toLowerCase().includes(q)
+        );
+      });
+
+      filtered.forEach(bank => {
+        const opt = document.createElement('option');
+        opt.value = bank.key;
+        opt.textContent = isEn ? bank.nameEn : bank.nameAr;
+        select.appendChild(opt);
+      });
+    }
+
+    renderOptions(searchInput.value || '');
+
+    // Select preselected bank if provided
+    if (preselectedBankId) {
+      const match = allBanks.find(b => b.key === preselectedBankId || b.shortCode.toLowerCase() === String(preselectedBankId).toLowerCase());
+      if (match) select.value = match.key;
+    }
+
+    function updateBankState() {
+      const isOther = select.value === 'other';
+      if (isOther) {
+        otherContainer.classList.remove('hidden');
+      } else {
+        otherContainer.classList.add('hidden');
+      }
+
+      // Check card types offered
+      const currentBank = allBanks.find(b => b.key === select.value);
+      const creditRadio = document.getElementById('type-credit');
+      const debitRadio = document.getElementById('type-debit');
+      if (currentBank && currentBank.types && !currentBank.types.includes('credit')) {
+        if (creditRadio) {
+          creditRadio.disabled = true;
+          creditRadio.checked = false;
+        }
+        if (debitRadio) {
+          debitRadio.checked = true;
+        }
+      } else {
+        if (creditRadio) creditRadio.disabled = false;
+      }
+
+      // Update Look dropdown
+      const activeType = document.querySelector('input[name="card-type"]:checked')?.value || 'credit';
+      const lookSelect = document.getElementById('card-look-select');
+      populateLookDropdown(lookSelect, select.value, activeType);
+
+      // Auto-name if applicable
+      const nameInput = document.getElementById('card-name');
+      if (nameInput && (!nameInput.value || nameInput.dataset.autonamed === 'true')) {
+        if (lookSelect && lookSelect.value && lookSelect.value !== 'none') {
+          const optText = lookSelect.options[lookSelect.selectedIndex]?.textContent || '';
+          const parts = optText.split(/[-–—]/);
+          const autoName = parts[parts.length - 1].trim();
+          nameInput.value = autoName;
+          nameInput.dataset.autonamed = 'true';
+        }
+      }
+    }
+
+    searchInput.oninput = (e) => {
+      renderOptions(e.target.value);
+      updateBankState();
+    };
+
+    select.onchange = () => {
+      updateBankState();
+      updateCardCycleInputs();
+    };
+
+    // Listen for type change to re-filter looks
+    document.querySelectorAll('input[name="card-type"]').forEach(radio => {
+      radio.onchange = () => {
+        updateBankState();
+        updateCardCycleInputs();
+      };
     });
+
+    // Listen for look change to auto-name
+    const lookSelect = document.getElementById('card-look-select');
+    if (lookSelect) {
+      lookSelect.onchange = () => {
+        const nameInput = document.getElementById('card-name');
+        if (nameInput && (!nameInput.value || nameInput.dataset.autonamed === 'true')) {
+          if (lookSelect.value && lookSelect.value !== 'none') {
+            const optText = lookSelect.options[lookSelect.selectedIndex]?.textContent || '';
+            const parts = optText.split(/[-–—]/);
+            const autoName = parts[parts.length - 1].trim();
+            nameInput.value = autoName;
+            nameInput.dataset.autonamed = 'true';
+          }
+        }
+      };
+    }
+
+    const nameInput = document.getElementById('card-name');
+    if (nameInput) {
+      nameInput.oninput = () => {
+        nameInput.dataset.autonamed = 'false';
+      };
+    }
+
+    updateBankState();
   }
 
   // --- Form Handlers ---
@@ -1653,7 +1913,7 @@ function initApp() {
 
   document.getElementById('form-add-card')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const bankId = document.getElementById('card-bank-select').value;
+    const selectedBankKey = document.getElementById('card-bank-select')?.value || 'other';
     const name = document.getElementById('card-name').value;
     const last4 = document.getElementById('card-last4').value;
     const cardType = document.querySelector('input[name="card-type"]:checked')?.value || 'credit';
@@ -1664,6 +1924,18 @@ function initApp() {
     const cycleStartDay = document.getElementById('card-cycle-start')?.value || 1;
     const cycleEndDay = document.getElementById('card-cycle-end')?.value || 30;
     const network = document.getElementById('card-network')?.value || 'Visa';
+
+    let targetBank = null;
+    if (selectedBankKey === 'other') {
+      const customBankName = (document.getElementById('card-other-bank-name')?.value || '').trim() || (getLang() === 'en' ? 'Other bank' : 'بنك آخر');
+      targetBank = ensureBankInStore('other', true, customBankName);
+    } else {
+      targetBank = ensureBankInStore(selectedBankKey, false);
+    }
+    const bankId = targetBank.id;
+
+    const lookVal = document.getElementById('card-look-select')?.value;
+    const colorPreset = (lookVal && lookVal !== 'none') ? lookVal : null;
 
     try {
       if (cardType === 'account') {
@@ -1685,6 +1957,7 @@ function initApp() {
           name,
           last4,
           cardType,
+          colorPreset,
           digitsPosition,
           linkedAccountId: cardType === 'debit' ? linkedAccountId : null,
           monthlyTarget,
@@ -1749,9 +2022,23 @@ function initApp() {
       ? parseFloat(creditLimitRaw)
       : null;
 
+    const selectedBankKey = document.getElementById('edit-card-bank-select')?.value || 'other';
+    let targetBank = null;
+    if (selectedBankKey === 'other') {
+      const customBankName = (document.getElementById('edit-card-other-bank-name')?.value || '').trim() || (store.getBank(card.bankId) ? store.getBank(card.bankId).name : 'Other');
+      targetBank = ensureBankInStore('other', true, customBankName);
+    } else {
+      targetBank = ensureBankInStore(selectedBankKey, false);
+    }
+
+    const lookVal = document.getElementById('edit-card-look-select')?.value;
+    const colorPreset = (lookVal && lookVal !== 'none') ? lookVal : null;
+
     try {
       store.updateCard(cardId, {
         name,
+        bankId: targetBank ? targetBank.id : card.bankId,
+        colorPreset: colorPreset,
         linkedAccountId: card.cardType === 'debit' ? (linkedAccountId || null) : card.linkedAccountId,
         monthlyTarget: targetVal,
         creditLimit: card.cardType === 'credit' ? creditLimit : card.creditLimit
@@ -1804,6 +2091,110 @@ function initApp() {
     `;
   }
 
+  // --- Card Looks Motif Artwork Generator ---
+  function renderCardMotifHtml(lookInfo) {
+    if (!lookInfo || lookInfo.isDefault || (!lookInfo.motif && !lookInfo.isRealCard && !lookInfo.tierStyle)) {
+      return '';
+    }
+    const brand = lookInfo.brandColor || '#6c737c';
+    let innerSvg = '';
+
+    switch (lookInfo.motif) {
+      case 'cib_cloud':
+        innerSvg = `
+          <rect x="180" y="32" width="135" height="46" rx="23" fill="rgba(255, 255, 255, 0.18)" />
+          <circle cx="215" cy="48" r="26" fill="rgba(255, 255, 255, 0.14)" />
+        `;
+        break;
+      case 'cib_concentric':
+        innerSvg = `
+          <circle cx="295" cy="100" r="32" stroke="#7fe0d4" stroke-opacity="0.32" stroke-width="1.5" fill="none" />
+          <circle cx="295" cy="100" r="54" stroke="#7fe0d4" stroke-opacity="0.32" stroke-width="1.5" fill="none" />
+          <circle cx="295" cy="100" r="76" stroke="#7fe0d4" stroke-opacity="0.32" stroke-width="1.5" fill="none" />
+          <circle cx="295" cy="100" r="98" stroke="#7fe0d4" stroke-opacity="0.32" stroke-width="1.5" fill="none" />
+        `;
+        break;
+      case 'cib_cashback_chevron':
+        innerSvg = `
+          <polygon points="175,0 240,97 175,195 215,195 280,97 215,0" fill="rgba(255, 255, 255, 0.09)" />
+          <circle cx="312" cy="46" r="16" stroke="#ff8c1a" stroke-width="3.5" fill="none" />
+        `;
+        break;
+      case 'gold_sheen':
+      case 'gold':
+        innerSvg = `
+          <defs>
+            <linearGradient id="goldSheenGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#fff" stop-opacity="0"/>
+              <stop offset="50%" stop-color="#fff" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M 120,0 L 220,0 L 160,195 L 60,195 Z" fill="url(#goldSheenGrad)" opacity="0.4" />
+          <line x1="25" y1="188" x2="330" y2="188" stroke="#f5b700" stroke-opacity="0.4" stroke-width="1.5" stroke-linecap="round" />
+        `;
+        break;
+      case 'bdc_arch':
+        innerSvg = `
+          <path d="M 252,195 L 252,90 A 34,34 0 0,1 320,90 L 320,195" stroke="rgba(255, 255, 255, ${lookInfo.isLightMint ? '0.75' : '0.55'})" stroke-width="6.5" fill="none" stroke-linecap="round" />
+        `;
+        break;
+      case 'nbk_wave':
+        innerSvg = `
+          <path d="M 0,135 C 100,75 190,185 355,80 L 355,195 L 0,195 Z" fill="rgba(255, 255, 255, 0.13)" />
+          <path d="M 0,150 C 110,95 200,195 355,100" stroke="rgba(255, 255, 255, 0.22)" stroke-width="2" fill="none" />
+        `;
+        break;
+      case 'classic':
+        innerSvg = `
+          <line x1="25" y1="188" x2="330" y2="188" stroke="${brand}" stroke-opacity="0.35" stroke-width="1.5" stroke-linecap="round" />
+        `;
+        break;
+      case 'titanium':
+        innerSvg = `
+          <line x1="25" y1="188" x2="330" y2="188" stroke="${brand}" stroke-opacity="0.4" stroke-width="1.5" stroke-linecap="round" />
+        `;
+        break;
+      case 'platinum':
+        innerSvg = `
+          <line x1="190" y1="0" x2="310" y2="195" stroke="rgba(255, 255, 255, 0.28)" stroke-width="2" />
+          <line x1="202" y1="0" x2="322" y2="195" stroke="${brand}" stroke-opacity="0.4" stroke-width="1" />
+        `;
+        break;
+      case 'world':
+        innerSvg = `
+          <ellipse cx="310" cy="98" rx="85" ry="85" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1.2" fill="none" />
+          <ellipse cx="310" cy="98" rx="55" ry="85" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1.2" fill="none" />
+          <ellipse cx="310" cy="98" rx="25" ry="85" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1.2" fill="none" />
+          <line x1="225" y1="98" x2="355" y2="98" stroke="${brand}" stroke-opacity="0.35" stroke-width="1.2" />
+          <path d="M 235,60 Q 310,85 355,80" stroke="rgba(255, 255, 255, 0.07)" stroke-width="1.2" fill="none" />
+          <path d="M 235,136 Q 310,111 355,116" stroke="rgba(255, 255, 255, 0.07)" stroke-width="1.2" fill="none" />
+        `;
+        break;
+      case 'cashback':
+        innerSvg = `
+          <circle cx="310" cy="46" r="21" stroke="#f5b700" stroke-width="3.5" fill="none" opacity="0.95" />
+          <path d="M 175,70 L 195,95 L 175,120" stroke="rgba(255, 255, 255, 0.10)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+          <path d="M 205,70 L 225,95 L 205,120" stroke="rgba(255, 255, 255, 0.15)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+          <path d="M 235,70 L 255,95 L 235,120" stroke="${brand}" stroke-opacity="0.35" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+        `;
+        break;
+      case 'debit':
+        innerSvg = `
+          <path d="M 305,75 A 14,14 0 0,1 305,115" stroke="rgba(255, 255, 255, 0.22)" stroke-width="2.5" stroke-linecap="round" fill="none" />
+          <path d="M 314,68 A 24,24 0 0,1 314,122" stroke="rgba(255, 255, 255, 0.22)" stroke-width="2.5" stroke-linecap="round" fill="none" />
+          <path d="M 323,61 A 34,34 0 0,1 323,129" stroke="rgba(255, 255, 255, 0.22)" stroke-width="2.5" stroke-linecap="round" fill="none" />
+          <path d="M 332,54 A 44,44 0 0,1 332,136" stroke="${brand}" stroke-opacity="0.5" stroke-width="2.5" stroke-linecap="round" fill="none" />
+        `;
+        break;
+      default:
+        innerSvg = '';
+    }
+
+    if (!innerSvg) return '';
+    return `<div class="card-art-layer"><svg viewBox="0 0 355 195" fill="none" xmlns="http://www.w3.org/2000/svg">${innerSvg}</svg></div>`;
+  }
+
   // ==========================================
   // VIEW 1: OVERVIEW (TILTED CARD OBJECT HERO)
   // ==========================================
@@ -1852,17 +2243,36 @@ function initApp() {
     const cardStat = store.getCardSpendingStats(card.id);
     const isRtl = getLang() === 'ar';
 
+    const lookInfo = (typeof getCardLookInfo === 'function')
+      ? getCardLookInfo(card, bank)
+      : (window.getCardLookInfo ? window.getCardLookInfo(card, bank) : { isDefault: true });
+
+    let lookClass = '';
+    let faceInlineStyle = '';
+    if (lookInfo.isRealCard) {
+      lookClass = `card-look-${lookInfo.lookKey}`;
+    } else if (lookInfo.tierStyle) {
+      lookClass = `card-tier-${lookInfo.tierStyle}`;
+      faceInlineStyle = `--bank-brand: ${lookInfo.brandColor || '#6c737c'};`;
+    } else if (lookInfo.isCustomColor) {
+      faceInlineStyle = `background: ${lookInfo.gradient};`;
+    } else if (lookInfo.isLegacyPreset) {
+      faceInlineStyle = `background: ${lookInfo.gradient};`;
+    }
+    const cardMotifHtml = renderCardMotifHtml(lookInfo);
+
     container.innerHTML = `
       <div class="space-y-3 pb-8">
         
         <!-- 1. TILTED HERO CARD OBJECT (Reference Match: Lighter Sheen, Flat Tilt, Flat Chip, Bold Sans Balance) -->
         <div class="tilted-hero-wrapper" id="hero-card-touch-zone">
           <div class="tilted-card-container ${isHeroCardExpanded ? 'straightened' : ''}" id="hero-card-tilted-box">
-            <div class="bank-card-face cursor-pointer" onclick="window.toggleCardStraighten(this)">
+            <div class="bank-card-face ${lookClass} cursor-pointer" style="${faceInlineStyle}" onclick="window.toggleCardStraighten(this)">
+              ${cardMotifHtml}
               <!-- Top Row (dir=ltr): Bank Code FAR LEFT, Card Name FAR RIGHT -->
               <div class="flex justify-between items-center z-10" dir="ltr">
-                <span class="text-[14px] font-extrabold text-[#F5B700] tracking-wider uppercase">${bank ? bank.shortCode : ''}</span>
-                <span class="text-[14px] font-bold text-[#F5B700] truncate max-w-[65%]">${card.name}</span>
+                <span class="card-bank-code text-[14px] font-extrabold text-[#F5B700] tracking-wider uppercase">${bank ? bank.shortCode : ''}</span>
+                <span class="card-name-text text-[14px] font-bold text-[#F5B700] truncate max-w-[65%]">${card.name}</span>
               </div>
 
               <!-- Middle-Left: Flat Solid Amber EMV Chip -->
@@ -1875,13 +2285,13 @@ function initApp() {
                 <span class="inline-flex items-center gap-1.5"><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span></span>
                 <span class="inline-flex items-center gap-1.5"><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span></span>
                 <span class="inline-flex items-center gap-1.5"><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span></span>
-                <span class="text-[15px] font-mono font-bold tracking-[0.16em] text-[#F3F1EC] ml-1">${card.last4}</span>
+                <span class="card-digits-text text-[15px] font-mono font-bold tracking-[0.16em] text-[#F3F1EC] ml-1">${card.last4}</span>
               </div>
 
               <!-- Bottom Row (dir=ltr): Remaining label BOTTOM LEFT, Big Bold Sans Balance BOTTOM RIGHT -->
               <div class="flex items-baseline justify-between gap-1.5 pt-1.5 z-10" dir="ltr">
                 <div class="min-w-0">
-                  <span class="text-[12px] text-[#C8CAD0] font-medium block truncate" dir="${isRtl ? 'rtl' : 'ltr'}">
+                  <span class="card-remaining-label text-[12px] text-[#C8CAD0] font-medium block truncate" dir="${isRtl ? 'rtl' : 'ltr'}">
                     ${cardStat.isExceeded
                       ? t('over_limit')
                       : `${t('left_of')} <span dir="ltr" class="font-sans-num">${formatCurrency(cardStat.target)}</span>`}
@@ -1891,8 +2301,8 @@ function initApp() {
                   ${formatAmountInlineHtml(cardStat.isExceeded ? cardStat.overAmount : cardStat.remaining, {
                     useSans: true,
                     prefixSign: cardStat.isExceeded ? '+' : '',
-                    numClass: `text-[24px] leading-none font-extrabold ${cardStat.isExceeded ? 'text-[#E6A8A8]' : 'text-[#F3F1EC]'}`,
-                    currClass: `text-[13px] font-bold ${cardStat.isExceeded ? 'text-[#E6A8A8]/85' : 'text-[#D1D5DB]'}`
+                    numClass: `card-balance-num text-[24px] leading-none font-extrabold ${cardStat.isExceeded ? 'text-[#E6A8A8]' : 'text-[#F3F1EC]'}`,
+                    currClass: `card-currency-code text-[13px] font-bold ${cardStat.isExceeded ? 'text-[#E6A8A8]/85' : 'text-[#D1D5DB]'}`
                   })}
                 </div>
               </div>
@@ -3761,6 +4171,7 @@ function initApp() {
     const card = store.getCard(cardId);
     if (!card) return;
     const bank = store.getBank(card.bankId);
+    const isEn = getLang() === 'en';
 
     const idInput = document.getElementById('edit-card-id');
     const nameInput = document.getElementById('edit-card-name');
@@ -3774,7 +4185,105 @@ function initApp() {
     if (idInput) idInput.value = card.id;
     if (nameInput) nameInput.value = card.name || '';
     if (targetInput) targetInput.value = (card.monthlyTarget !== undefined && card.monthlyTarget !== null) ? card.monthlyTarget : '';
-    if (headerEl) headerEl.textContent = `${bank ? bank.name : 'بنك'} • ${card.cardType.toUpperCase()} (•••• ${card.last4})`;
+    if (headerEl) headerEl.textContent = `${bank ? bank.name : 'Bank'} • ${card.cardType.toUpperCase()} (•••• ${card.last4})`;
+
+    // Inject Bank & Look section into form-edit-card if not present
+    let editBankSection = document.getElementById('edit-card-bank-section');
+    if (!editBankSection) {
+      editBankSection = document.createElement('div');
+      editBankSection.id = 'edit-card-bank-section';
+      editBankSection.className = 'space-y-2 pb-2 border-b border-[#33353C]/60';
+      editBankSection.innerHTML = `
+        <div>
+          <label class="block text-xs font-bold text-[#C8CAD0] mb-1">${t('bank_label') || 'البنك'}</label>
+          <input type="text" id="edit-card-bank-search" placeholder="${t('search_bank_placeholder')}" class="w-full bg-[#1A1B1F] border border-[#33353C] rounded-2xl px-3 py-1.5 text-xs font-semibold text-[#F3F1EC] mb-1.5 focus:outline-none focus:border-[#F5B700]">
+          <select id="edit-card-bank-select" class="w-full bg-[#1A1B1F] border border-[#33353C] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700] cursor-pointer"></select>
+        </div>
+        <div id="edit-card-other-bank-container" class="hidden">
+          <label class="block text-xs font-bold text-[#C8CAD0] mb-1">${t('other_bank_name_label')}</label>
+          <input type="text" id="edit-card-other-bank-name" placeholder="${t('other_bank_name_placeholder')}" class="w-full bg-[#1A1B1F] border border-[#33353C] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700]">
+        </div>
+        <div id="edit-card-look-container">
+          <label class="block text-xs font-bold text-[#C8CAD0] mb-1">${t('card_look_label')}</label>
+          <select id="edit-card-look-select" class="w-full bg-[#1A1B1F] border border-[#33353C] rounded-2xl px-3 py-2 text-xs font-semibold text-[#F3F1EC] focus:outline-none focus:border-[#F5B700] cursor-pointer"></select>
+        </div>
+      `;
+      const formEdit = document.getElementById('form-edit-card');
+      if (formEdit) {
+        formEdit.insertBefore(editBankSection, formEdit.children[1] || formEdit.firstChild);
+      }
+    }
+
+    const editBankSelect = document.getElementById('edit-card-bank-select');
+    const editBankSearch = document.getElementById('edit-card-bank-search');
+    const editOtherContainer = document.getElementById('edit-card-other-bank-container');
+    const editOtherNameInput = document.getElementById('edit-card-other-bank-name');
+    const editLookSelect = document.getElementById('edit-card-look-select');
+
+    const allBanks = (typeof getEgyptianBanks === 'function')
+      ? getEgyptianBanks(getLang())
+      : (window.EGYPTIAN_BANKS || []);
+
+    function renderEditBankOptions(filterText = '') {
+      editBankSelect.innerHTML = '';
+      const q = filterText.trim().toLowerCase();
+      const filtered = allBanks.filter(b => {
+        if (!q) return true;
+        if (b.key === 'other') return true;
+        return (
+          b.shortCode.toLowerCase().includes(q) ||
+          b.nameEn.toLowerCase().includes(q) ||
+          b.nameAr.toLowerCase().includes(q)
+        );
+      });
+      filtered.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.key;
+        opt.textContent = isEn ? b.nameEn : b.nameAr;
+        editBankSelect.appendChild(opt);
+      });
+    }
+
+    renderEditBankOptions('');
+
+    // Determine current bank match
+    const catalogMatch = bank ? (findBankInCatalog(bank.shortCode) || findBankInCatalog(bank.name)) : null;
+    if (catalogMatch && catalogMatch.key !== 'other') {
+      editBankSelect.value = catalogMatch.key;
+      editOtherContainer.classList.add('hidden');
+      if (editOtherNameInput) editOtherNameInput.value = '';
+    } else {
+      // Unmatched or custom bank (e.g. "LL") -> "Other bank" with text preserved
+      editBankSelect.value = 'other';
+      editOtherContainer.classList.remove('hidden');
+      if (editOtherNameInput) editOtherNameInput.value = bank ? bank.name : '';
+    }
+
+    function updateEditLooks() {
+      const isOther = editBankSelect.value === 'other';
+      if (isOther) {
+        editOtherContainer.classList.remove('hidden');
+      } else {
+        editOtherContainer.classList.add('hidden');
+      }
+      populateLookDropdown(editLookSelect, editBankSelect.value, card.cardType, card.colorPreset);
+    }
+
+    if (editBankSearch) {
+      editBankSearch.value = '';
+      editBankSearch.oninput = (e) => {
+        renderEditBankOptions(e.target.value);
+        updateEditLooks();
+      };
+    }
+
+    if (editBankSelect) {
+      editBankSelect.onchange = () => {
+        updateEditLooks();
+      };
+    }
+
+    updateEditLooks();
 
     if (card.cardType === 'debit') {
       if (linkedSection) linkedSection.classList.remove('hidden');
