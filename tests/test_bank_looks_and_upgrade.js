@@ -596,7 +596,16 @@ requiredRealKeys.forEach((key, idx) => {
   assert.ok(html.includes(`card-look-${key}`), `${key} must apply class card-look-${key}`);
   assert.ok(html.includes('bank-card-chip-svg'), `${key} must render realistic gold chip SVG`);
   assert.ok(html.includes('emvGoldGrad'), `${key} chip must contain emvGoldGrad gold gradient definition`);
-  assert.ok(html.includes('payment-network-logo'), `${key} must render payment network logo SVG`);
+  if (key === 'nbk_debit') {
+    assert.strictEqual(html.includes('payment-network-logo'), false, `${key} must NOT render any payment network logo`);
+    assert.ok(html.includes('card-network-logo-box'), `${key} must maintain empty card-network-logo-box`);
+  } else if (key === 'nbk_gold') {
+    assert.ok(html.includes('payment-network-logo'), `${key} must render payment network logo SVG`);
+    assert.ok(html.includes('aria-label="Visa"'), `${key} must render Visa logo`);
+  } else {
+    assert.ok(html.includes('payment-network-logo'), `${key} must render payment network logo SVG`);
+    assert.ok(html.includes('aria-label="Mastercard"'), `${key} must render Mastercard logo`);
+  }
   assert.ok(html.includes(`•••• ${c.last4}`), `${key} must render formatted last 4 digits "•••• ${c.last4}"`);
   assert.ok(html.includes('card-name-text'), `${key} must render card-name-text`);
   assert.ok(html.includes('card-tier-badge'), `${key} must render card-tier-badge`);

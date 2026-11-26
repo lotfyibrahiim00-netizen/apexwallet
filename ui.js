@@ -2164,9 +2164,57 @@ function initApp() {
     `;
   }
 
+  // --- Payment Network Logo Configuration per Card ---
+  const REAL_CARD_NETWORK_LOGOS = {
+    cib_prime: 'mastercard',
+    cib_titanium: 'mastercard',
+    cib_cashback: 'mastercard',
+    cib_gold: 'mastercard',
+    bdc_debit: 'mastercard',
+    bdc_titanium: 'mastercard',
+    nbk_titanium: 'mastercard',
+    nbk_gold: 'visa',
+    nbk_debit: 'none'
+  };
+
+  function getCardNetworkLogo(card, lookInfo) {
+    if (!card && !lookInfo) return 'mastercard';
+
+    const checkKey = (raw) => {
+      if (!raw || typeof raw !== 'string') return null;
+      if (Object.prototype.hasOwnProperty.call(REAL_CARD_NETWORK_LOGOS, raw)) {
+        return REAL_CARD_NETWORK_LOGOS[raw];
+      }
+      const stripped = raw.replace(/^card_/, '');
+      if (Object.prototype.hasOwnProperty.call(REAL_CARD_NETWORK_LOGOS, stripped)) {
+        return REAL_CARD_NETWORK_LOGOS[stripped];
+      }
+      return null;
+    };
+
+    // 1. Direct card.id or lookKey match
+    let match = (card && checkKey(card.id));
+    if (match) return match;
+
+    // 2. lookInfo.lookKey match
+    match = (lookInfo && checkKey(lookInfo.lookKey));
+    if (match) return match;
+
+    // 3. card.colorPreset match
+    match = (card && checkKey(card.colorPreset));
+    if (match) return match;
+
+    // Fallback for custom/other cards
+    return (card && card.network) ? card.network : 'mastercard';
+  }
+  window.getCardNetworkLogo = getCardNetworkLogo;
+
   // --- Payment Network Logo SVG (Mastercard / Visa) ---
   function renderPaymentNetworkLogoSvg(network) {
-    const net = String(network || '').toLowerCase();
+    const net = String(network || '').toLowerCase().trim();
+    if (!net || net === 'none') {
+      return '';
+    }
     if (net.includes('visa')) {
       return `
         <svg width="46" height="22" viewBox="0 0 48 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="payment-network-logo" aria-label="Visa" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55));">
@@ -2447,8 +2495,8 @@ function initApp() {
                   <span class="card-digits-text text-[18px] sm:text-[19px] font-mono font-semibold tracking-[0.18em] text-[#F3F1EC]">•••• ${card.last4}</span>
                 </div>
 
-                <div class="card-network-logo-box shrink-0 flex items-center justify-end">
-                  ${renderPaymentNetworkLogoSvg(card.network || 'mastercard')}
+                <div class="card-network-logo-box shrink-0 min-h-[28px] min-w-[44px] flex items-center justify-end">
+                  ${renderPaymentNetworkLogoSvg(getCardNetworkLogo(card, lookInfo))}
                 </div>
               </div>
             </div>
