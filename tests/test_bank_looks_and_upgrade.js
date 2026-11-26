@@ -20,6 +20,9 @@ if (typeof localStorage === 'undefined' || !global.localStorage) {
 }
 
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
 const {
   WalletAppStore,
   EGYPTIAN_BANKS,
@@ -27,6 +30,7 @@ const {
   REAL_CARD_LOOKS,
   getEgyptianBanks,
   findBankInCatalog,
+  findBankExactMatch,
   getCardLookInfo
 } = require('../app.js');
 
@@ -281,6 +285,269 @@ assert.strictEqual(tierGoldLook.tierStyle, 'gold');
 assert.strictEqual(tierGoldLook.brandColor, '#db0011', 'HSBC brand color must tint the tier look');
 
 console.log('  ✅ [PASS] All look resolver invariants hold (unstyled is default, custom is preserved, tiers tint correctly)\n');
+
+// ----------------------------------------------------
+// Test 6: Bug 1 - Bank Re-match on Edit (Exact Match Only)
+// Custom bank names "Bank", "Cairo", "L", "LL" must survive open-edit-save unchanged
+// ----------------------------------------------------
+console.log('--- Test 6: Bug 1 - Bank Re-match on Edit ---');
+
+const customBankNames = ['Bank', 'Cairo', 'L', 'LL'];
+
+// 1. Direct Catalog Match Assertions
+customBankNames.forEach(name => {
+  const exact = findBankExactMatch(name);
+  assert.strictEqual(exact, null, `findBankExactMatch("${name}") must be null`);
+
+  const catalogExact = findBankInCatalog(name, true);
+  assert.strictEqual(catalogExact, null, `findBankInCatalog("${name}", true) must be null`);
+
+  const catalogFuzzy = findBankInCatalog(name);
+  assert.strictEqual(catalogFuzzy, null, `findBankInCatalog("${name}") must be null (no false fuzzy match to NBE or CA)`);
+});
+
+// Verify catalog banks still match exactly
+assert.strictEqual(findBankExactMatch('CIB')?.key, 'cib');
+assert.strictEqual(findBankExactMatch('CA')?.key, 'ca');
+assert.strictEqual(findBankExactMatch('Credit Agricole')?.key, 'ca');
+assert.strictEqual(findBankExactMatch('NBE')?.key, 'nbe');
+assert.strictEqual(findBankExactMatch('Banque du Caire')?.key, 'bdc');
+
+// 2. Open-Edit-Save flow on custom banks: "Bank", "Cairo", "L", "LL"
+customBankNames.forEach(customName => {
+  const editStore = new WalletAppStore();
+  const bank = editStore.addBank({
+    name: customName,
+    shortCode: customName.replace(/[^A-Za-z0-9]/g, '').substring(0, 4).toUpperCase() || 'OTHR',
+    accentColor: '#6c737c'
+  });
+  const card = editStore.addCard({
+    bankId: bank.id,
+    name: `Card of ${customName}`,
+    last4: '9876',
+    cardType: 'credit',
+    cycleStartDay: 1,
+    cycleEndDay: 30,
+    colorPreset: null,
+    monthlyTarget: 15000
+  });
+
+  // A. Simulation of openEditCardModal preselection
+  const bankInStore = editStore.getBank(card.bankId);
+  const catalogMatch = bankInStore
+    ? (findBankInCatalog(bankInStore.shortCode, true) || findBankInCatalog(bankInStore.name, true))
+    : null;
+
+  assert.strictEqual(catalogMatch, null, `Custom bank "${customName}" must not match any catalog entry on edit preselection`);
+
+  // Preselected values in edit modal
+  const preselectedBankKey = (catalogMatch && catalogMatch.key !== 'other') ? catalogMatch.key : 'other';
+  const preselectedOtherName = (preselectedBankKey === 'other') ? (bankInStore ? bankInStore.name : '') : '';
+
+  assert.strictEqual(preselectedBankKey, 'other', `Dropdown must preselect "other" for custom bank "${customName}"`);
+  assert.strictEqual(preselectedOtherName, customName, `Other bank name input must retain "${customName}"`);
+
+  // B. Simulation of form-edit-card submit without touching bank dropdown
+  const selectedBankKey = preselectedBankKey; // User did not touch dropdown
+  const otherInputVal = preselectedOtherName;  // User did not touch input text
+
+  let targetBank = null;
+  const currentBank = editStore.getBank(card.bankId);
+  if (selectedBankKey === 'other') {
+    const customBankName = otherInputVal.trim() || (currentBank ? currentBank.name : 'Other');
+    if (currentBank && currentBank.name.trim().toLowerCase() === customBankName.toLowerCase()) {
+      targetBank = currentBank;
+    } else {
+      let existing = editStore.banks.find(b => b.name.toLowerCase() === customBankName.toLowerCase());
+      targetBank = existing || editStore.addBank({ name: customBankName, shortCode: 'OTHR', accentColor: '#6c737c' });
+    }
+  } else {
+    // If catalog bank were selected
+    targetBank = editStore.banks.find(b => b.name === selectedBankKey);
+  }
+
+  // Update card in store
+  editStore.updateCard(card.id, {
+    name: card.name,
+    bankId: targetBank ? targetBank.id : card.bankId
+  });
+
+  // C. Verification: card.bankId and bank name survive open-edit-save unchanged
+  const savedCard = editStore.getCard(card.id);
+  assert.strictEqual(savedCard.bankId, bank.id, `Card bankId must remain unchanged (${bank.id})`);
+  const savedBank = editStore.getBank(savedCard.bankId);
+  assert.strictEqual(savedBank.name, customName, `Bank name must remain exactly "${customName}"`);
+  assert.ok(savedBank.name !== 'National Bank of Egypt (NBE)', `Bank "${customName}" must not be moved to NBE`);
+  assert.ok(savedBank.name !== 'Credit Agricole', `Bank "${customName}" must not be moved to Credit Agricole`);
+});
+
+console.log('  ✅ [PASS] Custom bank names "Bank", "Cairo", "L", "LL" survive open-edit-save unchanged without re-matching\n');
+
+// ----------------------------------------------------
+// Test 7: Bug 2 - Look Wiped on Edit-Save
+// Legacy colorPreset "cib" and customColor must survive open-edit-save unchanged
+// ----------------------------------------------------
+console.log('--- Test 7: Bug 2 - Look Wiped on Edit-Save ---');
+
+// 1. Test populateLookDropdown in sandbox using shipped ui.js
+function createMockEl(tag) {
+  return {
+    tagName: tag.toUpperCase(),
+    value: '',
+    textContent: '',
+    selected: false,
+    children: [],
+    style: {},
+    classList: { add: () => {}, remove: () => {}, contains: () => false },
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    appendChild(c) { this.children.push(c); },
+    insertBefore(c, ref) {
+      const idx = this.children.indexOf(ref);
+      if (idx !== -1) this.children.splice(idx, 0, c);
+      else this.children.unshift(c);
+    }
+  };
+}
+
+const uiSandbox = {
+  window: {
+    location: { hostname: 'localhost', hash: '' },
+    localStorage: global.localStorage,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    EGYPTIAN_BANKS,
+    CARD_TIER_STYLES,
+    REAL_CARD_LOOKS,
+    getEgyptianBanks,
+    findBankInCatalog,
+    findBankExactMatch,
+    getCardLookInfo,
+    CARD_THEMES: require('../app.js').CARD_THEMES
+  },
+  document: {
+    readyState: 'complete',
+    createElement: createMockEl,
+    getElementById: () => createMockEl('div'),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: () => {},
+    removeEventListener: () => {}
+  },
+  localStorage: global.localStorage,
+  setTimeout: setTimeout,
+  clearTimeout: clearTimeout,
+  getLang: () => 'en',
+  t: (k) => k,
+  EGYPTIAN_BANKS,
+  CARD_TIER_STYLES,
+  REAL_CARD_LOOKS,
+  CARD_THEMES: require('../app.js').CARD_THEMES,
+  console
+};
+vm.createContext(uiSandbox);
+const appCode = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+vm.runInContext(appCode, uiSandbox, { filename: 'app.js' });
+const uiCode = fs.readFileSync(path.join(__dirname, '..', 'ui.js'), 'utf8');
+vm.runInContext(uiCode, uiSandbox, { filename: 'ui.js' });
+
+const testSelectEl = createMockEl('select');
+uiSandbox.window.populateLookDropdown(testSelectEl, 'cib', 'credit', 'cib');
+
+// Verify that testSelectEl has the first child as the preserved legacy look option
+const legacyOpt = testSelectEl.children[0];
+assert.ok(legacyOpt, 'Dropdown must have an option');
+assert.strictEqual(legacyOpt.value, 'cib', 'First option in dropdown must be preserved legacy preset "cib"');
+assert.strictEqual(legacyOpt.selected, true, 'Legacy preset option must be selected by default');
+assert.ok(legacyOpt.textContent.includes('CIB Navy'), `Option label must include theme name, got: ${legacyOpt.textContent}`);
+
+// 2. Test Store Open-Edit-Save simulation with legacy preset "cib"
+const storePreset = new WalletAppStore();
+const cibBank = storePreset.addBank({ name: 'Commercial International Bank', shortCode: 'CIB' });
+const legacyCard = storePreset.addCard({
+  bankId: cibBank.id,
+  name: 'Legacy CIB Card',
+  last4: '5566',
+  cardType: 'credit',
+  cycleStartDay: 1,
+  cycleEndDay: 30,
+  colorPreset: 'cib', // Legacy theme from CARD_THEMES
+  customColor: null,
+  monthlyTarget: 12000
+});
+
+// A. Check that legacy preset "cib" is preserved in look resolver
+const legacyLook = getCardLookInfo(legacyCard, cibBank);
+assert.strictEqual(legacyLook.isLegacyPreset, true, 'Legacy preset "cib" must be recognized as legacy preset');
+assert.strictEqual(legacyLook.lookKey, 'cib');
+
+// B. Simulation of form-edit-card submit when user DOES NOT change the look dropdown
+// Only write colorPreset if lookChanged === true. Saving unchanged card leaves colorPreset and customColor as were.
+const lookChanged = false; // User did not touch look dropdown
+const lookVal = 'cib'; // Dropdown populated with legacy look
+
+const updatePayload = {
+  name: 'Updated Card Name',
+  bankId: legacyCard.bankId,
+  monthlyTarget: 12000
+};
+
+if (lookChanged) {
+  if (lookVal && lookVal !== 'none') {
+    updatePayload.colorPreset = lookVal;
+  } else {
+    updatePayload.colorPreset = null;
+  }
+}
+
+storePreset.updateCard(legacyCard.id, updatePayload);
+
+// C. Verify: colorPreset survives open-edit-save unchanged
+const savedLegacyCard = storePreset.getCard(legacyCard.id);
+assert.strictEqual(savedLegacyCard.name, 'Updated Card Name', 'Card name should update');
+assert.strictEqual(savedLegacyCard.colorPreset, 'cib', 'Legacy colorPreset "cib" must survive unchanged and NOT become null');
+
+// D. Test card with customColor survives open-edit-save unchanged
+const customCard2 = storePreset.addCard({
+  bankId: cibBank.id,
+  name: 'Custom Hex Card',
+  last4: '7788',
+  cardType: 'credit',
+  cycleStartDay: 1,
+  cycleEndDay: 30,
+  colorPreset: null,
+  customColor: '#ff0055',
+  monthlyTarget: 8000
+});
+
+const updatePayloadCustom = {
+  name: 'Updated Hex Name',
+  bankId: customCard2.bankId
+};
+// User did not change look
+storePreset.updateCard(customCard2.id, updatePayloadCustom);
+const savedCustomCard = storePreset.getCard(customCard2.id);
+assert.strictEqual(savedCustomCard.customColor, '#ff0055', 'customColor must survive open-edit-save unchanged');
+assert.strictEqual(savedCustomCard.colorPreset, null, 'colorPreset must remain null');
+
+// E. Also test that if user explicitly changes look to a 7-tier look, it DOES update
+const lookChangedExplicit = true;
+const explicitLookVal = 'tier_gold';
+
+const updatePayloadExplicit = {
+  name: savedLegacyCard.name,
+  bankId: savedLegacyCard.bankId
+};
+if (lookChangedExplicit) {
+  updatePayloadExplicit.colorPreset = explicitLookVal;
+}
+storePreset.updateCard(legacyCard.id, updatePayloadExplicit);
+const explicitlyUpdatedCard = storePreset.getCard(legacyCard.id);
+assert.strictEqual(explicitlyUpdatedCard.colorPreset, 'tier_gold', 'Explicit change to tier_gold must update colorPreset');
+
+console.log('  ✅ [PASS] Legacy colorPreset "cib" and customColor survive open-edit-save unchanged unless explicitly modified\n');
 
 console.log('----------------------------------------------------');
 console.log('All Card Looks v3 & Upgrade Tests Passed (100%)');

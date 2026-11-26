@@ -1631,6 +1631,7 @@ function initApp() {
     const tierStyles = (typeof CARD_TIER_STYLES !== 'undefined' ? CARD_TIER_STYLES : (window.CARD_TIER_STYLES || []));
     const catBank = catBanks.find(b => b.key === bankKey);
     selectEl.innerHTML = '';
+    let matched = false;
 
     // 1. Bank specific variants if available for this type
     const variants = (catBank && catBank.variants)
@@ -1644,7 +1645,10 @@ function initApp() {
         const opt = document.createElement('option');
         opt.value = v.look;
         opt.textContent = isEn ? (catBank.nameEn + ' ' + v.nameEn) : (catBank.nameAr + ' - ' + v.nameAr);
-        if (selectedLook && selectedLook === v.look) opt.selected = true;
+        if (selectedLook && selectedLook === v.look) {
+          opt.selected = true;
+          matched = true;
+        }
         grp.appendChild(opt);
       });
       selectEl.appendChild(grp);
@@ -1657,16 +1661,32 @@ function initApp() {
       const opt = document.createElement('option');
       opt.value = tStyle.key;
       opt.textContent = isEn ? `${tStyle.nameEn} (${tStyle.descEn})` : `${tStyle.nameAr} (${tStyle.descAr})`;
-      if (selectedLook && (selectedLook === tStyle.key || selectedLook === tStyle.id)) opt.selected = true;
+      if (selectedLook && (selectedLook === tStyle.key || selectedLook === tStyle.id)) {
+        opt.selected = true;
+        matched = true;
+      }
       tierGrp.appendChild(opt);
     });
     selectEl.appendChild(tierGrp);
 
-    // 3. Default (No Look)
+    // 3. Preserve legacy colorPreset or custom look not in catalog variants or 7 tiers (Bug 2 fix)
+    if (selectedLook && !matched && selectedLook !== 'none') {
+      const currentOpt = document.createElement('option');
+      currentOpt.value = selectedLook;
+      const themeName = (typeof CARD_THEMES !== 'undefined' && CARD_THEMES[selectedLook])
+        ? CARD_THEMES[selectedLook].name
+        : selectedLook;
+      currentOpt.textContent = isEn ? `Current Look (${themeName})` : `المظهر الحالي (${themeName})`;
+      currentOpt.selected = true;
+      matched = true;
+      selectEl.insertBefore(currentOpt, selectEl.firstChild);
+    }
+
+    // 4. Default (No Look)
     const defaultOpt = document.createElement('option');
     defaultOpt.value = 'none';
     defaultOpt.textContent = isEn ? 'Default (No special look)' : 'افتراضي (بدون تصميم خاص)';
-    if (!selectedLook || selectedLook === 'none') defaultOpt.selected = true;
+    if (!selectedLook || selectedLook === 'none' || !matched) defaultOpt.selected = true;
     selectEl.appendChild(defaultOpt);
   }
 
@@ -2024,25 +2044,43 @@ function initApp() {
 
     const selectedBankKey = document.getElementById('edit-card-bank-select')?.value || 'other';
     let targetBank = null;
+    const currentBank = store.getBank(card.bankId);
     if (selectedBankKey === 'other') {
-      const customBankName = (document.getElementById('edit-card-other-bank-name')?.value || '').trim() || (store.getBank(card.bankId) ? store.getBank(card.bankId).name : 'Other');
-      targetBank = ensureBankInStore('other', true, customBankName);
+      const customBankName = (document.getElementById('edit-card-other-bank-name')?.value || '').trim() || (currentBank ? currentBank.name : 'Other');
+      // If bank dropdown remained 'other' and custom name matches current bank, retain current bank unchanged
+      if (currentBank && currentBank.name.trim().toLowerCase() === customBankName.toLowerCase()) {
+        targetBank = currentBank;
+      } else {
+        targetBank = ensureBankInStore('other', true, customBankName);
+      }
     } else {
       targetBank = ensureBankInStore(selectedBankKey, false);
     }
 
-    const lookVal = document.getElementById('edit-card-look-select')?.value;
-    const colorPreset = (lookVal && lookVal !== 'none') ? lookVal : null;
+    const lookSelect = document.getElementById('edit-card-look-select');
+    const lookChanged = lookSelect?.dataset?.userChanged === 'true';
+    const lookVal = lookSelect?.value;
 
     try {
-      store.updateCard(cardId, {
+      const updatePayload = {
         name,
         bankId: targetBank ? targetBank.id : card.bankId,
-        colorPreset: colorPreset,
         linkedAccountId: card.cardType === 'debit' ? (linkedAccountId || null) : card.linkedAccountId,
         monthlyTarget: targetVal,
         creditLimit: card.cardType === 'credit' ? creditLimit : card.creditLimit
-      });
+      };
+
+      // Bug 2 fix: only write colorPreset if the user actually changed the look dropdown.
+      // Saving an unchanged card must leave colorPreset and customColor exactly as they were.
+      if (lookChanged) {
+        if (lookVal && lookVal !== 'none') {
+          updatePayload.colorPreset = lookVal;
+        } else {
+          updatePayload.colorPreset = null;
+        }
+      }
+
+      store.updateCard(cardId, updatePayload);
       closeModal('editCard');
       showToast(t('toast_card_updated'), 'success');
       renderBanksView();
@@ -4246,20 +4284,20 @@ function initApp() {
 
     renderEditBankOptions('');
 
-    // Determine current bank match
-    const catalogMatch = bank ? (findBankInCatalog(bank.shortCode) || findBankInCatalog(bank.name)) : null;
+    // Determine current bank match by EXACT match on shortCode or name only (Bug 1 fix)
+    const catalogMatch = bank ? (findBankInCatalog(bank.shortCode, true) || findBankInCatalog(bank.name, true)) : null;
     if (catalogMatch && catalogMatch.key !== 'other') {
       editBankSelect.value = catalogMatch.key;
       editOtherContainer.classList.add('hidden');
       if (editOtherNameInput) editOtherNameInput.value = '';
     } else {
-      // Unmatched or custom bank (e.g. "LL") -> "Other bank" with text preserved
+      // Unmatched or custom bank (e.g. "Bank", "Cairo", "L", "LL") -> "Other bank" with text preserved
       editBankSelect.value = 'other';
       editOtherContainer.classList.remove('hidden');
       if (editOtherNameInput) editOtherNameInput.value = bank ? bank.name : '';
     }
 
-    function updateEditLooks() {
+    function updateEditLooks(isInitial = false) {
       const isOther = editBankSelect.value === 'other';
       if (isOther) {
         editOtherContainer.classList.remove('hidden');
@@ -4267,6 +4305,19 @@ function initApp() {
         editOtherContainer.classList.add('hidden');
       }
       populateLookDropdown(editLookSelect, editBankSelect.value, card.cardType, card.colorPreset);
+      if (isInitial && editLookSelect) {
+        editLookSelect.dataset.userChanged = 'false';
+      }
+    }
+
+    if (editLookSelect) {
+      editLookSelect.dataset.userChanged = 'false';
+      editLookSelect.onchange = () => {
+        editLookSelect.dataset.userChanged = 'true';
+      };
+      editLookSelect.oninput = () => {
+        editLookSelect.dataset.userChanged = 'true';
+      };
     }
 
     if (editBankSearch) {
@@ -4283,7 +4334,7 @@ function initApp() {
       };
     }
 
-    updateEditLooks();
+    updateEditLooks(true);
 
     if (card.cardType === 'debit') {
       if (linkedSection) linkedSection.classList.remove('hidden');

@@ -534,11 +534,15 @@ function getEgyptianBanks(lang = 'ar') {
 
 /**
  * Finds a bank catalog entry by key, code, or name.
+ * @param {string} query
+ * @param {boolean} [exactOnly=false] - If true, only matches exact shortCode, key, or name
  */
-function findBankInCatalog(query) {
+function findBankInCatalog(query, exactOnly = false) {
   if (!query) return null;
   const q = String(query).trim().toLowerCase();
-  // Exact match first
+  if (!q) return null;
+
+  // Exact match first on key, shortCode, or name (English or Arabic)
   let match = EGYPTIAN_BANKS.find(b => 
     b.key.toLowerCase() === q ||
     b.shortCode.toLowerCase() === q ||
@@ -546,16 +550,28 @@ function findBankInCatalog(query) {
     b.nameAr.toLowerCase() === q
   );
   if (match) return match;
+  if (exactOnly) return null;
+
   // Substring / fuzzy match
+  // 1. Never match generic words like "bank" or short queries (< 3 chars) to avoid false positives (e.g. "Bank" -> NBE, "L" -> NBE)
+  const genericWords = ['bank', 'بنك'];
+  if (genericWords.includes(q) || q.length < 3) return null;
+
+  // 2. Substring match without loose single-code / short-code containment
+  // (q.includes(b.shortCode) fuzzy branch removed to prevent false positives like "Cairo" -> CA)
   return EGYPTIAN_BANKS.find(b =>
-    b.key.toLowerCase() === q ||
-    b.shortCode.toLowerCase() === q ||
     b.nameEn.toLowerCase().includes(q) ||
     b.nameAr.toLowerCase().includes(q) ||
-    q.includes(b.shortCode.toLowerCase()) ||
     q.includes(b.nameEn.toLowerCase()) ||
     q.includes(b.nameAr.toLowerCase())
   ) || null;
+}
+
+/**
+ * Finds a bank catalog entry strictly by exact match on shortCode, key, or name.
+ */
+function findBankExactMatch(query) {
+  return findBankInCatalog(query, true);
 }
 
 /**
@@ -572,7 +588,7 @@ function getCardLookInfo(card, bank) {
   let bankCatalogEntry = null;
 
   if (bank) {
-    bankCatalogEntry = findBankInCatalog(bank.shortCode) || findBankInCatalog(bank.name);
+    bankCatalogEntry = findBankInCatalog(bank.shortCode, true) || findBankInCatalog(bank.name, true);
     bankBrandColor = (bankCatalogEntry && bankCatalogEntry.brandColor) || bank.accentColor || '#6c737c';
   }
 
@@ -1974,7 +1990,9 @@ if (typeof window !== 'undefined') {
   window.REAL_CARD_LOOKS = REAL_CARD_LOOKS;
   window.getEgyptianBanks = getEgyptianBanks;
   window.findBankInCatalog = findBankInCatalog;
+  window.findBankExactMatch = findBankExactMatch;
   window.getCardLookInfo = getCardLookInfo;
+  window.CARD_THEMES = CARD_THEMES;
 }
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -1984,6 +2002,8 @@ if (typeof module !== 'undefined' && module.exports) {
     REAL_CARD_LOOKS,
     getEgyptianBanks,
     findBankInCatalog,
-    getCardLookInfo
+    findBankExactMatch,
+    getCardLookInfo,
+    CARD_THEMES
   };
 }
