@@ -58,6 +58,29 @@
     return 'other';
   }
 
+  /**
+   * Returns true if a bank label is empty, missing, or a generic placeholder.
+   * Generic labels allow last-4 digit single-match fallback across the wallet.
+   */
+  function isGenericBankLabel(value) {
+    if (!value) return true;
+    const s = String(value).trim().toLowerCase();
+    if (!s) return true;
+    const genericLabels = [
+      'instapay',
+      'insta pay',
+      'ipn',
+      'bank',
+      'unknown bank',
+      'unknown',
+      'transaction',
+      'transactions',
+      'sms',
+      'بنك'
+    ];
+    return genericLabels.includes(s);
+  }
+
   // --- Bank SMS Engine Class ---
   class BankSmsEngine {
     constructor() {
@@ -81,6 +104,14 @@
       };
       this.allowlist = [...DEFAULT_ALLOWLIST];
       this.initialized = false;
+    }
+
+    isGenericBankLabel(value) {
+      return isGenericBankLabel(value);
+    }
+
+    static isGenericBankLabel(value) {
+      return isGenericBankLabel(value);
     }
 
     /**
@@ -383,12 +414,12 @@
       // Helper to access catalog bank lookup if available
       const getCatalogHelper = () => {
         if (typeof window !== 'undefined') {
-          if (typeof window.findBankExactMatch === 'function') return window.findBankExactMatch;
           if (typeof window.findBankInCatalog === 'function') return window.findBankInCatalog;
+          if (typeof window.findBankExactMatch === 'function') return window.findBankExactMatch;
         }
         if (typeof global !== 'undefined') {
-          if (typeof global.findBankExactMatch === 'function') return global.findBankExactMatch;
           if (typeof global.findBankInCatalog === 'function') return global.findBankInCatalog;
+          if (typeof global.findBankExactMatch === 'function') return global.findBankExactMatch;
         }
         return null;
       };
@@ -420,13 +451,16 @@
             if (bShort && (bShort === bLower || bLower.includes(bShort) || bShort.includes(bLower))) return true;
             if (bName && (bName === bLower || bName.includes(bLower) || bLower.includes(bName))) return true;
             if (bCatalog && (bCatalog === bLower || bLower.includes(bCatalog))) return true;
+            const bInitials = bLower.split(/\s+/).map(w => w[0] || '').join('');
+            if (bShort && bInitials === bShort) return true;
             return false;
           });
 
           // Catalog alias resolution (e.g. Arabic vs English: "البنك التجاري الدولي" <-> "Commercial International Bank" / CIB)
           if (!candidateBank && catalogLookup) {
             try {
-              const catEntry = catalogLookup(bQuery);
+              const bInitials = bLower.split(/\s+/).map(w => w[0] || '').join('');
+              const catEntry = catalogLookup(bQuery) || (bInitials.length >= 2 ? catalogLookup(bInitials) : null);
               if (catEntry) {
                 const catKey = (catEntry.key || '').toLowerCase();
                 const catShort = (catEntry.shortCode || '').toLowerCase();
@@ -478,7 +512,7 @@
               (card.digitsPosition || 'last') === candidatePos
             );
           }
-        } else if (!candidateBank && candidateDigits && candidateDigits.length === 4) {
+        } else if (!candidateBank && isGenericBankLabel(c.bank) && candidateDigits && candidateDigits.length === 4) {
           // Strict single-match fallback: If bank could not be resolved from SMS sender
           // (e.g. InstaPay, IPN, unknown sender), check if exactly ONE card or account in the entire wallet matches.
           let globalCards = [];
@@ -531,14 +565,7 @@
           c.matchedCardId = null;
           c.matchedAccountId = matchingAccounts[0].id;
           // If a card is linked to this account, suggest it
-          let linkedCard = allCards.find(cd => cd && cd.linkedAccountId === matchingAccounts[0].id);
-          if (!linkedCard && candidateBank) {
-            // Also check if there is a single debit card for this bank
-            const bankDebits = allCards.filter(cd => cd && cd.bankId === candidateBank.id && cd.cardType === 'debit');
-            if (bankDebits.length === 1) {
-              linkedCard = bankDebits[0];
-            }
-          }
+          const linkedCard = allCards.find(cd => cd && cd.linkedAccountId === matchingAccounts[0].id);
           if (linkedCard) {
             c.matchedCardId = linkedCard.id;
             c.confidence = 'high';
@@ -1288,6 +1315,7 @@
   if (typeof window !== 'undefined') {
     window.BankSmsEngine = new BankSmsEngine();
     window.WebFallbackParser = WebFallbackParser;
+    window.isGenericBankLabel = isGenericBankLabel;
     if (typeof document !== 'undefined') {
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => window.BankSmsEngine.init());
@@ -1298,6 +1326,6 @@
   }
 
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { BankSmsEngine, WebFallbackParser };
+    module.exports = { BankSmsEngine, WebFallbackParser, isGenericBankLabel };
   }
 })();
