@@ -54,6 +54,37 @@ public class BankSmsParser {
             "استرداد|إيداع|ايداع|دائن|اضافة|إضافة|تحويل\\s*وارد|تم\\s*استلام\\s*تحويل|استلام\\s*مبلغ|استقبلت|تم\\s*استقبال|تمت?\\s*إضافة"
     );
 
+    // Patterns for narrow incoming-transfer gate (ported verbatim from sms_engine.js at 28cba2d)
+    private static final Pattern IS_TO_USER_ACCOUNT_PATTERN = Pattern.compile(
+            "(?i)(?:(?:إلى|الى)\\s*[:\\-]?\\s*حسابك(?:م)?|\\b(?:to|into)\\s+your\\s+(?:account|card|wallet)\\b)"
+    );
+
+    private static final Pattern IS_FROM_USER_ACCOUNT_PATTERN = Pattern.compile(
+            "(?i)(?:من\\s+(?:حسابك|بطاقتك|كارتك|محفظتك)|\\bfrom\\s+your\\s+(?:account|card|wallet)\\b)"
+    );
+
+    private static final Pattern HAS_TRANSFER_KEYWORD_PATTERN = Pattern.compile(
+            "(?i)تحويل|تحويلات|\\btransfer\\b|\\btransferred\\b|\\breceived\\b"
+    );
+
+    private static final Pattern HAS_DEBIT_WORD_PATTERN = Pattern.compile(
+            "(?i)\\b(purchase|purchased|paid|debit|debited|spent|withdrawn|withdraw|charge|charged|was\\s*charged|sent|pos|online|atm|cash\\s*out)\\b|" +
+            "شراء|خصم|مدين|سحب|دفع|تمت?\\s*عملية|عملية\\s*خصم|تسوق|شحن|تم\\s*(?:تنفيذ\\s*)?تحويل|أرسلت|ارسلت|تم\\s*ارسال"
+    );
+
+    // Income-branch counterparty amount/currency stripping patterns (ported from sms_engine.js)
+    private static final Pattern STRIP_AMOUNT_SEGMENT_PATTERN = Pattern.compile(
+            "(?i)\\s+(?:مبلغ|بمبلغ|\\bamount\\b)[\\s:#].*$"
+    );
+
+    private static final Pattern STRIP_TRAILING_NUM_CURR_PATTERN = Pattern.compile(
+            "(?i)\\s+(?:[0-9]+(?:,[0-9]{3})*(?:\\.[0-9]{1,2})?|[0-9]+(?:\\.[0-9]{1,2})?)\\s*(?:EGP|LE|L\\.E|USD|EUR|GBP|AED|SAR|ج\\.م|جم|جنيه|\\$|€|£|د\\.إ|ر\\.س)?$"
+    );
+
+    private static final Pattern STRIP_TRAILING_CURR_NUM_PATTERN = Pattern.compile(
+            "(?i)\\s+(?:EGP|LE|L\\.E|USD|EUR|GBP|AED|SAR|ج\\.م|جم|جنيه|\\$|€|£|د\\.إ|ر\\.س)\\s*(?:[0-9]+(?:,[0-9]{3})*(?:\\.[0-9]{1,2})?|[0-9]+(?:\\.[0-9]{1,2})?)?$"
+    );
+
     // Reference number pattern (Item 8) - with word boundary so it won't match inside "Carrefour"
     private static final Pattern REF_PATTERN = Pattern.compile(
             "(?i)(?:برقم\\s*مرجعي|رقم\\s*(?:المرجع|العملية)|مرجع|\\bref(?:erence)?\\s*(?:no|num|number)?|\\btxn\\s*id|\\brrn)\\s*[:#]?\\s*([a-zA-Z0-9]+)"
@@ -70,7 +101,7 @@ public class BankSmsParser {
     );
 
     private static final Pattern TRANSFER_FROM_PATTERN = Pattern.compile(
-            "(?i)(?:من\\s+المحول|من\\s+العميل|من(?!(?:\\s+بطاقة|\\s+كارت|\\s+حسابك|\\s+حساب|\\s+ماكينة|\\s+atm|\\s+card|\\s+account))|\\bfrom\\b|\\breceived\\s+from\\b)\\s*[:\\-]?\\s*([^\\r\\n,;]+?)(?=\\s+(?:عبر|من\\s+خلال|باستخدام|\\bvia\\b|\\busing\\b|\\bon\\b|بتاريخ|في|\\bref\\b|برقم|\\bto\\b|\\d{1,2}[/-])|$)"
+            "(?i)(?:من\\s+المحول|من\\s+العميل|(?:\\s|^)من(?!(?:\\s+بطاقة|\\s+كارت|\\s+حسابك|\\s+حساب|\\s+ماكينة|\\s+atm|\\s+card|\\s+account))|\\bfrom\\b|\\breceived\\s+from\\b)\\s*[:\\-]?\\s*([^\\r\\n,;]+?)(?=\\s+(?:عبر|من\\s+خلال|باستخدام|\\bvia\\b|\\busing\\b|\\bon\\b|بتاريخ|في|\\bref\\b|برقم|\\bto\\b|\\d{1,2}[/-])|$)"
     );
 
     public static boolean isSenderAllowed(String sender, Set<String> allowlist) {
@@ -154,14 +185,24 @@ public class BankSmsParser {
         if (BALANCE_INQUIRY_ONLY.matcher(normalized).find()) return null;
 
         // 2. Identify Transaction Direction (Type)
-        String type = "expense";
+        boolean isToUserAccount = IS_TO_USER_ACCOUNT_PATTERN.matcher(normalized).find();
+        boolean isFromUserAccount = IS_FROM_USER_ACCOUNT_PATTERN.matcher(normalized).find();
+        boolean hasTransferKeyword = HAS_TRANSFER_KEYWORD_PATTERN.matcher(normalized).find();
+        boolean hasDebitWord = HAS_DEBIT_WORD_PATTERN.matcher(normalized).find();
+        boolean isMoneyIntoUserAccount = isToUserAccount && !isFromUserAccount && hasTransferKeyword && !hasDebitWord;
+
         boolean isCredit = CREDIT_PATTERN.matcher(normalized).find();
         boolean isDebit = DEBIT_PATTERN.matcher(normalized).find();
 
-        if (isCredit && !Pattern.compile("(?i)\\b(purchase|purchased|paid|spent|withdrawn|withdraw|charged)\\b|شراء|سحب|دفع|شحن").matcher(normalized).find()) {
-            type = "income";
-        } else if (!isCredit && !isDebit) {
+        if (!isCredit && !isDebit && !isMoneyIntoUserAccount) {
             return null;
+        }
+
+        String type = "expense";
+        if (isMoneyIntoUserAccount) {
+            type = "income";
+        } else if (isCredit && !Pattern.compile("(?i)\\b(purchase|purchased|paid|spent|withdrawn|withdraw|charged)\\b|شراء|سحب|دفع|شحن").matcher(normalized).find()) {
+            type = "income";
         }
 
         // 3. Extract Amount & Currency Strictly (Item 5)
@@ -189,7 +230,11 @@ public class BankSmsParser {
             if ("income".equals(type)) {
                 Matcher inMatcher = TRANSFER_FROM_PATTERN.matcher(normalized);
                 if (inMatcher.find() && inMatcher.group(1) != null) {
-                    String party = cleanCounterparty(inMatcher.group(1));
+                    String party = inMatcher.group(1).trim();
+                    party = STRIP_AMOUNT_SEGMENT_PATTERN.matcher(party).replaceAll("");
+                    party = STRIP_TRAILING_NUM_CURR_PATTERN.matcher(party).replaceAll("");
+                    party = STRIP_TRAILING_CURR_NUM_PATTERN.matcher(party).replaceAll("");
+                    party = cleanCounterparty(party);
                     if (!party.isEmpty()) {
                         merchant = hasInstaPay ? ("InstaPay: " + party) : ("تحويل من: " + party);
                     }
