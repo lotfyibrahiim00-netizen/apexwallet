@@ -264,7 +264,7 @@ html[dir="ltr"] .tilted-card-container {
   background: radial-gradient(circle at 18% 15%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 48%), linear-gradient(135deg, #2C2E35 0%, #23252B 58%, #1C1E23 100%);
   color: var(--text-main);
   padding: 15px 17px;
-  box-shadow: 0 14px 32px -8px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(245, 183, 0, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), inset 0 1px 0 0 rgba(255, 255, 255, 0.26), 0 14px 34px -8px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(245, 183, 0, 0.15);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -273,19 +273,108 @@ html[dir="ltr"] .tilted-card-container {
   direction: ltr;
 }
 
-.tilted-card-container.straightened .bank-card-face {
-  box-shadow: 0 18px 38px -6px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(245, 183, 0, 0.25);
+/* Light sheen overlay across upper-left for glossy shine */
+.bank-card-face::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 32%, transparent 60%);
+  pointer-events: none;
+  z-index: 2;
 }
 
-/* Flat Solid Amber Chip on Card (No grid lines, no metallic gradient) */
+/* Subtle dark vignette at bottom-right for realistic optical depth */
+.bank-card-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background: radial-gradient(circle at 92% 92%, rgba(0, 0, 0, 0.42) 0%, transparent 62%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Brushed metal finish for Titanium cards */
+.bank-card-face.card-tier-titanium::before,
+.bank-card-face.card-look-cib_titanium::before,
+.bank-card-face.card-look-bdc_titanium::before,
+.bank-card-face.card-look-nbk_titanium::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0px, rgba(255, 255, 255, 0.04) 1px, transparent 1px, transparent 3.5px),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.03) 35%, transparent 65%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.tilted-card-container.straightened .bank-card-face {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22), inset 0 1px 0 0 rgba(255, 255, 255, 0.35), 0 18px 40px -6px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(245, 183, 0, 0.28);
+}
+
+/* Realistic Gold EMV Chip Container */
 .bank-card-chip {
   width: 44px;
   height: 32px;
-  border-radius: 7px;
-  background: #F5B700;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
   position: relative;
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bank-card-chip-svg {
+  width: 44px;
+  height: 32px;
+  display: block;
+}
+
+.card-bank-code {
+  letter-spacing: 0.12em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+}
+
+.card-name-text {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.card-tier-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #F3F1EC;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.card-type-subtag {
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+}
+
+.card-digits-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+}
+
+.card-balance-num {
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.75);
+}
+
+.card-remaining-label {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+}
+
+.payment-network-logo {
+  display: block;
 }
 
 .card-mask-dot {
@@ -319,104 +408,112 @@ html[dir="ltr"] .tilted-card-container {
 
 /* --- 7 Tier Styles (Base dark charcoal + bank brand tint 25-35% + accent line) --- */
 .bank-card-face.card-tier-classic {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #2a2d33) 0%, #3b4048 100%);
-}
-.bank-card-face.card-tier-classic::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 10%;
-  right: 10%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--bank-brand, #F5B700) 65%, transparent), transparent);
-  pointer-events: none;
-  z-index: 2;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #1d2025) 0%, color-mix(in srgb, var(--bank-brand, #6c737c) 25%, #2d3139) 50%, #3a3f47 100%);
 }
 
 .bank-card-face.card-tier-gold {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #a6842c) 30%, #3a2c0c) 0%, #a6842c 60%, #4a380e 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #a6842c) 35%, #2a1f07) 0%, #785a15 35%, #cca335 70%, #4a380e 100%);
 }
 
 .bank-card-face.card-tier-titanium {
-  background:
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0px, rgba(255, 255, 255, 0.05) 1px, transparent 1px, transparent 4px),
-    linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #25282d) 0%, #6c737c 55%, #33383e 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #1e2126) 0%, #3e434b 40%, #6c737c 70%, #292d33 100%);
 }
 
 .bank-card-face.card-tier-platinum {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #1b1d22) 0%, #4b5058 50%, #23262b 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #16181d) 0%, #3d414a 40%, #717782 70%, #23262c 100%);
 }
 
 .bank-card-face.card-tier-world {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #0b0b0d) 0%, #1f2025 60%, #111215 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #090a0d) 0%, #1c1d22 45%, #2d2e35 75%, #101114 100%);
 }
 
 .bank-card-face.card-tier-cashback {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #24262b) 0%, #30333a 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #1a1c22) 0%, #2d313a 50%, #1e2026 100%);
 }
 
 .bank-card-face.card-tier-debit {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #22262c) 0%, #343a43 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bank-brand, #6c737c) 30%, #181c22) 0%, #29303a 50%, #1c2027 100%);
 }
 
-/* --- 9 Real Cards (Hand-tuned to match v4 sheet) --- */
+/* --- 9 Real Cards (Hand-tuned with 4-stop rich palettes and depth) --- */
 .bank-card-face.card-look-cib_prime {
-  background: linear-gradient(135deg, #1ab0d6 0%, #0780a8 100%);
+  background: linear-gradient(135deg, #013b52 0%, #03688a 32%, #0ea4c9 70%, #065a75 100%);
 }
 
 .bank-card-face.card-look-cib_titanium {
-  background: linear-gradient(135deg, #0d4a55 0%, #0a6f73 100%);
+  background: linear-gradient(135deg, #051d23 0%, #093c45 35%, #14626f 72%, #082930 100%);
 }
 
 .bank-card-face.card-look-cib_cashback {
-  background: linear-gradient(135deg, #0a1f6b 0%, #2a52c4 100%);
+  background: linear-gradient(135deg, #040d2b 0%, #0b2269 35%, #1b45b2 72%, #081648 100%);
 }
 
 .bank-card-face.card-look-cib_gold {
-  background: linear-gradient(135deg, #7a5a14 0%, #c9a23a 60%, #8a6a1c 100%);
+  background: linear-gradient(135deg, #3a2605 0%, #755212 32%, #cfa335 68%, #573a07 100%);
 }
 
 .bank-card-face.card-look-bdc_debit {
-  background: linear-gradient(135deg, #8fe0c8 0%, #c9f0e2 100%);
-  border-color: #0b5c43 !important;
+  background: linear-gradient(135deg, #3d967e 0%, #61c4a9 38%, #9ef0db 75%, #4ea790 100%);
+  border-color: #0b503b !important;
 }
 
-/* High-contrast dark green text & chip for Banque du Caire light mint debit */
-.bank-card-face.card-look-bdc_debit .card-bank-code,
-.bank-card-face.card-look-bdc_debit .card-name-text,
-.bank-card-face.card-look-bdc_debit .card-balance-num,
-.bank-card-face.card-look-bdc_debit .card-digits-text {
-  color: #063d2c !important;
+/* High-contrast dark text & elements for Banque du Caire light mint debit */
+.bank-card-face.card-look-bdc_debit .card-bank-code {
+  color: #04261B !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) !important;
 }
 
-.bank-card-face.card-look-bdc_debit .card-currency-code,
+.bank-card-face.card-look-bdc_debit .card-name-text {
+  color: #04261B !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+}
+
+.bank-card-face.card-look-bdc_debit .card-tier-badge {
+  background: rgba(4, 38, 27, 0.14) !important;
+  color: #04261B !important;
+  border-color: rgba(4, 38, 27, 0.28) !important;
+  box-shadow: 0 1px 2px rgba(4, 38, 27, 0.15) !important;
+}
+
+.bank-card-face.card-look-bdc_debit .card-type-subtag {
+  color: #073828 !important;
+  text-shadow: none !important;
+}
+
 .bank-card-face.card-look-bdc_debit .card-remaining-label {
-  color: #0a523c !important;
+  color: #073828 !important;
+  text-shadow: none !important;
 }
 
-.bank-card-face.card-look-bdc_debit .card-mask-dot {
-  background-color: #063d2c !important;
+.bank-card-face.card-look-bdc_debit .card-balance-num {
+  color: #04261B !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) !important;
 }
 
-.bank-card-face.card-look-bdc_debit .bank-card-chip {
-  background: #0d5c43 !important;
-  box-shadow: 0 2px 6px rgba(11, 92, 67, 0.4);
+.bank-card-face.card-look-bdc_debit .card-currency-code {
+  color: #0a4d37 !important;
+  text-shadow: none !important;
+}
+
+.bank-card-face.card-look-bdc_debit .card-digits-text {
+  color: #04261B !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) !important;
 }
 
 .bank-card-face.card-look-bdc_titanium {
-  background: linear-gradient(135deg, #6c6e72 0%, #c8cacd 55%, #808387 100%);
+  background: linear-gradient(135deg, #24262a 0%, #4c4f56 36%, #828790 68%, #32353b 100%);
 }
 
 .bank-card-face.card-look-nbk_debit {
-  background: linear-gradient(135deg, #102a7a 0%, #4a6fd0 55%, #1a2f80 100%);
+  background: linear-gradient(135deg, #051442 0%, #0c2d85 36%, #2151c6 72%, #081d58 100%);
 }
 
 .bank-card-face.card-look-nbk_gold {
-  background: linear-gradient(135deg, #5e4210 0%, #b8943a 55%, #6b4c14 100%);
+  background: linear-gradient(135deg, #312104 0%, #66450d 35%, #b58828 68%, #422c06 100%);
 }
 
 .bank-card-face.card-look-nbk_titanium {
-  background: linear-gradient(135deg, #2a3038 0%, #7d8691 55%, #3a424b 100%);
+  background: linear-gradient(135deg, #13171e 0%, #272e39 36%, #475262 70%, #191e26 100%);
 }
 
 /* Hero Expandable Details Drawer */

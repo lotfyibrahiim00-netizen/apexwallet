@@ -549,6 +549,62 @@ assert.strictEqual(explicitlyUpdatedCard.colorPreset, 'tier_gold', 'Explicit cha
 
 console.log('  ✅ [PASS] Legacy colorPreset "cib" and customColor survive open-edit-save unchanged unless explicitly modified\n');
 
+// ----------------------------------------------------
+// Test 8: Polish Visual Invariants (Chip, Network Logos, 3-Row Grid, Motifs)
+// ----------------------------------------------------
+console.log('--- Test 8: Card Looks Polish Visual Invariants ---');
+
+const visualStore = new WalletAppStore();
+requiredRealKeys.forEach((key, idx) => {
+  const bankShortCode = key.split('_')[0].toUpperCase();
+  const bankObj = visualStore.addBank({
+    name: `Bank ${bankShortCode} ${idx}`,
+    shortCode: bankShortCode,
+    accentColor: '#F5B700'
+  });
+
+  const realMeta = REAL_CARD_LOOKS[key];
+  const c = visualStore.addCard({
+    id: `card_${key}`,
+    bankId: bankObj.id,
+    name: realMeta.nameEn,
+    last4: String(1000 + idx),
+    cardType: realMeta.cardType,
+    cycleStartDay: 1,
+    cycleEndDay: 30,
+    colorPreset: key,
+    monthlyTarget: 20000
+  });
+
+  const look = getCardLookInfo(c, bankObj);
+  assert.strictEqual(look.isRealCard, true, `${key} must be recognized as real card`);
+  assert.strictEqual(look.lookKey, key);
+
+  // Set up mock DOM container for overview view rendering
+  const mockContainer = createMockEl('div');
+  mockContainer.id = 'view-dashboard';
+  uiSandbox.document.getElementById = (id) => (id === 'view-dashboard' ? mockContainer : createMockEl('div'));
+  uiSandbox.window.walletStore = visualStore;
+  uiSandbox.window.store = visualStore;
+
+  // Run selectFeaturedCard inside sandbox
+  vm.runInContext(`
+    window.selectFeaturedCard('${c.id}');
+  `, uiSandbox);
+
+  const html = mockContainer.innerHTML;
+  assert.ok(html.includes(`card-look-${key}`), `${key} must apply class card-look-${key}`);
+  assert.ok(html.includes('bank-card-chip-svg'), `${key} must render realistic gold chip SVG`);
+  assert.ok(html.includes('emvGoldGrad'), `${key} chip must contain emvGoldGrad gold gradient definition`);
+  assert.ok(html.includes('payment-network-logo'), `${key} must render payment network logo SVG`);
+  assert.ok(html.includes(`•••• ${c.last4}`), `${key} must render formatted last 4 digits "•••• ${c.last4}"`);
+  assert.ok(html.includes('card-name-text'), `${key} must render card-name-text`);
+  assert.ok(html.includes('card-tier-badge'), `${key} must render card-tier-badge`);
+  assert.ok(html.includes('card-balance-num'), `${key} must render card-balance-num`);
+});
+
+console.log('  ✅ [PASS] All 9 real cards render realistic gold chip, payment network logo, formatted last4 and 3-row layout\n');
+
 console.log('----------------------------------------------------');
 console.log('All Card Looks v3 & Upgrade Tests Passed (100%)');
 console.log('----------------------------------------------------');

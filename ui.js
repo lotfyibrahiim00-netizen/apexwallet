@@ -947,7 +947,7 @@ window.formatAmountInlineHtml = formatAmountInlineHtml;
 
 function initApp() {
   try {
-    const store = window.walletStore || window.store;
+    let store = window.walletStore || window.store;
 
   applyDocumentLanguage();
 
@@ -2092,6 +2092,7 @@ function initApp() {
 
   // --- Render Current View ---
   function renderCurrentView() {
+    store = window.walletStore || window.store || store;
     const stats = store.getOverallStats();
     const topSubtitle = document.getElementById('header-subtitle');
     if (topSubtitle) {
@@ -2129,6 +2130,60 @@ function initApp() {
     `;
   }
 
+  // --- Realistic Gold EMV Chip SVG ---
+  function renderGoldChipSvg(isLightMint) {
+    const strokeColor = isLightMint ? '#084833' : '#66460C';
+    const padLineColor = isLightMint ? '#084833' : '#7A540E';
+    return `
+      <div class="bank-card-chip">
+        <svg viewBox="0 0 44 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="bank-card-chip-svg" aria-label="EMV Chip">
+          <defs>
+            <linearGradient id="emvGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FFF2B2" />
+              <stop offset="28%" stop-color="#E5BA55" />
+              <stop offset="70%" stop-color="#C29329" />
+              <stop offset="100%" stop-color="#8C6316" />
+            </linearGradient>
+            <linearGradient id="emvSheenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.65" />
+              <stop offset="60%" stop-color="#FFFFFF" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          <rect x="0.5" y="0.5" width="43" height="31" rx="6" fill="url(#emvGoldGrad)" stroke="${strokeColor}" stroke-width="0.8" style="filter: drop-shadow(0 2px 3px rgba(0,0,0,0.38));" />
+          <rect x="1" y="1" width="42" height="14" rx="5" fill="url(#emvSheenGrad)" pointer-events="none" />
+          <rect x="4" y="3.5" width="36" height="25" rx="3.5" stroke="${padLineColor}" stroke-width="0.75" fill="none" opacity="0.85" />
+          <path d="M16 11 H28 V21 H16 Z" stroke="${padLineColor}" stroke-width="0.75" fill="none" opacity="0.85" />
+          <line x1="4" y1="16" x2="16" y2="16" stroke="${padLineColor}" stroke-width="0.75" opacity="0.85" />
+          <line x1="28" y1="16" x2="40" y2="16" stroke="${padLineColor}" stroke-width="0.75" opacity="0.85" />
+          <line x1="16" y1="3.5" x2="16" y2="11" stroke="${padLineColor}" stroke-width="0.75" opacity="0.85" />
+          <line x1="28" y1="3.5" x2="28" y2="11" stroke="${padLineColor}" stroke-width="0.75" opacity="0.85" />
+          <line x1="16" y1="21" x2="16" y2="28.5" stroke="${padLineColor}" stroke-width="0.75" opacity="0.85" />
+          <line x1="28" y1="21" x2="28" y2="28.5" stroke="${padLineColor}" stroke-width="0.75" opacity="0.85" />
+        </svg>
+      </div>
+    `;
+  }
+
+  // --- Payment Network Logo SVG (Mastercard / Visa) ---
+  function renderPaymentNetworkLogoSvg(network) {
+    const net = String(network || '').toLowerCase();
+    if (net.includes('visa')) {
+      return `
+        <svg width="46" height="22" viewBox="0 0 48 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="payment-network-logo" aria-label="Visa" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55));">
+          <path d="M19.4 3L13.8 19.5H9.6L6.2 6.4C6 5.6 5.5 5 4.8 4.6C3.6 4 1.8 3.5 0 3.2L0.2 2.3H7.5C8.6 2.3 9.5 3 9.7 4.3L11.5 14.1L15.6 2.3H19.4ZM36.5 14C36.5 8.7 29.3 8.4 29.3 6C29.3 5.3 30 4.5 31.6 4.3C32.4 4.2 34.6 4.1 36.6 5.1L37.3 1.9C36.3 1.5 35 1.1 33.3 1.1C28.2 1.1 24.6 3.8 24.6 7.7C24.6 13.5 32.7 13.2 32.7 16.3C32.7 17.3 31.6 18.2 29.7 18.2C27.6 18.2 25.1 17.2 24 16.6L23.2 20C24.4 20.6 26.8 21.2 29.2 21.2C34.7 21.2 38.3 18.5 38.3 14H36.5ZM47.8 2.3H44.3C43.2 2.3 42.4 2.6 42 3.6L35.8 19.5H40.6L41.6 16.7H47.4L47.9 19.5H52.2L48.4 2.3H47.8ZM42.8 13.2L45.2 6.6L46.6 13.2H42.8ZM25.6 2.3L21.8 19.5H17.2L21 2.3H25.6Z" fill="#FFFFFF"/>
+        </svg>
+      `;
+    }
+    // Authentic Mastercard interlocking circles with optical blended lens
+    return `
+      <svg width="44" height="28" viewBox="0 0 44 28" fill="none" xmlns="http://www.w3.org/2000/svg" class="payment-network-logo" aria-label="Mastercard" style="filter: drop-shadow(0 1.5px 3px rgba(0,0,0,0.55));">
+        <circle cx="16" cy="14" r="11" fill="#EB001B" />
+        <circle cx="28" cy="14" r="11" fill="#F79E1B" />
+        <path d="M22 6.55A11 11 0 0 1 26.24 14 11 11 0 0 1 22 21.45 11 11 0 0 1 17.76 14 11 11 0 0 1 22 6.55Z" fill="#FF5F00" />
+      </svg>
+    `;
+  }
+
   // --- Card Looks Motif Artwork Generator ---
   function renderCardMotifHtml(lookInfo) {
     if (!lookInfo || lookInfo.isDefault || (!lookInfo.motif && !lookInfo.isRealCard && !lookInfo.tierStyle)) {
@@ -2137,96 +2192,130 @@ function initApp() {
     const brand = lookInfo.brandColor || '#6c737c';
     let innerSvg = '';
 
-    switch (lookInfo.motif) {
-      case 'cib_cloud':
-        innerSvg = `
-          <rect x="180" y="32" width="135" height="46" rx="23" fill="rgba(255, 255, 255, 0.18)" />
-          <circle cx="215" cy="48" r="26" fill="rgba(255, 255, 255, 0.14)" />
-        `;
-        break;
-      case 'cib_concentric':
-        innerSvg = `
-          <circle cx="295" cy="100" r="32" stroke="#7fe0d4" stroke-opacity="0.32" stroke-width="1.5" fill="none" />
-          <circle cx="295" cy="100" r="54" stroke="#7fe0d4" stroke-opacity="0.32" stroke-width="1.5" fill="none" />
-          <circle cx="295" cy="100" r="76" stroke="#7fe0d4" stroke-opacity="0.32" stroke-width="1.5" fill="none" />
-          <circle cx="295" cy="100" r="98" stroke="#7fe0d4" stroke-opacity="0.32" stroke-width="1.5" fill="none" />
-        `;
-        break;
-      case 'cib_cashback_chevron':
-        innerSvg = `
-          <polygon points="175,0 240,97 175,195 215,195 280,97 215,0" fill="rgba(255, 255, 255, 0.09)" />
-          <circle cx="312" cy="46" r="16" stroke="#ff8c1a" stroke-width="3.5" fill="none" />
-        `;
-        break;
-      case 'gold_sheen':
-      case 'gold':
-        innerSvg = `
-          <defs>
-            <linearGradient id="goldSheenGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stop-color="#fff" stop-opacity="0"/>
-              <stop offset="50%" stop-color="#fff" stop-opacity="0.25"/>
-              <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
-            </linearGradient>
-          </defs>
-          <path d="M 120,0 L 220,0 L 160,195 L 60,195 Z" fill="url(#goldSheenGrad)" opacity="0.4" />
-          <line x1="25" y1="188" x2="330" y2="188" stroke="#f5b700" stroke-opacity="0.4" stroke-width="1.5" stroke-linecap="round" />
-        `;
-        break;
-      case 'bdc_arch':
-        innerSvg = `
-          <path d="M 252,195 L 252,90 A 34,34 0 0,1 320,90 L 320,195" stroke="rgba(255, 255, 255, ${lookInfo.isLightMint ? '0.75' : '0.55'})" stroke-width="6.5" fill="none" stroke-linecap="round" />
-        `;
-        break;
-      case 'nbk_wave':
-        innerSvg = `
-          <path d="M 0,135 C 100,75 190,185 355,80 L 355,195 L 0,195 Z" fill="rgba(255, 255, 255, 0.13)" />
-          <path d="M 0,150 C 110,95 200,195 355,100" stroke="rgba(255, 255, 255, 0.22)" stroke-width="2" fill="none" />
-        `;
-        break;
-      case 'classic':
-        innerSvg = `
-          <line x1="25" y1="188" x2="330" y2="188" stroke="${brand}" stroke-opacity="0.35" stroke-width="1.5" stroke-linecap="round" />
-        `;
-        break;
-      case 'titanium':
-        innerSvg = `
-          <line x1="25" y1="188" x2="330" y2="188" stroke="${brand}" stroke-opacity="0.4" stroke-width="1.5" stroke-linecap="round" />
-        `;
-        break;
-      case 'platinum':
-        innerSvg = `
-          <line x1="190" y1="0" x2="310" y2="195" stroke="rgba(255, 255, 255, 0.28)" stroke-width="2" />
-          <line x1="202" y1="0" x2="322" y2="195" stroke="${brand}" stroke-opacity="0.4" stroke-width="1" />
-        `;
-        break;
-      case 'world':
-        innerSvg = `
-          <ellipse cx="310" cy="98" rx="85" ry="85" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1.2" fill="none" />
-          <ellipse cx="310" cy="98" rx="55" ry="85" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1.2" fill="none" />
-          <ellipse cx="310" cy="98" rx="25" ry="85" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1.2" fill="none" />
-          <line x1="225" y1="98" x2="355" y2="98" stroke="${brand}" stroke-opacity="0.35" stroke-width="1.2" />
-          <path d="M 235,60 Q 310,85 355,80" stroke="rgba(255, 255, 255, 0.07)" stroke-width="1.2" fill="none" />
-          <path d="M 235,136 Q 310,111 355,116" stroke="rgba(255, 255, 255, 0.07)" stroke-width="1.2" fill="none" />
-        `;
-        break;
-      case 'cashback':
-        innerSvg = `
-          <circle cx="310" cy="46" r="21" stroke="#f5b700" stroke-width="3.5" fill="none" opacity="0.95" />
-          <path d="M 175,70 L 195,95 L 175,120" stroke="rgba(255, 255, 255, 0.10)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-          <path d="M 205,70 L 225,95 L 205,120" stroke="rgba(255, 255, 255, 0.15)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-          <path d="M 235,70 L 255,95 L 235,120" stroke="${brand}" stroke-opacity="0.35" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-        `;
-        break;
-      case 'debit':
-        innerSvg = `
-          <path d="M 305,75 A 14,14 0 0,1 305,115" stroke="rgba(255, 255, 255, 0.22)" stroke-width="2.5" stroke-linecap="round" fill="none" />
-          <path d="M 314,68 A 24,24 0 0,1 314,122" stroke="rgba(255, 255, 255, 0.22)" stroke-width="2.5" stroke-linecap="round" fill="none" />
-          <path d="M 323,61 A 34,34 0 0,1 323,129" stroke="rgba(255, 255, 255, 0.22)" stroke-width="2.5" stroke-linecap="round" fill="none" />
-          <path d="M 332,54 A 44,44 0 0,1 332,136" stroke="${brand}" stroke-opacity="0.5" stroke-width="2.5" stroke-linecap="round" fill="none" />
-        `;
-        break;
-      default:
-        innerSvg = '';
+    // Specialized check for 9 real cards first if applicable
+    if (lookInfo.lookKey === 'nbk_gold') {
+      // Bronze-gold metallic with distinct S-curved golden waves
+      innerSvg = `
+        <path d="M 0,138 C 110,80 200,190 355,85" stroke="#FFE599" stroke-opacity="0.55" stroke-width="4" stroke-linecap="round" fill="none" />
+        <path d="M 0,162 C 120,108 210,205 355,115" stroke="#FFD166" stroke-opacity="0.4" stroke-width="3" stroke-linecap="round" fill="none" />
+        <path d="M 80,195 C 170,140 250,200 355,145" stroke="#FFE599" stroke-opacity="0.25" stroke-width="2" stroke-linecap="round" fill="none" />
+      `;
+    } else if (lookInfo.lookKey === 'nbk_titanium') {
+      // Cool titanium sculpted wave contours
+      innerSvg = `
+        <path d="M 0,132 C 100,75 190,185 355,80" stroke="#A8B4C7" stroke-opacity="0.5" stroke-width="3.8" stroke-linecap="round" fill="none" />
+        <path d="M 0,156 C 110,102 200,195 355,108" stroke="#A8B4C7" stroke-opacity="0.32" stroke-width="2.8" stroke-linecap="round" fill="none" />
+        <path d="M 70,195 C 160,135 245,195 355,138" stroke="#A8B4C7" stroke-opacity="0.2" stroke-width="2" stroke-linecap="round" fill="none" />
+      `;
+    } else {
+      switch (lookInfo.motif) {
+        case 'cib_cloud':
+          // CIB Prime Debit: bold layered translucent pill / cloud geometry
+          innerSvg = `
+            <g opacity="0.9">
+              <rect x="170" y="22" width="155" height="56" rx="28" fill="rgba(255, 255, 255, 0.22)" />
+              <rect x="210" y="44" width="130" height="48" rx="24" fill="rgba(255, 255, 255, 0.14)" />
+              <circle cx="215" cy="50" r="34" fill="rgba(255, 255, 255, 0.18)" />
+            </g>
+          `;
+          break;
+        case 'cib_concentric':
+          // CIB Titanium: 4 concentric teal rings, stroke-width 2.6px, vibrant glowing teal
+          innerSvg = `
+            <g opacity="0.85">
+              <circle cx="295" cy="98" r="36" stroke="#4eeddc" stroke-opacity="0.65" stroke-width="2.6" fill="none" />
+              <circle cx="295" cy="98" r="60" stroke="#4eeddc" stroke-opacity="0.55" stroke-width="2.6" fill="none" />
+              <circle cx="295" cy="98" r="84" stroke="#4eeddc" stroke-opacity="0.45" stroke-width="2.6" fill="none" />
+              <circle cx="295" cy="98" r="108" stroke="#4eeddc" stroke-opacity="0.32" stroke-width="2.6" fill="none" />
+            </g>
+          `;
+          break;
+        case 'cib_cashback_chevron':
+          // CIB Cashback: bold chevron ribbons + glowing amber/orange ring
+          innerSvg = `
+            <g>
+              <polygon points="160,0 235,97 160,195 210,195 285,97 210,0" fill="rgba(255, 255, 255, 0.14)" />
+              <polygon points="215,0 290,97 215,195 245,195 320,97 245,0" fill="rgba(255, 255, 255, 0.08)" />
+              <circle cx="308" cy="46" r="18" stroke="#FF941A" stroke-width="4.5" fill="none" style="filter: drop-shadow(0 0 6px rgba(255, 148, 26, 0.65));" />
+            </g>
+          `;
+          break;
+        case 'gold_sheen':
+        case 'gold':
+          // CIB Gold / Tier Gold: warm diagonal metallic gold sheen band + metallic gold pinstripes
+          innerSvg = `
+            <defs>
+              <linearGradient id="goldSheenGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0"/>
+                <stop offset="50%" stop-color="#FFEBB0" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M 120,0 L 225,0 L 160,195 L 55,195 Z" fill="url(#goldSheenGrad)" />
+            <line x1="20" y1="188" x2="335" y2="188" stroke="#F5D061" stroke-opacity="0.55" stroke-width="2.5" stroke-linecap="round" />
+            <line x1="20" y1="183" x2="335" y2="183" stroke="#CCA133" stroke-opacity="0.32" stroke-width="1.2" stroke-linecap="round" />
+          `;
+          break;
+        case 'bdc_arch':
+          // Banque du Caire: double arch emblem
+          innerSvg = `
+            <path d="M 246,195 L 246,80 A 40,40 0 0,1 326,80 L 326,195" stroke="${lookInfo.isLightMint ? 'rgba(255, 255, 255, 0.85)' : '#E5E9F0'}" stroke-width="7" fill="none" stroke-linecap="round" />
+            <path d="M 264,195 L 264,96 A 22,22 0 0,1 308,96 L 308,195" stroke="${lookInfo.isLightMint ? 'rgba(255, 255, 255, 0.55)' : '#B8BCC6'}" stroke-width="3.5" fill="none" stroke-linecap="round" />
+          `;
+          break;
+        case 'nbk_wave':
+          // NBK Debit: Royal oceanic flowing wave ribbons
+          innerSvg = `
+            <path d="M 0,130 C 95,65 185,180 355,75 L 355,195 L 0,195 Z" fill="rgba(255, 255, 255, 0.15)" />
+            <path d="M 0,146 C 105,85 195,190 355,92" stroke="rgba(255, 255, 255, 0.38)" stroke-width="4" stroke-linecap="round" fill="none" />
+            <path d="M 60,195 C 150,130 240,195 355,120" stroke="rgba(255, 255, 255, 0.25)" stroke-width="2.5" stroke-linecap="round" fill="none" />
+          `;
+          break;
+        case 'classic':
+          innerSvg = `
+            <line x1="25" y1="188" x2="330" y2="188" stroke="${brand}" stroke-opacity="0.65" stroke-width="2.5" stroke-linecap="round" />
+          `;
+          break;
+        case 'titanium':
+          innerSvg = `
+            <line x1="25" y1="188" x2="330" y2="188" stroke="${brand}" stroke-opacity="0.65" stroke-width="2.5" stroke-linecap="round" />
+          `;
+          break;
+        case 'platinum':
+          innerSvg = `
+            <line x1="185" y1="0" x2="310" y2="195" stroke="rgba(255, 255, 255, 0.45)" stroke-width="3.5" />
+            <line x1="202" y1="0" x2="327" y2="195" stroke="${brand}" stroke-opacity="0.6" stroke-width="2" />
+          `;
+          break;
+        case 'world':
+          innerSvg = `
+            <ellipse cx="310" cy="98" rx="88" ry="88" stroke="rgba(255, 255, 255, 0.16)" stroke-width="1.8" fill="none" />
+            <ellipse cx="310" cy="98" rx="58" ry="88" stroke="rgba(255, 255, 255, 0.16)" stroke-width="1.8" fill="none" />
+            <ellipse cx="310" cy="98" rx="28" ry="88" stroke="rgba(255, 255, 255, 0.16)" stroke-width="1.8" fill="none" />
+            <line x1="222" y1="98" x2="355" y2="98" stroke="${brand}" stroke-opacity="0.6" stroke-width="2" />
+            <path d="M 235,60 Q 310,85 355,80" stroke="rgba(255, 255, 255, 0.14)" stroke-width="1.8" fill="none" />
+            <path d="M 235,136 Q 310,111 355,116" stroke="rgba(255, 255, 255, 0.14)" stroke-width="1.8" fill="none" />
+          `;
+          break;
+        case 'cashback':
+          innerSvg = `
+            <circle cx="310" cy="46" r="21" stroke="#F5B700" stroke-width="4.5" fill="none" style="filter: drop-shadow(0 0 6px rgba(245, 183, 0, 0.6));" />
+            <path d="M 175,70 L 195,95 L 175,120" stroke="rgba(255, 255, 255, 0.15)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+            <path d="M 205,70 L 225,95 L 205,120" stroke="rgba(255, 255, 255, 0.22)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+            <path d="M 235,70 L 255,95 L 235,120" stroke="${brand}" stroke-opacity="0.55" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+          `;
+          break;
+        case 'debit':
+          innerSvg = `
+            <path d="M 302,75 A 14,14 0 0,1 302,115" stroke="rgba(255, 255, 255, 0.35)" stroke-width="3" stroke-linecap="round" fill="none" />
+            <path d="M 312,67 A 24,24 0 0,1 312,123" stroke="rgba(255, 255, 255, 0.35)" stroke-width="3" stroke-linecap="round" fill="none" />
+            <path d="M 322,59 A 34,34 0 0,1 322,131" stroke="rgba(255, 255, 255, 0.35)" stroke-width="3" stroke-linecap="round" fill="none" />
+            <path d="M 332,51 A 44,44 0 0,1 332,139" stroke="${brand}" stroke-opacity="0.65" stroke-width="3" stroke-linecap="round" fill="none" />
+          `;
+          break;
+        default:
+          innerSvg = '';
+      }
     }
 
     if (!innerSvg) return '';
@@ -2237,6 +2326,7 @@ function initApp() {
   // VIEW 1: OVERVIEW (TILTED CARD OBJECT HERO)
   // ==========================================
   function renderOverviewView() {
+    store = window.walletStore || window.store || store;
     const container = document.getElementById('view-dashboard');
     if (!container) return;
 
@@ -2299,49 +2389,66 @@ function initApp() {
     }
     const cardMotifHtml = renderCardMotifHtml(lookInfo);
 
+    let tierBadgeText = '';
+    if (lookInfo.isRealCard && lookInfo.realLook) {
+      tierBadgeText = isRtl ? (lookInfo.realLook.variantNameAr || 'كارت') : (lookInfo.realLook.variantNameEn || 'CARD');
+    } else if (lookInfo.tierInfo) {
+      tierBadgeText = isRtl ? lookInfo.tierInfo.nameAr : lookInfo.tierInfo.nameEn;
+    } else {
+      tierBadgeText = card.cardType === 'debit' ? (isRtl ? 'ديبت' : 'DEBIT') : (isRtl ? 'كريدت' : 'CREDIT');
+    }
+
     container.innerHTML = `
       <div class="space-y-3 pb-8">
         
-        <!-- 1. TILTED HERO CARD OBJECT (Reference Match: Lighter Sheen, Flat Tilt, Flat Chip, Bold Sans Balance) -->
+        <!-- 1. TILTED HERO CARD OBJECT (3-Row Layout Grid: Name Top-Left, Chip Mid-Left, Balance Mid-Right, Last4 Bottom-Left, Logo Bottom-Right) -->
         <div class="tilted-hero-wrapper" id="hero-card-touch-zone">
           <div class="tilted-card-container ${isHeroCardExpanded ? 'straightened' : ''}" id="hero-card-tilted-box">
             <div class="bank-card-face ${lookClass} cursor-pointer" style="${faceInlineStyle}" onclick="window.toggleCardStraighten(this)">
               ${cardMotifHtml}
-              <!-- Top Row (dir=ltr): Bank Code FAR LEFT, Card Name FAR RIGHT -->
-              <div class="flex justify-between items-center z-10" dir="ltr">
-                <span class="card-bank-code text-[14px] font-extrabold text-[#F5B700] tracking-wider uppercase">${bank ? bank.shortCode : ''}</span>
-                <span class="card-name-text text-[14px] font-bold text-[#F5B700] truncate max-w-[65%]">${card.name}</span>
+              <!-- Row 1 (dir=ltr): Bank Code & Card Name FAR LEFT, Tier Badge & Type FAR RIGHT -->
+              <div class="flex justify-between items-start z-10 w-full" dir="ltr">
+                <div class="flex flex-col items-start min-w-0 max-w-[66%]">
+                  <span class="card-bank-code text-[11px] font-extrabold uppercase tracking-widest text-[#F5B700] mb-0.5">${bank ? bank.shortCode : ''}</span>
+                  <span class="card-name-text text-[16px] sm:text-[17px] font-bold text-[#F3F1EC] leading-tight truncate w-full" title="${card.name}">${card.name}</span>
+                </div>
+                <div class="flex flex-col items-end shrink-0 ml-2">
+                  <span class="card-tier-badge text-[11px] font-extrabold tracking-wider uppercase">${tierBadgeText}</span>
+                  <span class="card-type-subtag text-[9.5px] font-bold uppercase tracking-wider text-[#C8CAD0] mt-0.5">${t('card_' + (card.cardType || 'credit'))}</span>
+                </div>
               </div>
 
-              <!-- Middle-Left: Flat Solid Amber EMV Chip -->
-              <div class="my-auto flex items-center justify-start z-10" dir="ltr">
-                <div class="bank-card-chip"></div>
-              </div>
+              <!-- Row 2 (dir=ltr): Gold EMV Chip MIDDLE LEFT, Balance & Target MIDDLE RIGHT -->
+              <div class="flex items-center justify-between z-10 w-full my-auto py-1" dir="ltr">
+                <div class="shrink-0 flex items-center">
+                  ${renderGoldChipSvg(lookInfo.isLightMint)}
+                </div>
 
-              <!-- Masked Card Digits (Larger Brighter Dots + Large Mono Last 4) -->
-              <div class="flex items-center justify-center gap-3.5 z-10" dir="ltr">
-                <span class="inline-flex items-center gap-1.5"><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span></span>
-                <span class="inline-flex items-center gap-1.5"><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span></span>
-                <span class="inline-flex items-center gap-1.5"><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span><span class="card-mask-dot"></span></span>
-                <span class="card-digits-text text-[15px] font-mono font-bold tracking-[0.16em] text-[#F3F1EC] ml-1">${card.last4}</span>
-              </div>
-
-              <!-- Bottom Row (dir=ltr): Remaining label BOTTOM LEFT, Big Bold Sans Balance BOTTOM RIGHT -->
-              <div class="flex items-baseline justify-between gap-1.5 pt-1.5 z-10" dir="ltr">
-                <div class="min-w-0">
-                  <span class="card-remaining-label text-[12px] text-[#C8CAD0] font-medium block truncate" dir="${isRtl ? 'rtl' : 'ltr'}">
+                <div class="flex flex-col items-end text-end min-w-0 ml-2">
+                  <span class="card-remaining-label text-[11.5px] text-[#C8CAD0] font-medium block truncate max-w-[190px]" dir="${isRtl ? 'rtl' : 'ltr'}">
                     ${cardStat.isExceeded
                       ? t('over_limit')
                       : `${t('left_of')} <span dir="ltr" class="font-sans-num">${formatCurrency(cardStat.target)}</span>`}
                   </span>
+                  <div class="card-balance-container">
+                    ${formatAmountInlineHtml(cardStat.isExceeded ? cardStat.overAmount : cardStat.remaining, {
+                      useSans: true,
+                      prefixSign: cardStat.isExceeded ? '+' : '',
+                      numClass: `card-balance-num text-[23px] sm:text-[25px] leading-tight font-extrabold ${cardStat.isExceeded ? 'text-[#E6A8A8]' : 'text-[#F3F1EC]'}`,
+                      currClass: `card-currency-code text-[13px] font-bold ${cardStat.isExceeded ? 'text-[#E6A8A8]/85' : 'text-[#D1D5DB]'}`
+                    })}
+                  </div>
                 </div>
-                <div class="shrink-0">
-                  ${formatAmountInlineHtml(cardStat.isExceeded ? cardStat.overAmount : cardStat.remaining, {
-                    useSans: true,
-                    prefixSign: cardStat.isExceeded ? '+' : '',
-                    numClass: `card-balance-num text-[24px] leading-none font-extrabold ${cardStat.isExceeded ? 'text-[#E6A8A8]' : 'text-[#F3F1EC]'}`,
-                    currClass: `card-currency-code text-[13px] font-bold ${cardStat.isExceeded ? 'text-[#E6A8A8]/85' : 'text-[#D1D5DB]'}`
-                  })}
+              </div>
+
+              <!-- Row 3 (dir=ltr): Formatted Last 4 Digits BOTTOM LEFT, Payment Network Logo BOTTOM RIGHT -->
+              <div class="flex items-center justify-between z-10 w-full" dir="ltr">
+                <div class="card-last4-block flex items-center">
+                  <span class="card-digits-text text-[18px] sm:text-[19px] font-mono font-semibold tracking-[0.18em] text-[#F3F1EC]">•••• ${card.last4}</span>
+                </div>
+
+                <div class="card-network-logo-box shrink-0 flex items-center justify-end">
+                  ${renderPaymentNetworkLogoSvg(card.network || 'mastercard')}
                 </div>
               </div>
             </div>
