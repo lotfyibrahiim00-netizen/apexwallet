@@ -162,6 +162,70 @@ console.log('--- Test Case G: Plain purchase, ATM withdrawal, OTP rejection ---'
 }
 
 // ----------------------------------------------------
+// Regressions Prevention (Urgent Fix: FIX-1 to FIX-6 & KEEP)
+// Narrow incoming transfer gate to prevent false income on expenses
+// ----------------------------------------------------
+console.log('--- Test Regressions: FIX-1 to FIX-6 & KEEP ---');
+{
+  // FIX-1: Purchase mentioning "في بطاقتك" must stay expense
+  const r1 = WebFallbackParser.parse('CIB', 'تمت عملية شراء بمبلغ 250 جنيه في بطاقتك المنتهية بـ 1234 لدى AMAZON');
+  assert.ok(r1 !== null);
+  assert.strictEqual(r1.type, 'expense');
+  assert.strictEqual(r1.amount, 250);
+  assert.ok(r1.merchant.includes('AMAZON'));
+  console.log('  ✅ [PASS] FIX-1: purchase with "في بطاقتك" is expense (AMAZON 250)');
+
+  // FIX-2: English purchase / charge mentioning "payment to your account" must stay expense
+  const r2 = WebFallbackParser.parse('CIB', 'Your card ending 1234 was charged EGP 100 at NOON, payment to your account');
+  assert.ok(r2 !== null);
+  assert.strictEqual(r2.type, 'expense');
+  assert.strictEqual(r2.amount, 100);
+  console.log('  ✅ [PASS] FIX-2: "was charged ... payment to your account" is expense (NOON 100)');
+
+  // FIX-3: Fee deduction mentioning "في حسابك" must stay expense
+  const r3 = WebFallbackParser.parse('CIB', 'خصم 100 جنيه رسوم في حسابك المنتهي بـ 1234');
+  assert.ok(r3 !== null);
+  assert.strictEqual(r3.type, 'expense');
+  assert.strictEqual(r3.amount, 100);
+  console.log('  ✅ [PASS] FIX-3: fee deduction "خصم ... في حسابك" is expense (100)');
+
+  // FIX-4a: Outgoing transfer to another person\'s account must stay expense
+  const r4a = WebFallbackParser.parse('CIB', 'تم تحويل 500 جنيه إلى حساب أحمد المنتهي بـ 7788');
+  assert.ok(r4a !== null);
+  assert.strictEqual(r4a.type, 'expense');
+  assert.strictEqual(r4a.amount, 500);
+  console.log('  ✅ [PASS] FIX-4a: outgoing transfer to someone else is expense (500)');
+
+  // FIX-4b: Ambiguous transfer without explicit direction must return null
+  const r4b = WebFallbackParser.parse('CIB', 'تحويل 500 جنيه لحساب المنتهي بـ 7788');
+  assert.strictEqual(r4b, null, 'Ambiguous transfer without destination must return null');
+  console.log('  ✅ [PASS] FIX-4b: ambiguous transfer without destination returns null');
+
+  // FIX-5: Outgoing transfer with debit wording "تم تحويل" must stay expense even with "الى حسابك"
+  const r5 = WebFallbackParser.parse('CIB', 'تم تحويل 500 جنيه الى حسابك الخاص بك من حساب التوفير');
+  assert.ok(r5 !== null);
+  assert.strictEqual(r5.type, 'expense');
+  assert.strictEqual(r5.amount, 500);
+  console.log('  ✅ [PASS] FIX-5: debit "تم تحويل ... من حساب التوفير" is expense (500)');
+
+  // FIX-6: Outgoing transfer "You sent ... to your account ending ..." must stay expense
+  const r6 = WebFallbackParser.parse('CIB', 'You sent EGP 300 to Ahmed, to your account ending 1234 ref 998877');
+  assert.ok(r6 !== null);
+  assert.strictEqual(r6.type, 'expense');
+  assert.strictEqual(r6.amount, 300);
+  console.log('  ✅ [PASS] FIX-6: "You sent ... to your account" is expense (300)');
+
+  // KEEP: Legitimate incoming transfer to user\'s account must remain income
+  const rKeep = WebFallbackParser.parse('CIB', 'تحويل إلى: حسابك المنتهي بـ 1659 من منال 300.00 جنيه');
+  assert.ok(rKeep !== null);
+  assert.strictEqual(rKeep.type, 'income');
+  assert.strictEqual(rKeep.amount, 300);
+  assert.ok(rKeep.merchant.startsWith('تحويل من'));
+  assert.ok(rKeep.merchant.includes('منال'));
+  console.log('  ✅ [PASS] KEEP: incoming transfer to user account remains income (منال 300)');
+}
+
+// ----------------------------------------------------
 // End-to-End Approval Flow Verification:
 // Approving an incoming transfer candidate creates an income transaction (+300)
 // and updates the linked account balance from 1,000 to 1,300.

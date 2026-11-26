@@ -1024,14 +1024,19 @@
       const isBalanceInquiry = /^\s*(your\s*balance\s*is|available\s*balance\s*is|رصيدكم\s*الحالي|رصيدك\s*هو)\b/i.test(normalized);
       if (isBalanceInquiry) return null;
 
-      // Detect "money into the user's own account" (incoming destination)
-      const isToUserAccount = /(?:(?:إلى|الى|في|لـ|ل)\s*[:\-]?\s*(?:حسابك(?:م)?|بطاقتك(?:م)?|كارتك(?:م)?|محفظتك(?:م)?|حساب[^\r\n,;]{0,40}?(?:الخاص\s+بك|المنتهي(?:ة)?\s+بـ?|تنتهي\s+بـ?))|\b(?:to|into)\s+your\s+(?:account|card|wallet)\b)/i.test(normalized);
+      // Detect "money into the user's own account" (incoming destination).
+      // NARROW: only an explicit transfer-destination phrase naming the user's OWN account.
+      // Never matches "في بطاقتك" (purchase SMS), "لحساب ..." or "إلى حساب <name>" (someone else's account).
+      const isToUserAccount = /(?:(?:إلى|الى)\s*[:\-]?\s*حسابك(?:م)?|\b(?:to|into)\s+your\s+(?:account|card|wallet)\b)/i.test(normalized);
       const isFromUserAccount = /(?:من\s+(?:حسابك|بطاقتك|كارتك|محفظتك)|\bfrom\s+your\s+(?:account|card|wallet)\b)/i.test(normalized);
-      const isMoneyIntoUserAccount = isToUserAccount && !isFromUserAccount;
+      const hasTransferKeyword = /تحويل|تحويلات|\btransfer\b|\btransferred\b|\breceived\b/i.test(normalized);
+      // Any explicit debit wording means money is LEAVING; never force it to income.
+      const hasDebitWord = /\b(purchase|purchased|paid|debit|debited|spent|withdrawn|withdraw|charge|charged|was\s*charged|sent|pos|online|atm|cash\s*out)\b|شراء|خصم|مدين|سحب|دفع|تمت?\s*عملية|عملية\s*خصم|تسوق|شحن|تم\s*(?:تنفيذ\s*)?تحويل|أرسلت|ارسلت|تم\s*ارسال/i.test(normalized);
+      const isMoneyIntoUserAccount = isToUserAccount && !isFromUserAccount && hasTransferKeyword && !hasDebitWord;
 
       // Type
       const isExplicitIncoming = isMoneyIntoUserAccount || /\b(refund|refunded|deposited|deposit|credited|credit|reversed|reversal|cash\s*in|transfer\s*received|received|received\s*from)\b|استرداد|إيداع|ايداع|دائن|اضافة|إضافة|تحويل\s*وارد|تم\s*استلام\s*تحويل|استلام\s*مبلغ|استقبلت|تم\s*استقبال|تمت?\s*إضافة/i.test(normalized);
-      const isDebit = /\b(purchase|purchased|paid|debit|debited|spent|withdrawn|withdraw|charge|charged|was\s*charged|transferred|transfer|sent|pos|online|atm|cash\s*out)\b|شراء|خصم|مدين|سحب|دفع|تمت?\s*عملية|عملية\s*خصم|تسوق|شحن|تحويل(?:\s*صادر|\s*لحظي|\s*إلى|\s*الى)?|تم\s*(?:تنفيذ\s*)?تحويل|أرسلت|ارسلت|تم\s*ارسال/i.test(normalized);
+      const isDebit = /\b(purchase|purchased|paid|debit|debited|spent|withdrawn|withdraw|charge|charged|was\s*charged|transferred|transfer|sent|pos|online|atm|cash\s*out)\b|شراء|خصم|مدين|سحب|دفع|تمت?\s*عملية|عملية\s*خصم|تسوق|شحن|تحويل\s*صادر|تم\s*تنفيذ\s*تحويل|تحويل\s*لحظي|تم\s*تحويل|أرسلت|ارسلت|تم\s*ارسال/i.test(normalized);
       const isCredit = isExplicitIncoming;
 
       if (!isDebit && !isCredit) return null;
