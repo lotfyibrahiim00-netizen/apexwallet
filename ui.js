@@ -3980,41 +3980,211 @@ function initApp() {
       const isWarnOpen = expandedSmsWarnIds.has(c.id);
       const messageBodyHtml = c.rawMessage ? escapeHtmlText(c.rawMessage) : buildCandidateSummarySentence(c);
       const calmWarnTitle = getCalmNonMatchTitle(c);
+      const isRtl = getLang() === 'ar';
+
+      const matchedCard = c.matchedCardId ? store.getCard(c.matchedCardId) : null;
+      const matchedAcc = (!matchedCard && c.matchedAccountId) ? store.getAccount(c.matchedAccountId) : null;
+      const cardAccName = matchedCard ? matchedCard.name : (matchedAcc ? matchedAcc.name : (c.cardSuffix ? `•••• ${c.cardSuffix}` : ''));
 
       return `
         <div id="candidate-card-${c.id}" class="bg-[#25262B] border border-[#33353C] rounded-2xl p-4 space-y-3 transition-all shadow-md card-press">
-          <!-- Row 1: Bank + Card/Tags & Amount LTR -->
+          <!-- 1. Header row: Bank + Card/Account Name & Amount -->
           <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2 flex-wrap min-w-0">
+            <div class="flex items-center gap-1.5 flex-wrap min-w-0">
               <span class="text-[15px] font-black tracking-tight text-[#F3F1EC]" dir="ltr">${c.bank}</span>
-              ${c.cardSuffix ? `<span class="text-[13px] font-mono text-[#C8CAD0]" dir="ltr">•••• ${c.cardSuffix}</span>` : ''}
-              ${c.isHistorical ? `<span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#2A2B31] text-[#C8CAD0] border border-[#43464F]">${t('historical_badge')}</span>` : ''}
+              ${cardAccName ? `<span class="text-[13px] font-medium text-[#C8CAD0]" dir="auto">• ${cardAccName}</span>` : ''}
+              ${c.isHistorical ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#2A2B31] text-[#C8CAD0] border border-[#43464F]">${t('historical_badge')}</span>` : ''}
             </div>
             <div class="shrink-0">
               ${formatAmountInlineHtml(c.amount, {
                 useSans: true,
                 prefixSign: isCredit ? '+' : '-',
                 currency: c.currency || currentCurrency,
-                numClass: `text-[17px] font-extrabold ${isCredit ? 'text-[#F5B700]' : 'text-[#F3F1EC]'}`,
-                currClass: 'text-[11.5px] text-[#C8CAD0] font-semibold'
+                numClass: `text-[18px] font-extrabold ${isCredit ? 'text-[#4ADE80]' : 'text-[#F87171]'}`,
+                currClass: `text-[12px] font-bold ${isCredit ? 'text-[#4ADE80]/85' : 'text-[#F87171]/85'}`
               })}
             </div>
           </div>
 
-          <!-- Row 2: Original SMS Text (Hero Readability 16.5px) + Edit Toggle -->
-          <div class="flex items-start justify-between gap-2.5">
-            <p class="text-[16.5px] font-normal text-[#F3F1EC] leading-relaxed flex-1 min-w-0" dir="auto">${messageBodyHtml}</p>
-            <button type="button" onclick="window.toggleCandidateEditDetails('${c.id}')" class="w-11 h-11 rounded-xl bg-transparent hover:bg-[#2A2B31] border border-transparent hover:border-[#43464F] text-[#C8CAD0] hover:text-[#F5B700] shrink-0 flex items-center justify-center transition-colors active-press" title="${t('edit_details')}">
-              <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
-            </button>
+          <!-- 2. One short line: Merchant / Counterparty & Date -->
+          <div class="flex items-center justify-between text-xs text-[#C8CAD0] gap-2">
+            <span class="font-bold text-[#F3F1EC] truncate">${c.merchant ? escapeHtmlText(c.merchant) : (c.bank + ' Transaction')}</span>
+            <span class="shrink-0 font-mono text-[11px] text-[#C8CAD0]" dir="ltr">${c.transactionTime || new Date(c.receiptTime).toLocaleDateString()}</span>
           </div>
 
-          <!-- Collapsible Edit Details (Merchant, Category, Date/Ref) — Always in DOM for approveSmsCandidate -->
-          <div id="candidate-extra-edit-${c.id}" class="${isExtraOpen ? '' : 'hidden'} space-y-2.5 bg-[#1A1B1F] border border-[#33353C] rounded-xl p-3">
+          <!-- 3. Original SMS text, collapsed to 2 lines by default (tap to expand) -->
+          <div class="cursor-pointer" onclick="const p = this.querySelector('p'); if (p) p.style.webkitLineClamp = (p.style.webkitLineClamp === 'unset' ? '2' : 'unset');" title="${isRtl ? 'اضغط للتوسيع / الطي' : 'Tap to expand / collapse'}">
+            <p class="text-[13.5px] text-[#C8CAD0]/90 leading-relaxed transition-all" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" dir="auto">${messageBodyHtml}</p>
+          </div>
+
+          <!-- 4. Warning (if no match) and Card Selector -->
+          ${needsCardSelection ? `
+            <div class="space-y-2 pt-0.5">
+              <div class="bg-[#1E2025] border border-[#33353C] rounded-xl px-3 py-2 text-xs">
+                <div class="flex items-center justify-between gap-2 min-h-[30px]">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-2 h-2 rounded-full bg-[#F5B700] shrink-0"></span>
+                    <span class="text-[12.5px] font-bold text-[#F5B700] truncate">${calmWarnTitle}</span>
+                  </div>
+                  <button type="button" onclick="window.toggleCandidateWarningDetails('${c.id}')" class="min-h-[30px] px-2 inline-flex items-center gap-1 text-xs font-bold text-[#C8CAD0] hover:text-[#F3F1EC] shrink-0 active-press">
+                    <span id="candidate-warn-btn-label-${c.id}">${isWarnOpen ? t('hide') : t('details')}</span>
+                    <i id="candidate-warn-btn-chev-${c.id}" data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform" style="transform: ${isWarnOpen ? 'rotate(180deg)' : 'rotate(0deg)'}"></i>
+                  </button>
+                </div>
+                <div id="candidate-warn-details-${c.id}" class="${isWarnOpen ? '' : 'hidden'} pt-2 mt-1.5 border-t border-[#33353C] space-y-2 text-[12.5px] text-[#C8CAD0] leading-relaxed">
+                  <p>${c.nonMatchReason || t('non_match_default')}</p>
+                  ${c.matchSuggestion ? `
+                    <div class="text-[#C8CAD0] flex items-center justify-between gap-2 pt-1.5 border-t border-[#33353C]/70">
+                      <span>${c.matchSuggestion}</span>
+                      ${c.suggestAddAccount ? `
+                        <button type="button" onclick="window.openAddAccountPrompt('${c.suggestAddAccount.bankId || ''}', '${c.suggestAddAccount.digits || ''}', '${c.suggestAddAccount.position || 'last'}')" class="shrink-0 px-3 py-1.5 min-h-[36px] bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] rounded-xl text-xs font-bold active-press">
+                          ${t('add_account_btn')}
+                        </button>
+                      ` : ''}
+                    </div>
+                  ` : ''}
+                  ${c.isPotentialDuplicate ? `
+                    <div class="text-xs text-[#F5B700] pt-1 border-t border-[#33353C]">
+                      <span class="font-bold">${t('dup_title')}: </span>${c.potentialDuplicateReason || t('dup_default')}
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-[#C8CAD0] mb-1.5">${isRtl ? 'اختر الكارت' : 'Choose card'}</label>
+                <select id="candidate-card-select-${c.id}" onchange="window.onCandidateTypeChanged('${c.id}')" class="w-full text-[13px] font-bold text-[#F3F1EC] bg-[#1A1B1F] border border-[#33353C] focus:border-[#F5B700] rounded-xl px-3 py-2.5 min-h-[44px] outline-none cursor-pointer">
+                  <option value="" ${!c.matchedCardId && !c.matchedAccountId ? 'selected disabled' : ''}>${t('select_card_or_account')}</option>
+                  <optgroup label="${t('cards_optgroup')}">
+                    ${cards.map(card => {
+                      const isSelected = card.id === c.matchedCardId;
+                      return `<option value="${card.id}" ${isSelected ? 'selected' : ''}>${card.name} (•••• ${card.last4})</option>`;
+                    }).join('')}
+                  </optgroup>
+                  ${(store.accounts && store.accounts.length > 0) ? `
+                    <optgroup label="${t('accounts_optgroup')}">
+                      ${store.accounts.map(acc => {
+                        const isSelected = acc.id === c.matchedAccountId && !c.matchedCardId;
+                        return `<option value="acc:${acc.id}" ${isSelected ? 'selected' : ''}>${acc.name} (${acc.accountNumberMasked || acc.identifierDigits}) • ${t('balance_word')}: ${formatCurrency(acc.balance || 0)}</option>`;
+                      }).join('')}
+                    </optgroup>
+                  ` : ''}
+                </select>
+              </div>
+            </div>
+          ` : `
+            <!-- Hidden card selector to preserve matchedCardId for approveSmsCandidate -->
+            <select id="candidate-card-select-${c.id}" class="hidden" onchange="window.onCandidateTypeChanged('${c.id}')">
+              ${c.matchedCardId ? `<option value="${c.matchedCardId}" selected>${c.matchedCardId}</option>` : ''}
+              ${(!c.matchedCardId && c.matchedAccountId) ? `<option value="acc:${c.matchedAccountId}" selected>acc:${c.matchedAccountId}</option>` : ''}
+            </select>
+          `}
+
+          <!-- 5. Actions: Primary Approve (Full Width) + Secondary Edit Details & Reject -->
+          <div class="space-y-2 pt-1">
+            <button type="button" onclick="window.approveSmsCandidate('${c.id}')" class="w-full py-3 min-h-[46px] bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-[14.5px] font-black rounded-xl active-press transition-all flex items-center justify-center gap-1.5 shadow-md">
+              <span>${t('approve')}</span>
+            </button>
+            <div class="flex items-center justify-between px-1">
+              <button type="button" onclick="window.toggleCandidateEditDetails('${c.id}')" class="inline-flex items-center gap-1.5 text-xs font-bold text-[#C8CAD0] hover:text-[#F5B700] transition-colors active-press py-1">
+                <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+                <span>${t('edit_details')}</span>
+              </button>
+              <button type="button" onclick="window.rejectSmsCandidate('${c.id}')" class="text-xs font-bold text-[#C8CAD0] hover:text-[#F87171] transition-colors active-press py-1 px-1.5">
+                <span>${t('reject')}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 6. Collapsible Edit Details (Operation Type Radio, Assigned Card, Warning, Balance Preview, Inputs) -->
+          <div id="candidate-extra-edit-${c.id}" class="${isExtraOpen ? '' : 'hidden'} space-y-3 bg-[#1A1B1F] border border-[#33353C] rounded-xl p-3 text-xs">
+            <!-- Operation Type Radio (Purchase / Withdrawal / Transfer) -->
+            <div>
+              <label class="block text-xs font-bold text-[#C8CAD0] mb-1.5">${isRtl ? 'نوع العملية' : 'Transaction Type'}</label>
+              <div class="grid grid-cols-3 bg-[#25262B] border border-[#33353C] rounded-xl p-1 gap-1">
+                <label class="cursor-pointer">
+                  <input type="radio" name="candidate-type-${c.id}" value="purchase" class="hidden peer" ${c.transactionType === 'purchase' || !c.transactionType ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
+                  <span class="flex items-center justify-center min-h-[38px] px-1 rounded-lg text-[12px] font-bold text-[#C8CAD0] border border-transparent peer-checked:bg-[#2A2B31] peer-checked:border-[#43464F] peer-checked:text-[#F3F1EC] transition-all whitespace-nowrap">${t('purchase')}</span>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="radio" name="candidate-type-${c.id}" value="withdrawal" class="hidden peer" ${c.transactionType === 'withdrawal' ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
+                  <span class="flex items-center justify-center min-h-[38px] px-1 rounded-lg text-[12px] font-bold text-[#C8CAD0] border border-transparent peer-checked:bg-[#2A2B31] peer-checked:border-[#43464F] peer-checked:text-[#F3F1EC] transition-all whitespace-nowrap">${t('withdrawal')}</span>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="radio" name="candidate-type-${c.id}" value="transfer" class="hidden peer" ${c.transactionType === 'transfer' ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
+                  <span class="flex items-center justify-center min-h-[38px] px-1 rounded-lg text-[12px] font-bold text-[#C8CAD0] border border-transparent peer-checked:bg-[#2A2B31] peer-checked:border-[#43464F] peer-checked:text-[#F3F1EC] transition-all whitespace-nowrap">${t('transfer')}</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Card / Account Selector if already matched and user wishes to reassign -->
+            ${!needsCardSelection ? `
+              <div>
+                <label class="block text-xs font-bold text-[#C8CAD0] mb-1">${isRtl ? 'الكارت / الحساب المعين' : 'Assigned Card / Account'}</label>
+                <select onchange="const rootSel = document.getElementById('candidate-card-select-${c.id}'); if (rootSel) { rootSel.value = this.value; window.onCandidateTypeChanged('${c.id}'); }" class="w-full text-[13px] font-bold text-[#F3F1EC] bg-[#2A2B31] border border-[#43464F] focus:border-[#F5B700] rounded-xl px-3 py-2 min-h-[40px] outline-none cursor-pointer">
+                  <option value="" ${!c.matchedCardId && !c.matchedAccountId ? 'selected disabled' : ''}>${t('select_card_or_account')}</option>
+                  <optgroup label="${t('cards_optgroup')}">
+                    ${cards.map(card => {
+                      const isSelected = card.id === c.matchedCardId;
+                      return `<option value="${card.id}" ${isSelected ? 'selected' : ''}>${card.name} (•••• ${card.last4})</option>`;
+                    }).join('')}
+                  </optgroup>
+                  ${(store.accounts && store.accounts.length > 0) ? `
+                    <optgroup label="${t('accounts_optgroup')}">
+                      ${store.accounts.map(acc => {
+                        const isSelected = acc.id === c.matchedAccountId && !c.matchedCardId;
+                        return `<option value="acc:${acc.id}" ${isSelected ? 'selected' : ''}>${acc.name} (${acc.accountNumberMasked || acc.identifierDigits}) • ${t('balance_word')}: ${formatCurrency(acc.balance || 0)}</option>`;
+                      }).join('')}
+                    </optgroup>
+                  ` : ''}
+                </select>
+              </div>
+            ` : ''}
+
+            <!-- Warning for unlinked debit withdrawal -->
+            <div id="candidate-debit-warn-${c.id}" class="text-xs font-bold text-[#E6A8A8] bg-[#3A2020] border border-[#E6A8A8]/30 rounded-lg p-2.5 ${(() => {
+              const matchedCard = c.matchedCardId ? store.getCard(c.matchedCardId) : null;
+              return (c.transactionType === 'withdrawal' && matchedCard && matchedCard.cardType === 'debit' && !matchedCard.linkedAccountId && !c.matchedAccountId) ? '' : 'hidden';
+            })()}">
+              ${t('unlinked_debit_warn')}
+            </div>
+
+            <!-- Dynamic Balance Preview -->
+            ${(() => {
+              let candAcc = null;
+              if (c.matchedAccountId) {
+                candAcc = store.getAccount(c.matchedAccountId);
+              } else if (c.matchedCardId) {
+                const mc = store.getCard(c.matchedCardId);
+                if (mc && mc.cardType === 'debit' && mc.linkedAccountId) {
+                  candAcc = store.getAccount(mc.linkedAccountId);
+                }
+              }
+              if (!candAcc) return '';
+              const curBal = candAcc.balance || 0;
+              const isInc = c.direction === 'income' || c.type === 'income';
+              const expAfter = isInc ? curBal + c.amount : curBal - c.amount;
+              const isNeg = expAfter < 0;
+              return `
+                <div id="candidate-balance-box-${c.id}" class="p-2.5 rounded-xl bg-[#25262B] border ${isNeg ? 'border-[#E6A8A8]/40 text-[#E6A8A8]' : 'border-[#33353C] text-[#F3F1EC]'} space-y-1">
+                  <div class="flex items-center justify-between text-xs font-bold">
+                    <span>${t('balance_before_label', { name: candAcc.name })} <span dir="ltr" class="font-mono">${formatCurrency(curBal)}</span></span>
+                    <span>${t('balance_after_label')} <span dir="ltr" class="font-mono ${isNeg ? 'text-[#E6A8A8] font-black' : ''}">${formatCurrency(expAfter)}</span></span>
+                  </div>
+                  ${isNeg ? `
+                    <div class="text-xs font-bold text-[#E6A8A8]">${t('negative_balance_cand_warn')}</div>
+                  ` : ''}
+                </div>
+              `;
+            })()}
+
+            <!-- Merchant Input -->
             <div>
               <label class="block text-xs font-bold text-[#C8CAD0] mb-1">${t('merchant_label')}</label>
               <input type="text" id="candidate-merchant-${c.id}" value="${c.merchant ? c.merchant.replace(/"/g, '&quot;') : (c.bank + ' Transaction')}" class="w-full text-[13px] font-bold text-[#F3F1EC] bg-[#2A2B31] border border-[#43464F] rounded-xl px-3 py-2 outline-none focus:border-[#F5B700]">
             </div>
+
+            <!-- Category Select -->
             <div>
               <label class="block text-xs font-bold text-[#C8CAD0] mb-1">${t('category')}</label>
               <select id="candidate-category-select-${c.id}" class="w-full text-[13px] font-bold text-[#F3F1EC] bg-[#2A2B31] border border-[#43464F] rounded-xl px-2.5 py-2 outline-none cursor-pointer">
@@ -4029,135 +4199,12 @@ function initApp() {
                 <option value="other" ${!c.suggestedCategory || c.suggestedCategory === 'other' ? 'selected' : ''}>${t('cat_other')}</option>
               </select>
             </div>
-            <div class="text-xs text-[#C8CAD0] flex items-center justify-between pt-0.5">
+
+            <!-- Date & Reference info -->
+            <div class="text-[11.5px] text-[#C8CAD0] flex items-center justify-between pt-0.5 border-t border-[#33353C]/60">
               <span>${t('date_prefix')} <span dir="ltr" class="font-mono">${c.transactionTime || new Date(c.receiptTime).toLocaleString()}</span></span>
               <span>${t('ref_prefix')} <span dir="ltr" class="font-mono">${(c.fingerprint || '').slice(0, 10)}</span></span>
             </div>
-          </div>
-
-          ${needsCardSelection ? `
-            <div class="bg-[#1E2025] border border-[#33353C] rounded-xl px-3.5 py-2 text-xs">
-              <div class="flex items-center justify-between gap-2 min-h-[36px]">
-                <div class="flex items-center gap-2 min-w-0">
-                  <span class="w-2 h-2 rounded-full bg-[#F5B700] shrink-0"></span>
-                  <span class="text-[13px] font-bold text-[#F5B700] truncate">${calmWarnTitle}</span>
-                </div>
-                <button type="button" onclick="window.toggleCandidateWarningDetails('${c.id}')" class="min-h-[36px] px-2 inline-flex items-center gap-1 text-xs font-bold text-[#C8CAD0] hover:text-[#F3F1EC] shrink-0 active-press">
-                  <span id="candidate-warn-btn-label-${c.id}">${isWarnOpen ? t('hide') : t('details')}</span>
-                  <i id="candidate-warn-btn-chev-${c.id}" data-lucide="chevron-down" class="w-3.5 h-3.5 transition-transform" style="transform: ${isWarnOpen ? 'rotate(180deg)' : 'rotate(0deg)'}"></i>
-                </button>
-              </div>
-              <div id="candidate-warn-details-${c.id}" class="${isWarnOpen ? '' : 'hidden'} pt-2 mt-1.5 border-t border-[#33353C] space-y-2 text-[13px] text-[#C8CAD0] leading-relaxed">
-                <p>${c.nonMatchReason || t('non_match_default')}</p>
-                ${c.matchSuggestion ? `
-                  <div class="text-[#C8CAD0] flex items-center justify-between gap-2 pt-1.5 border-t border-[#33353C]/70">
-                    <span>${c.matchSuggestion}</span>
-                    ${c.suggestAddAccount ? `
-                      <button type="button" onclick="window.openAddAccountPrompt('${c.suggestAddAccount.bankId || ''}', '${c.suggestAddAccount.digits || ''}', '${c.suggestAddAccount.position || 'last'}')" class="shrink-0 px-3 py-2 min-h-[44px] bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] rounded-xl text-xs font-bold active-press">
-                        ${t('add_account_btn')}
-                      </button>
-                    ` : ''}
-                  </div>
-                ` : ''}
-              </div>
-            </div>
-          ` : ''}
-
-          ${c.isPotentialDuplicate ? `
-            <div class="bg-[#1E2025] border border-[#33353C] rounded-xl p-3 text-xs text-[#F5B700] space-y-1.5">
-              <div class="flex items-center gap-2 font-bold">
-                <span class="w-2 h-2 rounded-full bg-[#F5B700] shrink-0"></span>
-                <span>${t('dup_title')}</span>
-              </div>
-              <p class="text-[13px] text-[#C8CAD0] leading-snug">${c.potentialDuplicateReason || t('dup_default')}</p>
-              <div class="text-xs text-[#C8CAD0] bg-[#1A1B1F] p-2 rounded-lg font-mono border border-[#33353C]">
-                ${t('dup_prev_label')} ${c.potentialDuplicateMatch ? `${c.potentialDuplicateMatch.amount} • ${c.potentialDuplicateMatch.date} (${c.potentialDuplicateMatch.merchant})` : t('dup_prev_fallback')}
-              </div>
-            </div>
-          ` : ''}
-
-          <!-- Row 3: Segmented Operation Type Control (Purchase / Cash Withdrawal / Transfer) -->
-          <div class="grid grid-cols-3 bg-[#1A1B1F] border border-[#33353C] rounded-2xl p-1 gap-1">
-            <label class="cursor-pointer">
-              <input type="radio" name="candidate-type-${c.id}" value="purchase" class="hidden peer" ${c.transactionType === 'purchase' || !c.transactionType ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
-              <span class="flex items-center justify-center min-h-[44px] px-1 rounded-xl text-[12px] font-bold text-[#C8CAD0] border border-transparent peer-checked:bg-[#2A2B31] peer-checked:border-[#43464F] peer-checked:text-[#F3F1EC] peer-checked:shadow-xs transition-all whitespace-nowrap">${t('purchase')}</span>
-            </label>
-            <label class="cursor-pointer">
-              <input type="radio" name="candidate-type-${c.id}" value="withdrawal" class="hidden peer" ${c.transactionType === 'withdrawal' ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
-              <span class="flex items-center justify-center min-h-[44px] px-1 rounded-xl text-[12px] font-bold text-[#C8CAD0] border border-transparent peer-checked:bg-[#2A2B31] peer-checked:border-[#43464F] peer-checked:text-[#F3F1EC] peer-checked:shadow-xs transition-all whitespace-nowrap">${t('withdrawal')}</span>
-            </label>
-            <label class="cursor-pointer">
-              <input type="radio" name="candidate-type-${c.id}" value="transfer" class="hidden peer" ${c.transactionType === 'transfer' ? 'checked' : ''} onchange="window.onCandidateTypeChanged('${c.id}')">
-              <span class="flex items-center justify-center min-h-[44px] px-1 rounded-xl text-[12px] font-bold text-[#C8CAD0] border border-transparent peer-checked:bg-[#2A2B31] peer-checked:border-[#43464F] peer-checked:text-[#F3F1EC] peer-checked:shadow-xs transition-all whitespace-nowrap">${t('transfer')}</span>
-            </label>
-          </div>
-
-          <!-- Row 4: Neutral Card / Account Selector -->
-          <div>
-            <select id="candidate-card-select-${c.id}" onchange="window.onCandidateTypeChanged('${c.id}')" class="w-full text-[13.5px] font-bold text-[#F3F1EC] bg-[#1A1B1F] border border-[#33353C] focus:border-[#43464F] rounded-xl px-3.5 py-2.5 min-h-[44px] outline-none cursor-pointer">
-              <option value="" ${!c.matchedCardId && !c.matchedAccountId ? 'selected disabled' : ''}>${t('select_card_or_account')}</option>
-              <optgroup label="${t('cards_optgroup')}">
-                ${cards.map(card => {
-                  const isSelected = card.id === c.matchedCardId;
-                  return `<option value="${card.id}" ${isSelected ? 'selected' : ''}>${card.name} (•••• ${card.last4})</option>`;
-                }).join('')}
-              </optgroup>
-              ${(store.accounts && store.accounts.length > 0) ? `
-                <optgroup label="${t('accounts_optgroup')}">
-                  ${store.accounts.map(acc => {
-                    const isSelected = acc.id === c.matchedAccountId && !c.matchedCardId;
-                    return `<option value="acc:${acc.id}" ${isSelected ? 'selected' : ''}>${acc.name} (${acc.accountNumberMasked || acc.identifierDigits}) • ${t('balance_word')}: ${formatCurrency(acc.balance || 0)}</option>`;
-                  }).join('')}
-                </optgroup>
-              ` : ''}
-            </select>
-          </div>
-
-          <!-- Warning for unlinked debit withdrawal -->
-          <div id="candidate-debit-warn-${c.id}" class="text-xs font-bold text-[#E6A8A8] bg-[#3A2020] border border-[#E6A8A8]/30 rounded-lg p-2.5 ${(() => {
-            const matchedCard = c.matchedCardId ? store.getCard(c.matchedCardId) : null;
-            return (c.transactionType === 'withdrawal' && matchedCard && matchedCard.cardType === 'debit' && !matchedCard.linkedAccountId && !c.matchedAccountId) ? '' : 'hidden';
-          })()}">
-            ${t('unlinked_debit_warn')}
-          </div>
-
-          <!-- Dynamic Balance Preview -->
-          ${(() => {
-            let candAcc = null;
-            if (c.matchedAccountId) {
-              candAcc = store.getAccount(c.matchedAccountId);
-            } else if (c.matchedCardId) {
-              const mc = store.getCard(c.matchedCardId);
-              if (mc && mc.cardType === 'debit' && mc.linkedAccountId) {
-                candAcc = store.getAccount(mc.linkedAccountId);
-              }
-            }
-            if (!candAcc) return '';
-            const curBal = candAcc.balance || 0;
-            const isInc = c.direction === 'income' || c.type === 'income';
-            const expAfter = isInc ? curBal + c.amount : curBal - c.amount;
-            const isNeg = expAfter < 0;
-            return `
-              <div id="candidate-balance-box-${c.id}" class="p-2.5 rounded-xl bg-[#2A2B31] border ${isNeg ? 'border-[#E6A8A8]/40 text-[#E6A8A8]' : 'border-[#43464F] text-[#F3F1EC]'} space-y-1">
-                <div class="flex items-center justify-between text-xs font-bold">
-                  <span>${t('balance_before_label', { name: candAcc.name })} <span dir="ltr" class="font-mono">${formatCurrency(curBal)}</span></span>
-                  <span>${t('balance_after_label')} <span dir="ltr" class="font-mono ${isNeg ? 'text-[#E6A8A8] font-black' : ''}">${formatCurrency(expAfter)}</span></span>
-                </div>
-                ${isNeg ? `
-                  <div class="text-xs font-bold text-[#E6A8A8]">${t('negative_balance_cand_warn')}</div>
-                ` : ''}
-              </div>
-            `;
-          })()}
-
-          <!-- Row 5: Approve (Amber) + Reject (Bordered) -->
-          <div class="grid grid-cols-3 gap-2 pt-1">
-            <button type="button" onclick="window.approveSmsCandidate('${c.id}')" class="col-span-2 py-2.5 min-h-[44px] bg-[#F5B700] hover:bg-[#e0a600] text-[#111111] text-[14px] font-extrabold rounded-xl active-press transition-all flex items-center justify-center gap-1 shadow-md">
-              <span>${t('approve')}</span>
-            </button>
-            <button type="button" onclick="window.rejectSmsCandidate('${c.id}')" class="col-span-1 py-2.5 min-h-[44px] bg-[#2A2B31] hover:bg-[#43464F] border border-[#43464F] text-[#F3F1EC] hover:text-[#E6A8A8] text-[13px] font-bold rounded-xl active-press transition-all flex items-center justify-center gap-1">
-              <span>${t('reject')}</span>
-            </button>
           </div>
         </div>
       `;
