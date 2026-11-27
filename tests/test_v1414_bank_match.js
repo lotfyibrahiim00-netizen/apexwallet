@@ -220,7 +220,7 @@ console.log('\n--- Test 3: Bank Name Normalization & Catalog Aliases ---');
     { id: 'cib-card-ar', bankId: 'b-cib-ar', identifierDigits: '6434', last4: '6434', cardType: 'debit' }
   ];
   engine.pendingCandidates = [
-    { id: 'c-en', bank: 'Commercial International Bank', identifierDigits: '6434', entityType: 'card' }
+    { id: 'c-en', bank: 'CIB', identifierDigits: '6434', entityType: 'card' }
   ];
   engine.enrichCandidates();
   assert.strictEqual(engine.pendingCandidates[0].matchedCardId, 'cib-card-ar', 'English candidate bank name must match Arabic wallet bank');

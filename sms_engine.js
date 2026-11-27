@@ -451,16 +451,13 @@
             if (bShort && (bShort === bLower || bLower.includes(bShort) || bShort.includes(bLower))) return true;
             if (bName && (bName === bLower || bName.includes(bLower) || bLower.includes(bName))) return true;
             if (bCatalog && (bCatalog === bLower || bLower.includes(bCatalog))) return true;
-            const bInitials = bLower.split(/\s+/).map(w => w[0] || '').join('');
-            if (bShort && bInitials === bShort) return true;
             return false;
           });
 
           // Catalog alias resolution (e.g. Arabic vs English: "البنك التجاري الدولي" <-> "Commercial International Bank" / CIB)
           if (!candidateBank && catalogLookup) {
             try {
-              const bInitials = bLower.split(/\s+/).map(w => w[0] || '').join('');
-              const catEntry = catalogLookup(bQuery) || (bInitials.length >= 2 ? catalogLookup(bInitials) : null);
+              const catEntry = catalogLookup(bQuery);
               if (catEntry) {
                 const catKey = (catEntry.key || '').toLowerCase();
                 const catShort = (catEntry.shortCode || '').toLowerCase();
